@@ -1,0 +1,27 @@
+# Build the package and publish it to PyPI on tag push.
+name: Publish to PyPI
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build package
+        run: |
+          python -m pip install -U pip build
+          python -m build
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@v1.5.0
+        with:
+          user: __token__
+          password: ${{ secrets.TWINE_API_KEY }}
