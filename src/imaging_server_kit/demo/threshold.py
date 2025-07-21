@@ -12,7 +12,7 @@ from skimage.exposure import rescale_intensity
     used_for=["Segmentation"],
     tags=["Demo"],
     parameters={
-        "image": ImageUI(),
+        "image": ImageUI(dimensionality=[2, 3]),
         "threshold": FloatUI(
             default=0.5,
             title="Threshold",
@@ -30,7 +30,13 @@ def threshold_algo_server(
 ):
     """Implements a simple intensity threshold algorithm."""
     mask = rescale_intensity(image, out_range=(0, 1)) > threshold
-    return [(mask, {"name": "Threshold result"}, "mask")]
+
+    if image.ndim == 2:
+        data_type = "mask"
+    elif image.ndim == 3:
+        data_type = "mask3d"
+
+    return [(mask, {"name": "Threshold result"}, data_type)]
 
 
 if __name__ == "__main__":
