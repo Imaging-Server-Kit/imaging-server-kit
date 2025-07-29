@@ -21,11 +21,13 @@ class DropDownUI(ParameterUI):
         description="Dropdown selection",
         items: List = [],
         default: str = None,
+        auto_call: bool = False,
     ):
         super().__init__(title, description)
         self.type = Literal.__getitem__(tuple(items))
         self.default = default
         self.widget_type = "dropdown"
+        self.auto_call = auto_call
 
 
 class FloatUI(ParameterUI):
@@ -37,6 +39,7 @@ class FloatUI(ParameterUI):
         max: float = 1000.0,
         step: float = 0.1,
         default: float = 0.0,
+        auto_call: bool = False,
     ):
         super().__init__(title, description)
         self.min = min
@@ -45,6 +48,7 @@ class FloatUI(ParameterUI):
         self.type = float
         self.default = default
         self.widget_type = "float"
+        self.auto_call = auto_call
 
 
 class IntUI(ParameterUI):
@@ -56,6 +60,7 @@ class IntUI(ParameterUI):
         max: int = 1000,
         step: int = 1,
         default: int = 0,
+        auto_call: bool = False,
     ):
         super().__init__(title, description)
         self.min = min
@@ -64,6 +69,7 @@ class IntUI(ParameterUI):
         self.type = int
         self.default = default
         self.widget_type = "int"
+        self.auto_call = auto_call
 
 
 class BoolUI(ParameterUI):
@@ -72,11 +78,13 @@ class BoolUI(ParameterUI):
         title="Bool",
         description="Boolean parameter",
         default: bool = False,
+        auto_call: bool = False,
     ):
         super().__init__(title, description)
         self.type = bool
         self.default = default
         self.widget_type = "bool"
+        self.auto_call = auto_call
 
 
 class StringUI(ParameterUI):
@@ -92,16 +100,33 @@ class StringUI(ParameterUI):
         self.widget_type = "str"
 
 
+### For the future: maybe we could explicitate the dimensions order?
+# class nDImageUI(ParameterUI):
+#     def __init__(
+#         self,
+#         title="nD Image",
+#         description="Input image",
+#         dims_order: str = "TCZYX",
+#         dimensionality: List[int] = [2, 3],
+#     ):
+#         super().__init__(title, description)
+#         self.widget_type = "image"
+#         self.dims_order = dims_order
+#         self.dimensionality = dimensionality
+
+
 class ImageUI(ParameterUI):
     def __init__(
         self,
         title="Image",
         description="Input image (2D, 3D)",
         dimensionality: List[int] = [2, 3],
+        rgb: bool = False,
     ):
         super().__init__(title, description)
         self.widget_type = "image"
         self.dimensionality = dimensionality
+        self.rgb = rgb
 
 
 class MaskUI(ParameterUI):
