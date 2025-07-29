@@ -1,11 +1,14 @@
 from functools import partial
+from inspect import isgeneratorfunction
 from typing import Callable, List
-import numpy as np
 
+import numpy as np
 import skimage.io
-from pydantic import BaseModel, Field, create_model, field_validator, ConfigDict
-from .server import AlgorithmServer
+from pydantic import (BaseModel, ConfigDict, Field, create_model,
+                      field_validator)
+
 from .encoding import decode_contents
+from .server import AlgorithmServer
 
 
 class BaseParamsModel(BaseModel):
@@ -52,12 +55,14 @@ def parse_params(parameters: dict) -> BaseModel:
                 field_constraints["description"] = param_details.description
             if hasattr(param_details, "step"):
                 field_constraints["json_schema_extra"]["step"] = param_details.step
+            if hasattr(param_details, "auto_call"):
+                field_constraints["json_schema_extra"]["auto_call"] = param_details.auto_call
 
             field_constraints["json_schema_extra"][
                 "widget_type"
             ] = param_details.widget_type
 
-            if param_details.widget_type in ["image", "mask"]:
+            if param_details.widget_type in ["image", "mask", "mask3d", "instance_mask"]:
                 validated_func = partial(
                     decode_image_array, dimensionality=param_details.dimensionality
                 )
@@ -65,6 +70,8 @@ def parse_params(parameters: dict) -> BaseModel:
                 validators[validator_name] = field_validator(param_name, mode="after")(
                     validated_func
                 )
+                # TODO: Another validator to check for param_details.rgb if it's an `image`
+                # ...
             elif param_details.widget_type == "points":
                 validated_func = partial(
                     decode_points_array, dimensionality=param_details.dimensionality
@@ -118,14 +125,19 @@ class CustomAlgorithmServer(AlgorithmServer):
             project_url=project_url,
             serverkit_repo_url=serverkit_repo_url,
         )
-        self.func = func
+        self.run_algorithm = func  # `Rename` the function
+        self.stream = isgeneratorfunction(func)
         self.sample_images = sample_images
 
-    def run_algorithm(self, **algo_params):
-        return self.func(**algo_params)
-
     def load_sample_images(self) -> List["np.ndarray"]:
-        return [skimage.io.imread(image_path) for image_path in self.sample_images]
+        # Sample images can be image paths, URLs or Numpy arrays
+        images = []
+        for sample_image_or_path in self.sample_images:
+            if isinstance(sample_image_or_path, np.ndarray):
+                images.append(sample_image_or_path)
+            else:
+                images.append(skimage.io.imread(sample_image_or_path))
+        return images
 
 
 def algorithm_server(

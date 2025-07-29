@@ -16,7 +16,6 @@ from imaging_server_kit import AlgorithmServer
 from imaging_server_kit.core import (
     parse_algo_params_schema,
     encode_contents,
-    decode_contents,
 )
 
 templates_dir = importlib.resources.files("imaging_server_kit.core").joinpath(
@@ -66,6 +65,7 @@ class MultiAlgorithmServer:  # TODO: could this inherit from algoserver somehow?
                 "run_funct": server.run_algorithm,
                 "parameters_model": server.parameters_model,
                 "algo_info": server.algo_info,
+                "is_stream": server._is_stream,
             }
 
         self.register_routes()
@@ -123,6 +123,16 @@ class MultiAlgorithmServer:  # TODO: could this inherit from algoserver somehow?
         def get_version():
             return serverkit.__version__
 
+        @self.app.get("/{algorithm_name}/is_stream")
+        def is_stream(algorithm_name):
+            if algorithm_name not in self.algorithms:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Algorithm {algorithm_name} not found",
+                )
+            algo_is_stream = self.algorithms[algorithm_name].get("is_stream")
+            return algo_is_stream
+
         @self.app.get("/{algorithm_name}/info", response_class=HTMLResponse)
         async def get_algorithm_info(
             algorithm_name: str = Path(...),
@@ -173,6 +183,25 @@ class MultiAlgorithmServer:  # TODO: could this inherit from algoserver somehow?
             decoded_params = algo_params.dict()
 
             return await self._run_algo_logic(algorithm_name, decoded_params)
+
+        @self.app.post(
+            "/{algorithm_name}/stream",
+            status_code=status.HTTP_201_CREATED,
+        )
+        async def stream_algo(
+            algorithm_name: str = Path(...),
+            request: Request = ...,
+        ):
+            if algorithm_name not in self.algorithms:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Algorithm {algorithm_name} not found",
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=f"Streaming algorithms in multi-algorithm servers are not supported.",
+            )
 
         @self.app.get("/{algorithm_name}/parameters", response_model=dict)
         def get_algo_params(algorithm_name):

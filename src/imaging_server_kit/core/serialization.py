@@ -82,12 +82,10 @@ def serialize_result_tuple(result_data_tuple: List[Tuple]) -> List[Dict]:
         if data_type == "image":
             features = encode_contents(data.astype(np.float32))
         elif data_type == "mask":
-            data = data.astype(np.uint16)
-            features = mask2features(data)
+            features = mask2features(data.astype(np.uint16))
             data_params["image_shape"] = data.shape
         elif data_type == "instance_mask":
-            data = data.astype(np.uint16)
-            features = instance_mask2features(data)
+            features = instance_mask2features(data.astype(np.uint16))
             data_params["image_shape"] = data.shape
         elif data_type == "mask3d":
             features = encode_contents(data.astype(np.uint16))

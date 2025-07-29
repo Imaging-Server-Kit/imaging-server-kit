@@ -27,6 +27,7 @@ dependencies = [
     "uvicorn[standard]",
     "python-multipart",
     "httpx",
+    "msgpack",
     "tifffile",
     "numpy",
     "scikit-image",
@@ -37,6 +38,7 @@ dependencies = [
     "pydantic>=2.0",
     "cookiecutter",
     "opencv-contrib-python-headless",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
