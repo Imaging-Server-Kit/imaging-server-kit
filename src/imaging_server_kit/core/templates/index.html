@@ -12,11 +12,11 @@
 <body>
     <div class="container">
         <h1>Available algorithms</h1>
-        {% for service in services %}
-        <a href="/{{ service }}/info">
+        {% for algorithm in algorithms %}
+        <a href="/{{ algorithm }}/info">
             <div class="card-product">
                 <div class="card-product-infos">
-                    <h2>{{ service }}</h2>
+                    <h2>{{ algorithm }}</h2>
                 </div>
             </div>
         </a>

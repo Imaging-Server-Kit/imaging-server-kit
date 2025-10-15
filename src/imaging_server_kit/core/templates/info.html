@@ -12,14 +12,11 @@
 
 <body>
     <div class="container">
-        <h1>{{ algo_info.project_name }}</h1>
+        <h1>{{ algo_info.title }}</h1>
 
         <p>{{ algo_info.description }}</p>
 
         <p><strong>Keywords:</strong>
-            {% for used_for_tag in algo_info.used_for %}
-            <span class="keyword">{{ used_for_tag }}</span>
-            {% endfor %}
             {% for tag in algo_info.tags %}
             <span class="keyword">{{ tag }}</span>
             {% endfor %}
@@ -30,12 +27,6 @@
                 <div class="card-category">
                     <i class="fa-solid fa-house"></i>
                     <p>Project Homepage</p>
-                </div>
-            </a>
-            <a href="{{ algo_info.serverkit_repo_url }}">
-                <div class="card-category">
-                    <i class="fa-brands fa-github"></i>
-                    <p>Server Kit Repository</p>
                 </div>
             </a>
         </div>
