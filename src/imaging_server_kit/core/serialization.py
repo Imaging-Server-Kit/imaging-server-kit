@@ -1,25 +1,19 @@
-from typing import Dict, List, Tuple
+"""
+Serialization module for the Imaging Server Kit.
+"""
+
+from typing import Dict, List
+import base64
 import numpy as np
 from imaging_server_kit.core.encoding import (
     encode_contents,
     decode_contents,
 )
-from imaging_server_kit.core.geometry import (
-    mask2features,
-    instance_mask2features,
-    points2features,
-    boxes2features,
-    vectors2features,
-    features2mask,
-    features2instance_mask,
-    features2points,
-    features2boxes,
-    features2vectors,
-)
-import base64
+from imaging_server_kit.types import DATA_TYPES
+from imaging_server_kit.core.results import Results
 
 
-def is_base64_encoded(data: str) -> bool:
+def _is_base64_encoded(data: str) -> bool:
     """
     Check if a given string is Base64-encoded.
 
@@ -38,7 +32,7 @@ def is_base64_encoded(data: str) -> bool:
         return False
 
 
-def decode_data_features(data_params):
+def _decode_data_features(data_params):
     """
     Decodes the `features` key of the data parameters.
     The `features` key represents measurements associated with labels, points, vectors, or tracks.
@@ -47,7 +41,7 @@ def decode_data_features(data_params):
     if encoded_features is not None:
         decoded_features = {}
         for key, val in encoded_features.items():
-            if isinstance(val, str) and is_base64_encoded(val):
+            if isinstance(val, str) and _is_base64_encoded(val):
                 decoded_features[key] = decode_contents(val)
             else:
                 decoded_features[key] = val
@@ -55,7 +49,7 @@ def decode_data_features(data_params):
     return data_params
 
 
-def encode_data_features(data_params):
+def _encode_data_features(data_params):
     """
     Encodes the `features` key of the data parameters.
     The `features` key represents measurements associated with labels, points, vectors, or tracks.
@@ -64,113 +58,38 @@ def encode_data_features(data_params):
     if features is not None:
         # For these data types, we can pass features as numpy array but they must be encoded
         encoded_features = {
-            key: (
-                encode_contents(val) if isinstance(val, np.ndarray) else val
-            )
+            key: (encode_contents(val) if isinstance(val, np.ndarray) else val)
             for (key, val) in features.items()
         }
         data_params["features"] = encoded_features
     return data_params
 
 
-def serialize_result_tuple(result_data_tuple: List[Tuple]) -> List[Dict]:
-    """Converts the result data tuple to dict that can be serialized as JSON (used by the server)."""
+def serialize_results(results: Results) -> List[Dict]:
+    """Serialize a Results object to JSON."""
     serialized_results = []
-    for data, data_params, data_type in result_data_tuple:
-        data_params = encode_data_features(data_params)
-
-        if data_type == "image":
-            features = encode_contents(data.astype(np.float32))
-        elif data_type == "mask":
-            features = mask2features(data.astype(np.uint16))
-            data_params["image_shape"] = data.shape
-        elif data_type == "instance_mask":
-            features = instance_mask2features(data.astype(np.uint16))
-            data_params["image_shape"] = data.shape
-        elif data_type == "mask3d":
-            features = encode_contents(data.astype(np.uint16))
-        elif data_type == "points":
-            features = points2features(data)
-        elif data_type == "points3d":
-            features = encode_contents(data.astype(np.float32))
-        elif data_type == "boxes":
-            features = boxes2features(data)
-            data_params["shape_type"] = "rectangle"
-        elif data_type == "vectors":
-            features = vectors2features(data)
-        elif data_type == "tracks":
-            features = encode_contents(data.astype(np.float32))
-        elif data_type == "class":
-            features = data  # A simple string
-        elif data_type == "text":
-            features = data  # A text string
-        elif data_type == "notification":
-            features = data
-        elif data_type == "scalar":
-            features = data
-        elif data_type == "list":
-            features = data  # Lists of numeric/string values don't need to be encoded
-        else:
-            print(f"Unknown data_type: {data_type}")
-            features = None
-
+    for layer in results:
         serialized_results.append(
             {
-                "type": data_type,
-                "data": features,
-                "data_params": data_params,
+                "kind": layer.kind,
+                "data": type(layer).to_features(layer.data),
+                "name": layer.name,
+                "meta": _encode_data_features(layer.meta),
             }
         )
-
     return serialized_results
 
 
-def deserialize_result_tuple(serialized_results: List[Dict]) -> List[Tuple]:
-    """Converts serialized JSON results to a results data tuple (used by the client)."""
-    result_data_tuple = []
+def deserialize_results(serialized_results: List[Dict]) -> Results:
+    """Deserialize a JSON to a Results object."""
+    results = Results()
     for result_dict in serialized_results:
-        data_type = result_dict.get("type")
-        features = result_dict.get("data")
-        data_params = result_dict.get("data_params")
-
-        data_params = decode_data_features(data_params)
-
-        if data_type == "image":
-            data = decode_contents(features).astype(float)
-        elif data_type == "mask":
-            image_shape = data_params.pop("image_shape")
-            data = features2mask(features, image_shape)
-        elif data_type == "instance_mask":
-            image_shape = data_params.pop("image_shape")
-            data = features2instance_mask(features, image_shape)
-        elif data_type == "mask3d":
-            data = decode_contents(features).astype(int)
-        elif data_type == "points":
-            data = features2points(features)
-        elif data_type == "points3d":
-            data = decode_contents(features).astype(float)
-        elif data_type == "boxes":
-            data = features2boxes(features)
-        elif data_type == "vectors":
-            data = features2vectors(features)
-        elif data_type == "tracks":
-            data = decode_contents(features).astype(float)
-        elif data_type == "class":
-            data = features  # A simple string
-        elif data_type == "text":
-            data = features  # A text string
-        elif data_type == "notification":
-            data = features
-        elif data_type == "scalar":
-            data = features
-        elif data_type == "list":
-            data = features
-        else:
-            print(f"Unknown data_type: {data_type}")
-            data = features
-
-        data_tuple = (data, data_params, data_type)
-
-        result_data_tuple.append(data_tuple)
-
-    return result_data_tuple
+        results.create(
+            kind=result_dict.get("kind"),
+            data=DATA_TYPES.get(result_dict.get("kind")).to_data(
+                result_dict.get("data")
+            ),
+            name=result_dict.get("name"),
+            meta=_decode_data_features(result_dict.get("meta")),
+        )
+    return results

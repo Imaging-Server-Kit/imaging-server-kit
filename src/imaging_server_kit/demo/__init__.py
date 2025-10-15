@@ -1,1 +1,1 @@
-from .threshold import threshold_algo_server
+from .threshold import threshold

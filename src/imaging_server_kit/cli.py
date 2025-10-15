@@ -1,6 +1,5 @@
 from pathlib import Path
 import argparse
-from cookiecutter.main import cookiecutter
 
 
 def main():
@@ -24,13 +23,14 @@ def main():
     args = parser.parse_args()
 
     if args.command == "new":
+        from cookiecutter.main import cookiecutter
         output_dir = Path(args.output_dir).resolve()
         template_dir = str(Path(__file__).parent.resolve() / "template")
         cookiecutter(template=template_dir, output_dir=output_dir)
     elif args.command == "demo":
-        import uvicorn
-        from imaging_server_kit.demo import threshold_algo_server
-        uvicorn.run(threshold_algo_server.app, host="0.0.0.0", port=8000)
+        import imaging_server_kit as sk
+        from imaging_server_kit.demo import threshold
+        sk.serve(threshold, host="0.0.0.0", port=8000)
     else:
         parser.print_help()
 
