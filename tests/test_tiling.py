@@ -15,13 +15,14 @@ import skimage.data
             default="reflect",
         ),
     },
-    sample_images=[skimage.data.camera()],
+    samples=[{"image": skimage.data.camera()}],
 )
 def sk_gaussian(image, sigma, mode):
     return gaussian(image, sigma=sigma, preserve_range=True, mode=mode)
 
 def test_sk_gaussian():
-    image = sk_gaussian.get_sample_images(first_only=True)
+    sample = sk_gaussian.get_sample(idx=0)
+    image = sample.get("image")
 
     results = sk_gaussian.run(
         image=image, tiled=True, tile_size_px=256, overlap_percent=0.1, randomize=True

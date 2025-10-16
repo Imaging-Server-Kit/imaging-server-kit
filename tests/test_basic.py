@@ -80,30 +80,15 @@ def test_multiply():
 
 # Single image + first-only
 @sk.algorithm(
-    sample_images=["https://cdn.prod.website-files.com/651a9e655d7f73325230a7e1/67a1dad8556329069f59449a_1-narwhal-tusk_SAXS%201.png"]
+    samples=[{"image": "https://cdn.prod.website-files.com/651a9e655d7f73325230a7e1/67a1dad8556329069f59449a_1-narwhal-tusk_SAXS%201.png"}]
 )
-def sample_image():
+def sample_image(image):
     pass
 
 def test_sample_image():
-    image = sample_image.get_sample_images(first_only=True)
+    sample = sample_image.get_sample()
+    image = sample.get("image")
     assert isinstance(image, np.ndarray)
-
-
-# Two samples, one URL and one file
-@sk.algorithm(
-    sample_images=[
-        "https://cdn.prod.website-files.com/651a9e655d7f73325230a7e1/67a1dad8556329069f59449a_1-narwhal-tusk_SAXS%201.png",
-        Path(__file__).parent / "sample_images" / "blobs.tif"
-    ]
-)
-def sample_images():
-    pass
-
-def test_sample_images():
-    images = sample_images.get_sample_images()
-    assert isinstance(images[0], np.ndarray)
-    assert isinstance(images[1], np.ndarray)
 
 
 # Basic parameters
