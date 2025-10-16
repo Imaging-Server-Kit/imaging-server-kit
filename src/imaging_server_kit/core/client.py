@@ -3,7 +3,7 @@ Client interface for the Imaging Server Kit.
 """
 
 import webbrowser
-from typing import Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 from urllib.parse import urljoin
 import numpy as np
 
@@ -21,6 +21,45 @@ from imaging_server_kit.core.errors import (
 )
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.serialization import deserialize_results
+
+
+def _encode_numpy_parameters(algo_params: Dict) -> Dict:
+    return {
+        param: encode_contents(value) if isinstance(value, np.ndarray) else value
+        for param, value in algo_params.items()
+    }
+
+
+def _decode_numpy_parameters(algo_params: Dict, algo_param_defs: Dict) -> Dict:
+    param_keys = list(algo_params.keys())
+    param_values = list(algo_params.values())
+
+    param_types = []
+    for key in param_keys:
+        algo_def = algo_param_defs.get(key)
+        if algo_def:
+            param_types.append(algo_def.get("param_type"))
+
+    numpy_types = [
+        "image",
+        "mask",
+        "instance_mask",
+        "points",
+        "vectors",
+        "boxes",
+        "paths",
+        "tracks",
+    ]
+    
+    decoded_params = {}
+    for param_key, param_val, param_type in zip(param_keys, param_values, param_types):
+        if param_type in numpy_types:
+            val = decode_contents(param_val)
+        else:
+            val = param_val
+        decoded_params[param_key] = val
+
+    return decoded_params
 
 
 class Client(AlgorithmRunner):
@@ -63,23 +102,23 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     @validate_algorithm
-    def get_sample_images(
-        self, algorithm=None, first_only: bool = False
-    ) -> Iterable[np.ndarray]:
-        endpoint = f"{self.server_url}/{algorithm}/sample_images"
+    def get_sample(self, algorithm=None, idx: int = 0) -> Dict[str, Any]:
+        n_samples = self.get_n_samples(algorithm)
+        if (idx < 0) | (idx > n_samples-1):
+            raise ValueError(f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!")
+        
+        endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
         json_response = self._access_algo_get_endpoint(endpoint)
-
-        images = []
-        for content in json_response.get("sample_images"):
-            encoded_image = content.get("sample_image")
-            image = decode_contents(encoded_image)
-            images.append(image)
-            if first_only:
-                return image
-        if first_only:
-            return
-        else:
-            return images
+        algo_param_defs = self.get_parameters(algorithm).get("properties")
+        decoded_params = _decode_numpy_parameters(json_response, algo_param_defs)
+        return decoded_params
+    
+    @validate_algorithm
+    def get_n_samples(self, algorithm=None) -> int:
+        endpoint = f"{self.server_url}/{algorithm}/n_samples"
+        json_response = self._access_algo_get_endpoint(endpoint)
+        n_samples = json_response.get("n_samples")
+        return n_samples
 
     @validate_algorithm
     def get_signature_params(self, algorithm: str) -> List[str]:
@@ -91,7 +130,7 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     def _stream(self, algorithm, **algo_params):
-        algo_params_encoded = self._encode_numpy_parameters(algo_params)
+        algo_params_encoded = _encode_numpy_parameters(algo_params)
         endpoint = f"{self.server_url}/{algorithm}/stream"
         with requests.Session() as client:
             try:
@@ -139,9 +178,7 @@ class Client(AlgorithmRunner):
                 delay_sec,
                 randomize,
             ):
-                algo_params_tile_encoded = self._encode_numpy_parameters(
-                    algo_params_tile
-                )
+                algo_params_tile_encoded = _encode_numpy_parameters(algo_params_tile)
                 endpoint = f"{self.server_url}/{algorithm}/process"
                 try:
                     response = client.post(
@@ -166,7 +203,7 @@ class Client(AlgorithmRunner):
             return []
 
     def _run(self, algorithm, **algo_params) -> Iterable[Tuple]:
-        algo_params_encoded = self._encode_numpy_parameters(algo_params)
+        algo_params_encoded = _encode_numpy_parameters(algo_params)
         endpoint = f"{self.server_url}/{algorithm}/process"
         with httpx.Client(base_url=self.server_url) as client:
             try:
@@ -197,12 +234,6 @@ class Client(AlgorithmRunner):
             return response.json()
         else:
             self._handle_response_errored(response)
-
-    def _encode_numpy_parameters(self, algo_params: dict) -> dict:
-        return {
-            param: encode_contents(value) if isinstance(value, np.ndarray) else value
-            for param, value in algo_params.items()
-        }
 
     def _handle_response_errored(self, response):
         if response.status_code == 422:

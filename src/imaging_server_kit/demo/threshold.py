@@ -22,7 +22,12 @@ import imaging_server_kit as sk
             auto_call=True,
         ),
     },
-    sample_images=[str(Path(__file__).parent / "sample_images" / "blobs.tif")],
+    samples=[
+        {
+            "image": str(Path(__file__).parent / "sample_images" / "blobs.tif"),
+            "threshold": 0.7,
+        }
+    ],
 )
 def threshold(image: np.ndarray, threshold: float):
     """Implements a simple intensity threshold algorithm."""

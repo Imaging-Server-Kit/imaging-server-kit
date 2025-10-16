@@ -28,11 +28,14 @@ import imaging_server_kit as sk
             auto_call=True,
         ),
     },
-    sample_images=[
-        # From a local path:
-        str(Path(__file__).parent / "sample_images" / "blobs.tif"),
-        # From a URL:
-        "https://github.com/Imaging-Server-Kit/imaging-server-kit/blob/main/src/imaging_server_kit/demo/sample_images/blobs.tif",
+    samples=[
+        {
+            "image": str(Path(__file__).parent / "sample_images" / "blobs.tif"),
+            "threshold": 0.7,
+        },
+        {
+            "image": "https://github.com/Imaging-Server-Kit/imaging-server-kit/blob/main/src/imaging_server_kit/demo/sample_images/blobs.tif"
+        }
     ],
 )
 def threshold_sk(image, threshold):

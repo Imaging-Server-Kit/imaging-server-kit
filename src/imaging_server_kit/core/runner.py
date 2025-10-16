@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Iterable, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 from tqdm import tqdm
@@ -74,11 +74,14 @@ class AlgorithmRunner(ABC):
 
     @abstractmethod
     def get_parameters(self, algorithm: str) -> Dict: ...
-
+    
     @abstractmethod
-    def get_sample_images(
-        self, algorithm: str, first_only: bool
-    ) -> Iterable[np.ndarray]: ...
+    def get_sample(
+        self, algorithm: str, idx: int = 0
+    ) -> Dict[str, Any]: ...
+    
+    @abstractmethod
+    def get_n_samples(self, algorithm: str) -> int: ...
 
     @abstractmethod
     def get_signature_params(self, algorithm: str) -> List[str]: ...

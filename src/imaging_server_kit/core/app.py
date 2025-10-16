@@ -3,9 +3,10 @@ import importlib.resources
 import os
 import pathlib
 from functools import partial
-from typing import Callable, Iterable, List
+from typing import Callable, Dict, Iterable, List
 
 import msgpack
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -34,6 +35,13 @@ templates = Jinja2Templates(directory=str(templates_dir))
 PROCESS_TIMEOUT_SEC = 3600  # Client timeout for the /process route
 
 ALGORITHM_HUB_URL = os.getenv("ALGORITHM_HUB_URL", "http://algorithm_hub:8000")
+
+
+def _encode_numpy_parameters(algo_params: Dict) -> Dict:
+    return {
+        param: encode_contents(value) if isinstance(value, np.ndarray) else value
+        for param, value in algo_params.items()
+    }
 
 
 def find_algorithm(algorithm_name, algorithms_dict):
@@ -225,22 +233,33 @@ class AlgorithmApp:
             """Get the parameter JSON schema."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             return algorithm.get_parameters(algorithm=algorithm_name)
-
+        
         @self.app.get(
-            "/{algorithm_name}/sample_images",
+            "/{algorithm_name}/sample/{idx}",
             response_model=dict,
-            summary="Get sample images",
-            description="Return a list of encoded sample images for this algorithm.",
+            summary="Get sample parameters",
+            description="Return encoded sample parameters for this algorithm.",
             tags=["algorithm"],
         )
-        def get_sample_images(algorithm_name: str):
-            """Fetch and encode sample images."""
+        def get_sample(algorithm_name: str, idx: int):
+            """Fetch and encode sample parameters."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-            images = algorithm.get_sample_images(algorithm=algorithm_name)
-            encoded_images = [
-                {"sample_image": encode_contents(image)} for image in images
-            ]
-            return {"sample_images": encoded_images}
+            sample_params = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
+            encoded_sample_params = _encode_numpy_parameters(sample_params)
+            return encoded_sample_params
+        
+        @self.app.get(
+            "/{algorithm_name}/n_samples",
+            response_model=dict,
+            summary="Get the number of samples availbale.",
+            description="Return the number of samples available for this algorithm.",
+            tags=["algorithm"],
+        )
+        def get_n_samples(algorithm_name: str):
+            """Get the number of samples availbale."""
+            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
+            n_samples = algorithm.get_n_samples(algorithm=algorithm_name)
+            return {"n_samples": n_samples}
 
         @self.app.get("/{algorithm_name}/signature", tags=["algorithm"])
         def get_signature(algorithm_name: str):

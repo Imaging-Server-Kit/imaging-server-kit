@@ -99,8 +99,7 @@ def generate_tiles(algo_param_defs, algo_params, tile_size_px, overlap_percent, 
     for key in param_keys:
         algo_def = algo_param_defs.get(key)
         if algo_def:
-            tp = algo_def.get("param_type")
-            param_types.append(tp)
+            param_types.append(algo_def.get("param_type"))
 
     pixel_domain = get_pixel_domain(param_types, param_values)
 

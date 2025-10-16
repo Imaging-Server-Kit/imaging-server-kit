@@ -233,13 +233,13 @@ class Algorithm(AlgorithmRunner):
         tags: Optional[List[str]] = None,
         project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
         metadata_file: str = "metadata.yaml",
-        sample_images: Optional[List[Any]] = None,
+        samples: Optional[Dict[str, Any]] = None,
     ):
         # Initialize mutables
         if tags is None:
             tags = []
-        if sample_images is None:
-            sample_images = []
+        if samples is None:
+            samples = []
         if parameters is None:
             parameters = {}
 
@@ -252,8 +252,8 @@ class Algorithm(AlgorithmRunner):
         self._run_algorithm_func = run_algorithm_func
         update_wrapper(self, self._run_algorithm_func)  # improve function emulation
 
-        # Sample images
-        self.sample_images = sample_images
+        # Samples
+        self.samples = samples
 
         # Resolve the Pydantic parameters model
         self.parameters_model = _parse_pydantic_params_schema(
@@ -305,22 +305,44 @@ class Algorithm(AlgorithmRunner):
     @validate_algorithm
     def get_parameters(self, algorithm=None) -> dict:
         return self.parameters_model.model_json_schema()
-
+    
     @validate_algorithm
-    def get_sample_images(  # TODO: modify
-        self, algorithm=None, first_only: bool = False
-    ) -> Iterable[np.ndarray]:
-        images = []
-        if len(self.sample_images) > 0:
-            for sample_image_or_path in self.sample_images:
-                if isinstance(sample_image_or_path, np.ndarray):
-                    images.append(sample_image_or_path)
-                else:
-                    images.append(skimage.io.imread(sample_image_or_path))
-                if first_only:
-                    images = images[0]
-                    break
-        return images
+    def get_sample(
+        self, algorithm=None, idx: int = 0
+    ) -> Dict[str, Any]:
+        n_samples = self.get_n_samples(algorithm)
+        if n_samples == 0:
+            return None
+        if idx > n_samples-1:
+            raise ValueError(f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!")
+        
+        sample_params = self.samples[idx]
+        
+        algo_params_defs = self.get_parameters(algorithm).get("properties")
+        signature_params = self.get_signature_params(algorithm)
+
+        resolved_params = etc.resolve_params(
+            algo_param_defs=algo_params_defs,
+            signature_params=signature_params,
+            args=[],
+            algo_params=sample_params,
+        )
+
+        parsed_sample = {}
+        for param_name, param_value in resolved_params.items():
+            for param_name_, param_props in algo_params_defs.items():
+                if param_name == param_name_:
+                    kind = param_props.get("param_type")
+                    # For images specifically, we allow passing a URL string. In this case, we need to load it here.
+                    if (kind == "image") & (not isinstance(param_value, np.ndarray)):
+                        param_value = skimage.io.imread(param_value)
+                    parsed_sample[param_name] = param_value
+        
+        # parsed_sample contains a whole list of parameters.
+        return parsed_sample
+    
+    def get_n_samples(self, algorithm=None):
+        return len(self.samples)
 
     @validate_algorithm
     def get_signature_params(self, algorithm=None) -> List[str]:
@@ -384,7 +406,7 @@ def algorithm(
     tags: Optional[List[str]] = None,
     project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
     metadata_file: str = "metadata.yaml",
-    sample_images: Optional[List[Any]] = None,
+    samples: Optional[Dict[str, Any]] = None,    
 ):
     def _decorate(run_aglorithm_func: Callable):
         return Algorithm(
@@ -396,7 +418,7 @@ def algorithm(
             tags=tags,
             project_url=project_url,
             metadata_file=metadata_file,
-            sample_images=sample_images,
+            samples=samples,
         )
 
     if func is not None and callable(func):

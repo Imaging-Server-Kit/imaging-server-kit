@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
@@ -28,11 +28,14 @@ class MultiAlgorithm(AlgorithmRunner):
         return algorithm.get_parameters(algorithm.name)
 
     @validate_algorithm
-    def get_sample_images(
-        self, algorithm: str, first_only: bool = False
-    ) -> Iterable["np.ndarray"]:
+    def get_sample(self, algorithm: str, idx: int = 0) -> Dict[str, Any]:
         algorithm = self.algorithms_dict[algorithm]
-        return algorithm.get_sample_images(algorithm.name, first_only=first_only)
+        return algorithm.get_sample(algorithm.name, idx=idx)
+    
+    @validate_algorithm
+    def get_n_samples(self, algorithm: str) -> int:
+        algorithm = self.algorithms_dict[algorithm]
+        return algorithm.get_n_samples(algorithm.name)
 
     @validate_algorithm
     def get_signature_params(self, algorithm: str) -> List[str]:
