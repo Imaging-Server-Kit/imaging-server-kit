@@ -202,7 +202,10 @@ def _parse_user_func_output(payload: Any) -> Results:
                         if isinstance(content, DataLayer):
                             layers.append(content)
                         elif isinstance(content, RECOGNIZED_TYPES):
-                            layers.append(layer_class(TYPE_MAPPINGS[type(content)]))
+                            if hasattr(content, "meta"):  # Make sure it's one of the sk.types (TODO: may need to improve)
+                                layers.append(content)
+                            else:
+                                layers.append(TYPE_MAPPINGS[type(content)](content))
                         else:
                             raise Exception(
                                 "Invalid algorithm return format: ", type(content)
