@@ -1,14 +1,16 @@
 from typing import Dict, List, Optional, Union
 import numpy as np
+from geojson import Feature, Point
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
+from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
 from imaging_server_kit.types.data_layer import DataLayer
 
 
-def _preprocess_tile_info(current_data: np.ndarray, tile_info: dict):
+def _preprocess_tile_info(points: np.ndarray, points_meta: Dict, tile_info: Dict):
     tile_info = tile_info.get("tile_params")
     ndim = tile_info.get("ndim")
-    if ndim != current_data.shape[1]:
+    if ndim != points.shape[1]:
         raise Exception("Tile info does not match with data shape")
 
     tile_sizes = [tile_info.get(f"tile_size_{idx}") for idx in range(ndim)]
@@ -18,17 +20,64 @@ def _preprocess_tile_info(current_data: np.ndarray, tile_info: dict):
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
     ]
 
-    coords = current_data[:, :ndim]  # shape (N, ndim)
-    mask = (coords >= tile_positions) & (
-        coords < tile_max_positions
-    )  # broadcasts to (N, ndim)
-    all_filt = mask.all(axis=1)  # (N,)
-    tile_data = current_data[all_filt].copy()  # Copy necessary?
+    n_objects = len(points)
 
-    return ndim, tile_data, all_filt, tile_positions
+    if n_objects:
+        # Coordinates of the points
+        points_coords = points[:, :ndim]  # shape (N, ndim)
+
+        # Mask of point coordinates in the tile
+        points_in_tile = (points_coords >= tile_positions) & (
+            points_coords < tile_max_positions
+        )
+
+        # All coordinates must be in the tile bounds
+        tile_filter = points_in_tile.all(axis=1)  # (N,)
+
+        # Select points in the tile
+        points_tile = points[tile_filter]
+
+        # Select meta of points in the tile
+        points_meta_tile = extract_meta_tile(points_meta, n_objects, tile_filter)
+    else:
+        points_tile = points
+        points_meta_tile = points_meta
+        tile_filter = np.full_like(points, fill_value=True, dtype=np.bool_)
+
+    return ndim, points_tile, points_meta_tile, tile_filter, tile_positions
+
+
+def decode_features(features):
+    if len(features):
+        points = np.array([feature["geometry"]["coordinates"] for feature in features])
+        points = points[:, 0, :]  # Remove an extra dimension
+        points = points[:, ::-1]  # Invert XY
+        return points.astype(float)
+    else:
+        return features
+
+
+def encode_features(data: np.ndarray):
+    features = []
+    point_coords = np.array(data)[:, ::-1]  # Invert XY
+    for i, point in enumerate(point_coords):
+        try:
+            geom = Point(coordinates=[np.array(point).tolist()])
+            features.append(Feature(geometry=geom, properties={"Detection ID": i}))
+        except:
+            print("Invalid point geometry.")
 
 
 class Points(DataLayer):
+    """Data layer used to represent points.
+
+    Parameters
+    ----------
+    data: A Numpy array of shape (N, D) representing point coordinates, where D is the dimensionality (2, 3..).
+    """
+
+    kind = "points"
+
     def __init__(
         self,
         data: Optional[np.ndarray] = None,
@@ -44,79 +93,104 @@ class Points(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "points"
         self.dimensionality = (
-            dimensionality if dimensionality is not None else list(np.arange(6))
+            dimensionality if dimensionality is not None else np.arange(6).tolist()
         )
-        if not required:
+        self.required = False
+
+        # Schema contributions
+        main = {}
+        if not self.required:
             self.default = None
+            main["default"] = self.default
+        extra = {
+            "dimensionality": self.dimensionality,
+            "required": self.required,
+        }
+        self.constraints = [main, extra]
 
-    @classmethod
-    def pixel_domain(cls, data: np.ndarray):
-        return np.max(data, axis=0)
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
 
-    @classmethod
-    def _get_tile(cls, current_data: np.ndarray, tile_info: dict) -> np.ndarray:
-        ndim, tile_data, all_filt, tile_positions = _preprocess_tile_info(
-            current_data, tile_info
+        # TODO: Implement object-specific properties, like max_objects or min_point_distance (could be validated).
+
+    def pixel_domain(self):
+        if self.data is None:
+            return
+        return np.max(self.data, axis=0)
+
+    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+        ndim, points_tile, points_meta_tile, tile_filter, tile_positions = (
+            _preprocess_tile_info(self.data, self.meta, tile_info)
         )
-        tile_data[:, :ndim] -= tile_positions
-        return tile_data
 
-    @classmethod
-    def _merge_tile(
-        cls, current_data: np.ndarray, tile_data: np.ndarray, tile_info: dict
-    ) -> np.ndarray:
-        ndim, tile_data, all_filt, tile_positions = _preprocess_tile_info(
-            current_data, tile_info
+        # Offset the points in the tile by the tile position
+        points_tile[:, :ndim] = points_tile[:, :ndim] - tile_positions
+
+        return points_tile, points_meta_tile
+
+    def merge_tile(self, points_tile: np.ndarray, tile_info: Dict):
+        points_tile_meta = tile_info
+        ndim, old_points_tile, old_points_meta_tile, tile_filter, tile_positions = (
+            _preprocess_tile_info(self.data, points_tile_meta, tile_info)
         )
-        tile_data[:, :ndim] += tile_positions
-        current_data = np.vstack((current_data[~all_filt], tile_data))
-        return current_data
+
+        # Offset the tile data by the tile positions
+        points_tile[:, :ndim] = points_tile[:, :ndim] + tile_positions
+
+        n_objects = len(self.data)
+
+        if n_objects:
+            # Remove the points from the points data that are in the tile
+            points_clean = self.data[~tile_filter]
+
+            # Merge the tile data with the cleaned points data
+            merged_points = np.vstack((points_clean, points_tile))
+
+            # Do the same for the meta
+            merged_points_meta = merge_meta_tile(
+                self.meta, points_tile_meta, n_objects, tile_filter
+            )
+        else:
+            merged_points = points_tile
+            merged_points_meta = points_tile_meta
+
+        self.data = merged_points
+        self.meta = merged_points_meta
 
     @classmethod
-    def to_features(cls, data):
-        # ndim = data.shape[1]
-        # if ndim == 2:
-        #     features = []
-        #     point_coords = np.array(data)[:, ::-1]  # Invert XY
-        #     for i, point in enumerate(point_coords):
-        #         try:
-        #             geom = Point(coordinates=[np.array(point).tolist()])
-        #             features.append(
-        #                 Feature(geometry=geom, properties={"Detection ID": i})
-        #             )
-        #         except:
-        #             print("Invalid point geometry.")
-        # elif ndim == 3:
-        features = encode_contents(data.astype(np.float32))
+    def serialize(cls, data, client_origin):
+        if client_origin == "Python/Napari":
+            features = encode_contents(data.astype(np.float32))
+        elif client_origin == "Java/QuPath":
+            features = encode_features(data)
+        else:
+            raise ValueError(f"Unrecognized client origin: {client_origin}")
         return features
 
     @classmethod
-    def to_data(cls, features: Union[np.ndarray, str]):
-        # if ndim == 2:
-        #     # 2D case...
-        #     if len(features):
-        #         points = np.array(
-        #             [feature["geometry"]["coordinates"] for feature in features]
-        #         )
-        #         points = points[:, 0, :]  # Remove an extra dimension
-        #         points = points[:, ::-1]  # Invert XY
-        #         return points
-        #     else:
-        #         return features
-        # elif ndim == 3:
-        #     # 3D case...
-        if isinstance(features, str):
-            features = decode_contents(features)
-        return features.astype(float)
+    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
+        if isinstance(serialized_data, str):
+            if client_origin == "Python/Napari":
+                data = decode_contents(serialized_data).astype(float)
+            elif client_origin == "Java/QuPath":
+                data = decode_features(serialized_data)
+            else:
+                raise ValueError(f"Unrecognized client origin: {client_origin}")
+        return data
 
     @classmethod
     def _get_initial_data(cls, pixel_domain):
+        if pixel_domain is None:
+            return
         return np.zeros((0, len(pixel_domain)), dtype=np.float32)
 
     @classmethod
-    def validate_data(cls, data, meta):
+    def validate_data(cls, data, meta, constraints):
+        main, extra = constraints
+        if extra["required"] is False:
+            return
+
         assert isinstance(
             data, np.ndarray
         ), f"Points data ({type(data)}) is not a Numpy array"

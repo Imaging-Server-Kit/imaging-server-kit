@@ -10,22 +10,45 @@ from ._float import Float
 from ._integer import Integer
 from ._bool import Bool
 from ._string import String
-from ._dropdown import DropDown
+from ._choice import Choice
 from ._notification import Notification
+from ._null import Null
 
 DATA_TYPES = {
-    "image": Image,
-    "mask": Mask,
-    "instance_mask": Mask,  # TODO
-    "points": Points,
-    "vectors": Vectors,
-    "boxes": Boxes,
-    "paths": Paths,
-    "tracks": Tracks,
-    "float": Float,
-    "int": Integer,
-    "bool": Bool,
-    "str": String,
-    "dropdown": DropDown,
-    "notification": Notification,
+    c.kind: c
+    for c in [
+        Image,
+        Mask,
+        Points,
+        Vectors,
+        Boxes,
+        Paths,
+        Tracks,
+        Float,
+        Integer,
+        Bool,
+        String,
+        Choice,
+        Notification,
+        Null,
+    ]
 }
+
+__all__ = [
+    "DATA_TYPES",
+    "DataLayer",
+    "Image",
+    "Mask",
+    "Points",
+    "Vectors",
+    "Boxes",
+    "Paths",
+    "Tracks",
+    "Float",
+    "Integer",
+    "Bool",
+    "String",
+    "Choice",
+    "Notification",
+    "Null",
+]

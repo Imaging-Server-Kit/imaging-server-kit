@@ -6,6 +6,16 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 
 class Paths(DataLayer):
+    """Data layer used to represent 2D and 3D paths.
+
+    Parameters
+    ----------
+    data: A list of Numpy arrays (one for each path), each with shape (N, D),
+        where N is the length (number of points) in the path and D the dimensionality (2, 3..).
+    """
+
+    kind = "paths"
+
     def __init__(
         self,
         data: Optional[List] = None,
@@ -21,39 +31,46 @@ class Paths(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "paths"
         self.dimensionality = (
-            dimensionality if dimensionality is not None else list(np.arange(6))
+            dimensionality if dimensionality is not None else np.arange(6).tolist()
         )
-        if not required:
-            self.default = None
+        self.required = required
 
-    @classmethod
-    def pixel_domain(cls, data: np.ndarray):
+        # Schema contributions
+        main = {}
+        if not self.required:
+            main["default"] = None
+        extra = {"dimensionality": self.dimensionality}
+        self.constraints = [main, extra]
+
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
+
+        # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
+
+    def pixel_domain(self):
+        raise NotImplementedError("Not implemented")
+
+    def get_tile(
+        self, paths: np.ndarray, paths_meta: Dict, tile_info: Dict
+    ) -> List[np.ndarray]:
+        raise NotImplementedError("Not implemented")
+
+    def merge_tile(self, paths_tile: np.ndarray, tile_info: Dict):
         raise NotImplementedError("Not implemented")
 
     @classmethod
-    def _get_tile(cls, current_data: np.ndarray, tile_info: dict) -> np.ndarray:
-        raise NotImplementedError("Not implemented")
-
-    @classmethod
-    def _merge_tile(
-        cls, current_data: np.ndarray, tile_data: np.ndarray, tile_info: dict
-    ) -> np.ndarray:
-        raise NotImplementedError("Not implemented")
-
-    @classmethod
-    def to_features(cls, data):
+    def serialize(cls, data, client_origin):
         return [encode_contents(arr.astype(np.float32) for arr in data)]
 
     @classmethod
-    def to_data(cls, features):
-        decoded = []
-        for f in features:
+    def deserialize(cls, serialized_data, client_origin):
+        data = []
+        for f in serialized_data:
             if isinstance(f, str):
                 f = decode_contents(f)
-            decoded.append(f.astype(float))
-        return decoded
+            data.append(f.astype(float))
+        return data
 
     @classmethod
     def _get_initial_data(cls, pixel_domain):

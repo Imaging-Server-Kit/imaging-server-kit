@@ -1,5 +1,4 @@
 """
-Algorithm server definition.
 Documentation: https://imaging-server-kit.github.io/imaging-server-kit/
 """
 
@@ -8,12 +7,10 @@ from pathlib import Path
 import imaging_server_kit as sk
 
 # Import your package if needed (also add it to requirements.txt)
-# import [...]
-
+# (...)
 
 @sk.algorithm(
     name="{{ cookiecutter.name }}",
-    title="{{ cookiecutter.title }}",
     description="",
     project_url="{{ cookiecutter.project_url }}",
     tags=["Segmentation"],
@@ -30,18 +27,15 @@ import imaging_server_kit as sk
     },
     samples=[
         {
-            "image": str(Path(__file__).parent / "sample_images" / "blobs.tif"),
+            "image": Path(__file__).parent / "sample_images" / "blobs.tif",
             "threshold": 0.7,
-        },
-        {
-            "image": "https://github.com/Imaging-Server-Kit/imaging-server-kit/blob/main/src/imaging_server_kit/demo/sample_images/blobs.tif"
         }
     ],
 )
-def threshold_sk(image, threshold):
+def threshold_algo(image, threshold):
     segmentation = image > threshold  # Replace this with your code
-    return sk.Mask(data=segmentation, name="Binarized image")
+    return sk.Mask(segmentation, name="Binarized image")
 
 
 if __name__ == "__main__":
-    sk.serve(threshold_sk)  # Serve on http://localhost:8000
+    sk.serve(threshold_algo)  # Serve on http://localhost:8000

@@ -3,10 +3,9 @@ import importlib.resources
 import os
 import pathlib
 from functools import partial
-from typing import Callable, Dict, Iterable, List
+from typing import Callable, Iterable, List
 
 import msgpack
-import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -17,10 +16,8 @@ from pydantic import ValidationError
 
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
-from imaging_server_kit.core.encoding import encode_contents
-from imaging_server_kit.core.runner import (AlgorithmRunner, AlgoStream,
-                                            algo_stream_gen)
-from imaging_server_kit.core.serialization import serialize_results
+from imaging_server_kit.core.runner import AlgorithmRunner, AlgoStream, algo_stream_gen
+from imaging_server_kit.core.serialization import deserialize_results, serialize_results
 
 templates_dir = pathlib.Path(
     importlib.resources.files("imaging_server_kit.core").joinpath("templates")
@@ -37,13 +34,6 @@ PROCESS_TIMEOUT_SEC = 3600  # Client timeout for the /process route
 ALGORITHM_HUB_URL = os.getenv("ALGORITHM_HUB_URL", "http://algorithm_hub:8000")
 
 
-def _encode_numpy_parameters(algo_params: Dict) -> Dict:
-    return {
-        param: encode_contents(value) if isinstance(value, np.ndarray) else value
-        for param, value in algo_params.items()
-    }
-
-
 def find_algorithm(algorithm_name, algorithms_dict):
     if algorithm_name not in algorithms_dict:
         raise HTTPException(
@@ -55,9 +45,8 @@ def find_algorithm(algorithm_name, algorithms_dict):
 
 
 class AlgorithmApp:
-    def __init__(self, name: str, algorithm_servers: List[AlgorithmRunner]):
-        self.name = name
-        self.algorithms_dict = {server.name: server for server in algorithm_servers}
+    def __init__(self, algorithms: List[AlgorithmRunner], name: str):
+        self.algorithms_dict = {algo.name: algo for algo in algorithms}
         self.app = FastAPI(title=name)
         self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
@@ -175,20 +164,19 @@ class AlgorithmApp:
         ):
             """Run the algorithm processing endpoint."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
+            encoded_params = await request.json()
+            client_origin = request.headers.get("User-Agent")
+            validated_param_results = self._decode_and_validate(
+                algorithm, encoded_params, client_origin
+            )
 
-            # Validate the algo params
-            data = await request.json()
-            try:
-                algo_params = algorithm.parameters_model(**data)
-            except ValidationError as e:
-                raise HTTPException(status_code=422, detail=e.errors())
-            decoded_params = algo_params.dict()
+            algo_run_funct = partial(
+                algorithm._run,
+                algorithm=algorithm_name,
+                param_results=validated_param_results,
+            )
 
-            if "algorithm" not in decoded_params:
-                decoded_params["algorithm"] = algorithm_name
-
-            algo_run_funct = partial(algorithm._run, **decoded_params)
-            return await self._run_algo_logic(algo_run_funct)
+            return await self._run_algo_logic(algo_run_funct, client_origin)
 
         @self.app.post(
             "/{algorithm_name}/stream",
@@ -203,22 +191,24 @@ class AlgorithmApp:
         ):
             """Run the algorithm as a stream."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-
-            # Validate the algo params
-            data = await request.json()
-            try:
-                algo_params = algorithm.parameters_model(**data)
-            except ValidationError as e:
-                raise HTTPException(status_code=422, detail=e.errors())
-            decoded_params = algo_params.dict()
-
-            wrap = AlgoStream(
-                algorithm._stream(algorithm=algorithm_name, **decoded_params)
+            encoded_params = await request.json()
+            client_origin = request.headers.get("User-Agent")
+            validated_params = self._decode_and_validate(
+                algorithm, encoded_params, client_origin
             )
-            algo_stream_funct = algo_stream_gen(wrap)
+
+            algo_stream_funct = algo_stream_gen(
+                AlgoStream(
+                    algorithm._stream(
+                        algorithm=algorithm_name, param_results=validated_params
+                    )
+                )
+            )
 
             return StreamingResponse(
-                content=self._stream_algorithm_msgpack(algo_stream_funct),
+                content=self._stream_algorithm_msgpack(
+                    algo_stream_funct, client_origin
+                ),
                 media_type="application/msgpack",
             )
 
@@ -233,10 +223,9 @@ class AlgorithmApp:
             """Get the parameter JSON schema."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             return algorithm.get_parameters(algorithm=algorithm_name)
-        
+
         @self.app.get(
             "/{algorithm_name}/sample/{idx}",
-            response_model=dict,
             summary="Get sample parameters",
             description="Return encoded sample parameters for this algorithm.",
             tags=["algorithm"],
@@ -244,10 +233,12 @@ class AlgorithmApp:
         def get_sample(algorithm_name: str, idx: int):
             """Fetch and encode sample parameters."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-            sample_params = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
-            encoded_sample_params = _encode_numpy_parameters(sample_params)
-            return encoded_sample_params
-        
+            sample_results = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
+            encoded_sample = serialize_results(
+                sample_results, client_origin="Python/Napari"
+            )
+            return encoded_sample
+
         @self.app.get(
             "/{algorithm_name}/n_samples",
             response_model=dict,
@@ -266,28 +257,32 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             return algorithm.get_signature_params(algorithm_name)
 
-    def _stream_algorithm_msgpack(self, algo_stream_funct: Callable):
+    def _stream_algorithm_msgpack(
+        self, algo_stream_funct: Callable, client_origin: str
+    ):
         """Generator that yields the (serialized) results of run_algorithm with the provided parameters."""
         for results in algo_stream_funct:
             if results is not None:
-                serialized_results = serialize_results(results)
+                serialized_results = serialize_results(results, client_origin)
                 for r in serialized_results:
                     yield msgpack.packb(r)
         if hasattr(algo_stream_funct, "value"):
             for v in algo_stream_funct.value:
                 if v is not None:
-                    for r in serialize_results(v):
+                    for r in serialize_results(v, client_origin):
                         yield msgpack.packb(r)
 
-    async def _serialize_results(self, results):
-        serialized_results = await asyncio.to_thread(serialize_results, results)
+    async def _serialize_results(self, results, client_origin):
+        serialized_results = await asyncio.to_thread(
+            serialize_results, results, client_origin
+        )
         return serialized_results
 
     async def _run_algorithm(self, algo_run_funct: Callable):
         results = await asyncio.to_thread(algo_run_funct)
         return results
 
-    async def _run_algo_logic(self, algo_run_funct: Callable):
+    async def _run_algo_logic(self, algo_run_funct: Callable, client_origin: str):
         try:
             results = await asyncio.wait_for(
                 self._run_algorithm(algo_run_funct=algo_run_funct),
@@ -299,7 +294,7 @@ class AlgorithmApp:
             )
         try:
             serialized_results = await asyncio.wait_for(
-                self._serialize_results(results),
+                self._serialize_results(results, client_origin),
                 timeout=PROCESS_TIMEOUT_SEC,
             )
         except asyncio.TimeoutError:
@@ -307,3 +302,14 @@ class AlgorithmApp:
                 status_code=504, detail="Request timeout during serialization."
             )
         return serialized_results
+
+    def _decode_and_validate(self, algorithm, encoded_params, client_origin):
+        param_results = deserialize_results(encoded_params, client_origin)
+        
+        decoded_params = param_results.to_params_dict()
+        try:
+            algorithm.parameters_model(**decoded_params)
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=e.errors())
+
+        return param_results

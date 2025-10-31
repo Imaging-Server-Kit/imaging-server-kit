@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Dict, List, Union
 
-import numpy as np
 from tqdm import tqdm
 
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmStreamError,
+    AlgorithmRuntimeError,
     napari_available,
 )
 from imaging_server_kit.core.results import LayerStackBase, Results
@@ -47,9 +47,12 @@ class AlgoStream:
     def __next__(self):
         try:
             return next(self._it)
-        except StopIteration as e:
-            self.value = e.value
-            raise
+        except (StopIteration, AlgorithmRuntimeError) as e:
+            if isinstance(e, StopIteration):
+                self.value = e.value
+                raise
+            elif isinstance(e, AlgorithmRuntimeError):
+                raise e
 
 
 def algo_stream_gen(algo_stream: AlgoStream):
@@ -74,12 +77,10 @@ class AlgorithmRunner(ABC):
 
     @abstractmethod
     def get_parameters(self, algorithm: str) -> Dict: ...
-    
+
     @abstractmethod
-    def get_sample(
-        self, algorithm: str, idx: int = 0
-    ) -> Dict[str, Any]: ...
-    
+    def get_sample(self, algorithm: str, idx: int = 0) -> LayerStackBase: ...
+
     @abstractmethod
     def get_n_samples(self, algorithm: str) -> int: ...
 
@@ -90,7 +91,7 @@ class AlgorithmRunner(ABC):
     def _is_stream(self, algorithm: str): ...
 
     @abstractmethod
-    def _stream(self, algorithm, **algo_params): ...
+    def _stream(self, algorithm, param_results: Results): ...
 
     @abstractmethod
     def _tile(
@@ -100,11 +101,11 @@ class AlgorithmRunner(ABC):
         overlap_percent,
         delay_sec,
         randomize,
-        **algo_params,
+        param_results,
     ): ...
 
     @abstractmethod
-    def _run(self, algorithm, **algo_params) -> Iterable[Tuple]: ...
+    def _run(self, algorithm, param_results: Results) -> Results: ...
 
     def run(
         self,
@@ -118,6 +119,19 @@ class AlgorithmRunner(ABC):
         results: Union[LayerStackBase, "napari.Viewer"] = None,
         **algo_params,
     ) -> Union[LayerStackBase, "napari.Viewer"]:
+        """
+        Execute an algorithm with a set of parameters.
+        
+        Parameters
+        ----------
+        algorithm: The algorithm to run (only used with algorithm collections).
+        tiled: Set to True for tiled inference.
+        tile_size_px: Tile size in pixels.
+        overlap_percent: Relative overlap between tiles.
+        delay_sec: Artificial delay (sleep) time between each tile processing.
+        randomize: Process tiles in a random order.
+        results: An optional layer stack object to collect results into.
+        """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 
         # Parameters from the Pydantic model => gives defaults from the {parameters=} definition
@@ -135,6 +149,17 @@ class AlgorithmRunner(ABC):
             algo_params,
         )
 
+        # Convert the resolved parameters to a Results object
+        param_results = Results()
+        for param_name, param_value in resolved_params.items():
+            kind = algo_param_defs.get(param_name).get("param_type")
+            if kind == "image":
+                # TODO: this is a special case for RGB... how else could we handle that?
+                rgb = algo_param_defs.get(param_name).get("rgb")
+                param_results.create(kind, param_value, param_name, rgb=rgb)
+            else:
+                param_results.create(kind, param_value, param_name)
+
         if results is None:
             results = Results()
 
@@ -142,6 +167,7 @@ class AlgorithmRunner(ABC):
         if NAPARI_INSTALLED:
             import napari
             from napari_serverkit import NapariResults
+
             if isinstance(results, napari.Viewer):
                 special_napari_case = True
                 results = NapariResults(viewer=results)
@@ -161,7 +187,7 @@ class AlgorithmRunner(ABC):
                 overlap_percent,
                 delay_sec,
                 randomize,
-                **resolved_params,
+                param_results,
             ):
                 results.merge(
                     tile_results,
@@ -172,12 +198,12 @@ class AlgorithmRunner(ABC):
         else:
             if stream:
                 tqdm_pbar = tqdm()
-                wrap = AlgoStream(self._stream(algorithm=algorithm, **resolved_params))
+                wrap = AlgoStream(self._stream(algorithm, param_results))
                 for frame_results in algo_stream_gen(wrap):
                     results.merge(frame_results)
             else:
-                frame_results = self._run(algorithm=algorithm, **resolved_params)
-                results.merge(frame_results)
+                run_results = self._run(algorithm, param_results)
+                results.merge(run_results)
 
         if special_napari_case:
             return results.viewer

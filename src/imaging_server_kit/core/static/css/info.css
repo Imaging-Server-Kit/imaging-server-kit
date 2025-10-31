@@ -35,7 +35,7 @@ a:hover {
     padding: 2px 4px;
 }
 
-.card-category {
+/* .card-category {
     flex-direction: column;
     display: flex;
     justify-content: center;
@@ -83,7 +83,7 @@ a:hover {
     .cards {
         grid-template-columns: 1fr 1fr;
     }
-}
+} */
 
 table {
     width: 100%;                 /* Make the table span the full width of its container */

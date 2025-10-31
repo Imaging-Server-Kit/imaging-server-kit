@@ -6,6 +6,15 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 
 class Tracks(DataLayer):
+    """Data layer used to represent tracking data.
+
+    Parameters
+    ----------
+    data: A Numpy array of shape (N, D+1) where the dimensions (D) are [ID, T, (Z), Y, X].
+    """
+
+    kind = "tracks"
+
     def __init__(
         self,
         data: Optional[np.ndarray] = None,
@@ -21,36 +30,42 @@ class Tracks(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "tracks"
         self.dimensionality = (
-            dimensionality if dimensionality is not None else list(np.arange(6))
+            dimensionality if dimensionality is not None else np.arange(6).tolist()
         )
-        if not required:
+        self.required = required
+
+        # Schema contributions
+        main = {}
+        if not self.required:
             self.default = None
+            main["default"] = self.default
+        extra = {"dimensionality": self.dimensionality}
+        self.constraints = [main, extra]
 
-    @classmethod
-    def pixel_domain(cls, data: np.ndarray):
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
+
+        # TODO: Implement object-specific properties, like max_objects or min_track_length (could be validated).
+
+    def pixel_domain(self):
+        raise NotImplementedError("Not implemented")
+    
+    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+        raise NotImplementedError("Not implemented")
+
+    def merge_tile(self, tracks_tile: np.ndarray, tile_info: Dict):
         raise NotImplementedError("Not implemented")
 
     @classmethod
-    def _get_tile(cls, self, current_data: np.ndarray, tile_info: dict) -> np.ndarray:
-        raise NotImplementedError("Not implemented")
-
-    @classmethod
-    def _merge_tile(
-        cls, current_data: np.ndarray, tile_data: np.ndarray, tile_info: dict
-    ) -> np.ndarray:
-        raise NotImplementedError("Not implemented")
-
-    @classmethod
-    def to_features(cls, data):
+    def serialize(cls, data, client_origin):
         return encode_contents(data.astype(np.float32))
 
     @classmethod
-    def to_data(cls, features: Union[np.ndarray, str]):
-        if isinstance(features, str):
-            features = decode_contents(features)
-        return features.astype(float)
+    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
+        if isinstance(serialized_data, str):
+            serialized_data = decode_contents(serialized_data)
+        return serialized_data.astype(float)
 
     @classmethod
     def _get_initial_data(cls, pixel_domain):

@@ -1,40 +1,61 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-from imaging_server_kit.types import DATA_TYPES
+from imaging_server_kit.types import DATA_TYPES, DataLayer
+from imaging_server_kit.core.encoding import encode_contents
+
+
+def _serialize_value(obj: Any) -> Any:
+    if isinstance(obj, Dict):
+        return {k: _serialize_value(v) for k, v in obj.items()}
+    if isinstance(obj, np.ndarray):
+        return encode_contents(obj)
+    return obj
+
+
+def _serialize_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively serialize Numpy arrays in the meta dictionary."""
+    return {k: _serialize_value(v) for k, v in meta.items()}
 
 
 class LayerStackBase(ABC):
-    """Implements CRUD + merge for data layers."""
+    """
+    Base class representing a layer stack.
+    """
+
     @abstractmethod
     def __iter__(self): ...
 
     @abstractmethod
-    def __getitem__(self): ...
+    def __getitem__(self) -> DataLayer: ...
 
     @abstractmethod
-    def create(self, kind, data, name: Optional[str], meta: Optional[Dict]): ...
+    def create(
+        self, kind: str, data: Any, name: Optional[str], meta: Optional[Dict]
+    ) -> DataLayer: ...
 
     @abstractmethod
-    def read(self, layer_name): ...
+    def read(self, layer_name: str) -> Optional[DataLayer]: ...
 
     @abstractmethod
-    def update(self, layer_name, layer_data: np.ndarray): ...
+    def update(
+        self, layer_name: str, layer_data: np.ndarray, layer_meta: Dict
+    ) -> Optional[DataLayer]: ...
 
     @abstractmethod
-    def delete(self, layer_name): ...
-    
+    def delete(self, layer_name: str): ...
+
     def __len__(self):
         return len(self.layers)
 
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> DataLayer:
         return self.layers[idx]
 
     def merge(
@@ -42,111 +63,134 @@ class LayerStackBase(ABC):
         layer_stack: Optional[LayerStackBase] = None,
         tiles_callback: Optional[Callable] = None,
     ):
+        """Merge another layer stack, based on layer names.
+
+        Parameters
+        ----------
+        layer_stack: Layer stack to be merged.
+            Layers from this stack of the same kind, with the same name as instance layers (self.layers) will update corresponding meta and data attributes.
+            Other layers from layer_stack will be added via the create() method.
+        """
         if layer_stack is None:
             return
 
         for layer in layer_stack:
-            # Get a data layer for the corresponding kind
-            kind = layer.kind
-            data = layer.data
-            meta = layer.meta
-            name = layer.name
+            existing_layer = self.read(layer.name)
 
-            layer_class = type(layer)
-            layer_class.validate_data(data, meta)
-
-            # Find an eventual existing layer, based on name
-            existing_layer = self.read(name)
-
-            algo_is_tiled = meta.get("tile_params") is not None
-
-            if existing_layer is None:  # => Create
-                # Resolve pixel domain
-                if algo_is_tiled:
-                    tile_params = meta.get("tile_params")
-                    ndim = tile_params.get("ndim")
-                    if ndim is not None:
-                        pixel_domain = tuple(
-                            [
-                                tile_params.get(f"domain_size_{idx}")
-                                for idx in range(ndim)
-                            ]
-                        )
-                    else:
-                        pixel_domain = layer_class.pixel_domain(data)
-                else:
-                    pixel_domain = layer_class.pixel_domain(data)
-
-                # Initialize data
-                initial_data = layer_class._get_initial_data(pixel_domain)
-
-                # Create a new layer
+            if existing_layer is None:
+                initial_data = layer.get_initial_data()
                 existing_layer = self.create(
-                    kind, initial_data, name, meta
+                    layer.kind, initial_data, layer.name, layer.meta
                 )
-
-            else:  # => Update
-                # On first tile, initialize and update the existing layer
-                if algo_is_tiled:
-                    tile_params = meta.get("tile_params")
-                    is_first_tile = tile_params.get("first_tile")
-                    if is_first_tile is not None:
-                        ndim = tile_params.get("ndim")
-                        if ndim is not None:
-                            pixel_domain = tuple(
-                                [
-                                    tile_params.get(f"domain_size_{idx}")
-                                    for idx in range(ndim)
-                                ]
-                            )
-                        else:
-                            pixel_domain = layer.pixel_domain(data)
-
-                        first_tile_data = layer._get_initial_data(pixel_domain)
-
-                        # Update the existing layer
-                        self.update(existing_layer.name, first_tile_data)
-
-            # Refresh reference to the current data
-            current_data = existing_layer.data
-
-            # Resolving what the updated data should be
-            if algo_is_tiled:
-                # Add current_data to data
-                updated_data = layer_class._merge_tile(current_data, data, meta)
             else:
-                # Replace data by current_data
-                updated_data = data
-
-            # Updating the layer
-            self.update(existing_layer.name, updated_data)
-
-            if algo_is_tiled:
-                # Emit a progress step
-                if tiles_callback is not None:
-                    tiles_callback(
-                        tile_idx=meta.get("tile_params").get("tile_idx"),
-                        n_tiles=meta.get("tile_params").get("n_tiles"),
+                if layer.is_first_tile:
+                    self.update(
+                        layer_name=existing_layer.name,
+                        layer_data=layer.get_initial_data(),
+                        layer_meta=layer.meta,
                     )
 
-    def samples_emitted(self, images):  # TODO: modify this
-        for k, image in enumerate(images):
-            self.create(
-                kind="image",
-                data=image,
-                name=f"Sample image [{k}]",
+            if layer.is_tiled:
+                existing_layer.merge_tile(layer.data, layer.meta)
+                updated_data = existing_layer.data
+                updated_meta = existing_layer.meta
+            else:
+                updated_data = layer.data
+                updated_meta = layer.meta
+
+            self.update(existing_layer.name, updated_data, updated_meta)
+
+            if (layer.is_tiled) & (tiles_callback is not None):
+                tiles_callback(
+                    tile_idx=layer.meta.get("tile_params").get("tile_idx"),
+                    n_tiles=layer.meta.get("tile_params").get("n_tiles"),
+                )
+
+    def serialize(self, client_origin: str) -> List[Dict]:
+        """Serialize a layer stack to JSON-compatible representation."""
+        serialized_results = []
+        for layer in self.layers:
+            datalayer_class: DataLayer = type(layer)
+            data = datalayer_class.serialize(layer.data, client_origin)
+            meta = _serialize_meta(layer.meta)
+            serialized_results.append(
+                {
+                    "kind": layer.kind,
+                    "data": data,
+                    "name": layer.name,
+                    "meta": meta,
+                }
             )
+        return serialized_results
+
+    def to_params_dict(self) -> Dict[str, Any]:
+        """
+        Convert a layer stack to a dictionary representation mapping layer.name to layer.data.
+
+        Examples
+        ----------
+        Use it to convert samples to runnable parameters:
+
+        sample = algo.get_sample(0)
+        params = sample.to_params_dict()
+        results = algo.run(**params)
+        """
+        algo_params = {}
+        for layer in self.layers:
+            algo_params[layer.name] = layer.data
+        return algo_params
 
 
 class Results(LayerStackBase):
+    """A stack of data layers.
+
+    Access layers by index: `layer = results[0]` or name: `layer = results.read("Layer Name")`.
+
+    Attributes
+    ----------
+    layers: List of layers in the stack.
+
+    Methods
+    ----------
+    create(): Create a new layer.
+    read(): Read a layer by name.
+    update(): Update the data and meta attributes of a layer.
+    delete(): Delete a layer by name.
+    merge(): Merge another result stack, based on layer names.
+        Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
+    """
+
     def __init__(self):
         super().__init__()
-        self.layers = []
+        self.layers: List[DataLayer] = []
+
+    def __str__(self):
+        message = f"Results (Layers: {len(self.layers)})"
+        for l in self.layers:
+            message += "\n"
+            message += l.__str__()
+        return message
 
     def __repr__(self):
-        return f"Results (Layers: {len(self.layers)})"
+        return self.__str__()
 
-    def create(self, kind, data, name=None, meta=None):
+    def create(
+        self,
+        kind: str,
+        data: Any,
+        name: Optional[str] = None,
+        meta: Optional[str] = None,
+        **kwargs,
+    ) -> DataLayer:
+        """Create a new layer in the results stack.
+
+        Parameters
+        ----------
+        name: Name of the layer. If it already exists, a suffix will be added (e.g. Image-01).
+        data: Data in the layer (must be compatible with the kind of layer).
+        kind: The kind of layer: ["image", "mask", "points", "vectors", "tracks", "boxes", "paths", "float", "int", "bool", "str", "choice", "notification", "null"]
+        meta: An optional dictionary of metadata about the layer.
+        """
         # Make sure layer has a name
         if name is None:
             name = kind.capitalize()
@@ -164,29 +208,47 @@ class Results(LayerStackBase):
             meta = {}
 
         # Get layer class to instanciate
-        layer_class = DATA_TYPES.get(kind)
-        if layer_class is None:
-            raise ValueError(f"{layer_class} layers cannot be handled.")
+        cls: DataLayer = DATA_TYPES.get(kind)
+        if cls is None:
+            raise ValueError(f"{kind} layers cannot be handled.")
 
-        # Instanciate layer
-        added_layer = layer_class(name=name, data=data, meta=meta)
+        # Instantiate layer
+        layer = cls(name=name, data=data, meta=meta, **kwargs)
 
         # Add layer to the stack
-        self.layers.append(added_layer)
+        self.layers.append(layer)
 
-        return added_layer
+        return layer
 
-    def read(self, layer_name):
+    def read(self, layer_name: str) -> Optional[DataLayer]:
+        """Read a layer by name."""
         for layer in self.layers:
             if layer.name == layer_name:
                 return layer
 
-    def update(self, layer_name, updated_data: np.ndarray):
+    def update(
+        self, layer_name: str, updated_data: np.ndarray, updated_meta: Dict
+    ) -> Optional[DataLayer]:
+        """Update the data and meta attributes of a layer."""
         layer = self.read(layer_name)
-        layer.update(updated_data)
+        if layer is not None:
+            layer.update(updated_data, updated_meta)
         return layer
 
-    def delete(self, layer_name):
+    def delete(self, layer_name: str):
+        """Delete a layer by name."""
         for idx, layer in enumerate(self.layers):
             if layer.name == layer_name:
                 self.layers.pop(idx)
+
+    def get_pixel_domain(self) -> np.ndarray:
+        domains = []
+        for data_layer in self.layers:
+            domain = data_layer.pixel_domain()
+            if domain is not None:
+                domains.append(domain)
+        if len(domains):
+            # Final domain is the max bound of all parameter domains (Note: this assumes shared world coordinates, etc.)
+            return np.max(np.stack(domains), axis=0)
+        else:
+            raise Exception("Could not compute pixel domain.")

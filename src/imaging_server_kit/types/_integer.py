@@ -1,19 +1,25 @@
 from typing import Dict, Optional
+import numpy as np
 
 from imaging_server_kit.types.data_layer import DataLayer
 
 
 class Integer(DataLayer):
+    """Data layer used to represent integer values."""
+
+    kind = "int"
+    type = int
+
     def __init__(
         self,
         data: Optional[int] = None,
         name="Int",
         description="Numeric parameter (integer)",
-        min: int = 0,
-        max: int = 1000,
-        step: int = 1,
         default: int = 0,
         auto_call: bool = False,
+        min: int = int(np.iinfo(np.int16).min),
+        max: int = int(np.iinfo(np.int16).max),
+        step: int = 1,
         meta: Optional[Dict] = None,
     ):
         super().__init__(
@@ -22,18 +28,31 @@ class Integer(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "int"
-        self.type = int
+        self.default = default
+        self.auto_call = auto_call
         self.min = min
         self.max = max
         self.step = step
-        self.default = default
-        self.auto_call = auto_call
+        
+        # Schema contributions
+        main = {
+            "default": self.default,
+            "ge": self.min,
+            "le": self.max,
+        }
+        extra = {
+            "auto_call": self.auto_call,
+            "step": self.step,
+        }
+        self.constraints = [main, extra]
+        
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
 
     @classmethod
-    def to_features(cls, data):
+    def serialize(cls, data, client_origin):
         return int(data)
 
     @classmethod
-    def to_data(cls, features):
-        return int(features)
+    def deserialize(cls, serialized_data, client_origin):
+        return int(serialized_data)

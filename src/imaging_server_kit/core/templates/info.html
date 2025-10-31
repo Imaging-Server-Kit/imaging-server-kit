@@ -11,25 +11,22 @@
 </head>
 
 <body>
-    <div class="container">
-        <h1>{{ algo_info.title }}</h1>
+    <div class="container" style="position: relative;">
+        <h1>{{ algo_info.name }}</h1>
 
         <p>{{ algo_info.description }}</p>
+
+        <p style="position: absolute; top: 0; right: 0; margin: 10px;">
+            <a href="{{ algo_info.project_url }}" target="_blank">
+                <strong><i class="fa-solid fa-arrow-up-right-from-square"></i> External documentation</strong>
+            </a>
+        </p>
 
         <p><strong>Keywords:</strong>
             {% for tag in algo_info.tags %}
             <span class="keyword">{{ tag }}</span>
             {% endfor %}
         </p>
-
-        <div class="cards">
-            <a href="{{ algo_info.project_url }}">
-                <div class="card-category">
-                    <i class="fa-solid fa-house"></i>
-                    <p>Project Homepage</p>
-                </div>
-            </a>
-        </div>
 
         <table>
             <thead>

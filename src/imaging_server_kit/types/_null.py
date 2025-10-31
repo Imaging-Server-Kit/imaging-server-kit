@@ -1,20 +1,21 @@
-from typing import Dict, Optional
-
+from typing import Any, Dict, Optional
 from imaging_server_kit.types.data_layer import DataLayer
 
 
-class String(DataLayer):
-    """Data layer used to represent strings of text."""
+class Null(DataLayer):
+    """
+    Data layer used to represent None or the absence of data.
+    """
 
-    kind = "str"
-    type = str
+    kind = "null"
+    type = type(None)
 
     def __init__(
         self,
-        data: Optional[str] = None,
-        name="String",
-        description="String parameter",
-        default: str = "",
+        data: Optional[Any] = None,
+        name="None",
+        description="Null (None) type",
+        default=None,
         meta: Optional[Dict] = None,
     ):
         super().__init__(
@@ -33,12 +34,12 @@ class String(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
 
-        # TODO: implement string-specific properties, for example: max_length (could be validated).
-
     @classmethod
     def serialize(cls, data, client_origin):
-        return str(data)
+        if data is not None:
+            raise ValueError(f"Cannot serialize this object: {data}")
+        return None
 
     @classmethod
     def deserialize(cls, serialized_data, client_origin):
-        return str(serialized_data)
+        return None

@@ -8,30 +8,29 @@ except ImportError:
 
 from .core import (
     Client,
-    Algorithm,
-    Parameters,
-    generate_nd_tiles,
-    Results,
-    LayerStackBase,
     algorithm,
+    Algorithm,
     MultiAlgorithm,
     combine,
+    LayerStackBase,
+    Results,
 )
 
 from .types import (
     Image,
     Mask,
+    Paths,
+    Boxes,
     Points,
     Vectors,
-    Boxes,
-    Paths,
     Tracks,
     Float,
     Integer,
     Bool,
     String,
-    DropDown,
+    Choice,
     Notification,
+    Null,
 )
 
 from .core.errors import napari_available
@@ -39,8 +38,8 @@ from .core.errors import napari_available
 NAPARI_INSTALLED = napari_available()
 
 
-def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]] = None):
-    """Convert an algorithm to a QWidget."""
+def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]], viewer):
+    """Convert an algorithm to a QWidget. Used when packaging a Napari plugin."""
     if not NAPARI_INSTALLED:
         print(
             "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
@@ -54,22 +53,27 @@ def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]] =
             # Assuming the user has passed a "raw" Python function, we attempt to convert it to an Algorithm:
             algorithm = Algorithm(algorithm)
 
-    widget = AlgorithmWidget(viewer=None, server=algorithm)
-
-    return widget
+    return AlgorithmWidget(viewer=viewer, algorithm=algorithm)
 
 
 def to_napari(
     algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]] = None,
     viewer: Optional[Union["napari.Viewer", "napari_serverkit.NapariResults"]] = None,
-):
-    """Convert an algorithm to a dock widget and add it to a napari viewer."""
+) -> None:
+    """
+    Convert an algorithm (or algorithm collection) to a dock widget and add it to a Napari viewer.
+
+    Parameters
+    ----------
+    algorithm : The algorithm object to add to Napari as a dock widget.
+    viewer : An existing Napari viewer to add the dock widget to. If none is passed, a new Napari viewer is created.
+    """
     if not NAPARI_INSTALLED:
         print(
             "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
         )
         return
-    
+
     import napari
     from napari_serverkit import add_as_widget
 
@@ -86,15 +90,19 @@ def to_napari(
     return viewer
 
 
-def serve(algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs):
-    """Serve an algorithm as an HTTP server."""
-    try:
-        from imaging_server_kit.core.app import AlgorithmApp
-    except ImportError:
-        print(
-            "To use this method, install the Imaging Server Kit with the server extension: `pip install imaging-server-kit[server]`."
-        )
-        return
+def serve(
+    algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs
+) -> None:
+    """
+    Serve an algorithm as an HTTP server.
+
+    Parameters
+    ----------
+    algorithm : The algorithm object to serve.
+    host : The IP of the host (default: "0.0.0.0")
+    port : The network port (default: 8000)
+    """
+    from imaging_server_kit.core.app import AlgorithmApp
 
     if isinstance(algorithm, Algorithm):
         algorithm_servers = [algorithm]
@@ -105,14 +113,28 @@ def serve(algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs
         algorithm = Algorithm(algorithm)
         algorithm_servers = [algorithm]
 
-    algo_app = AlgorithmApp(algorithm.name, algorithm_servers=algorithm_servers)
+    algo_app = AlgorithmApp(algorithms=algorithm_servers, name=algorithm.name)
     algo_app.serve(*args, **kwargs)
 
 
-def convert(results: LayerStackBase, to: str = "results") -> Union[LayerStackBase, "napari.Viewer"]:
-    """Convert a set of results to various respresentations."""
-    supported_results = ["results", "napari"]
+def convert(
+    results: LayerStackBase, to: str = "results"
+) -> Union[LayerStackBase, "napari.Viewer"]:
+    """
+    Convert a result object into a different representation.
 
+    Parameters
+    ----------
+    results : The result object to convert.
+    to : The target representation to convert to. Supported values: ["results", "napari"]
+
+    Returns
+    -------
+    The converted result object.
+    - If `to == "results"`, a Results() object containing copies of the input layers.
+    - If `to == "napari"` the napari.Viewer associated with the converted results.
+    """
+    supported_results = ["results", "napari"]
     if not to in supported_results:
         raise ValueError(f"{to} is not supported. Please use {supported_results}")
 
@@ -125,16 +147,19 @@ def convert(results: LayerStackBase, to: str = "results") -> Union[LayerStackBas
             )
             return
         from napari_serverkit import NapariResults
+
         results_dst = NapariResults()
 
     for layer in results:
         results_dst.create(
-            kind=layer.kind, data=layer.data, name=layer.name, meta=layer.meta
+            kind=layer.kind,
+            data=layer.data,
+            name=layer.name,
+            meta=layer.meta,
         )
 
     if to == "napari":
-        # For napari specifically, return a reference to the viewer so that users can call add_image on it instead of create()
-        # + When using results = runner.run(results=viewer), we should return the viewer
+        # For napari, we return the viewer directly
         return results_dst.viewer
     else:
         return results_dst

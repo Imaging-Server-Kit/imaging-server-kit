@@ -4,6 +4,11 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 
 class Bool(DataLayer):
+    """Data layer used to represent boolean values."""
+
+    kind = "bool"
+    type = bool
+
     def __init__(
         self,
         data: Optional[bool] = None,
@@ -19,15 +24,21 @@ class Bool(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "bool"
-        self.type = bool
         self.default = default
         self.auto_call = auto_call
 
+        # Schema contributions
+        main = {"default": self.default}
+        extra = {"auto_call": self.auto_call}
+        self.constraints = [main, extra]
+        
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
+
     @classmethod
-    def to_features(cls, data):
+    def serialize(cls, data, client_origin):
         return bool(data)
 
     @classmethod
-    def to_data(cls, features):
-        return bool(features)
+    def deserialize(cls, serialized_data, client_origin):
+        return bool(serialized_data)

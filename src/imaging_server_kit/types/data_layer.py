@@ -1,9 +1,42 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 import numpy as np
 
 
 class DataLayer(ABC):
+    """
+    Data layer container for a particular data type.
+
+    Attributes
+    ----------
+    data : None
+        Data in the layer.
+    name : str
+        The name of the layer.
+    description : str
+        A short description of the layer.
+    meta : dict
+        Metadata about the layer.
+    type : Any
+        The type of data stored in the layer.
+    kind : str
+        A short string identifying the layer type.
+
+    Methods
+    -------
+    update():
+        Updates the data and meta attributes.
+    validate_data():
+        Validates a set of data and meta values.
+    serialize():
+        Serializes the class into a JSON-compatible representation.
+    deserialize():
+        Reconstructs an instance from a JSON representation.
+    """
+
+    kind = None
+    type = Union[str, np.ndarray, type(None)]
+
     def __init__(
         self,
         data=None,
@@ -13,54 +46,77 @@ class DataLayer(ABC):
     ):
         self.name = name
         self.description = description
-        self.type = Union[str, np.ndarray]
-        self.kind = None
         self.meta = meta if meta is not None else {}
         self.data = data
-        if self.data is not None:
-            self.validate_data(data, self.meta)
+
+        # Schema contributions
+        main = {}
+        extra = {}
+        self.constraints = [main, extra]
+
+    @property
+    def is_tiled(self) -> bool:
+        return self.meta.get("tile_params") is not None
+
+    @property
+    def is_first_tile(self):
+        if not self.is_tiled:
+            return False
+        tile_params = self.meta.get("tile_params")
+        is_first_tile = tile_params.get("first_tile")
+        return is_first_tile is not None
+
+    def get_initial_data(self):
+        # Figure out the pixel domain
+        pixel_domain = self.pixel_domain()
+        if self.is_tiled:
+            tile_params = self.meta.get("tile_params")
+            ndim = tile_params.get("ndim")
+            if ndim is not None:
+                pixel_domain = tuple(
+                    [tile_params.get(f"domain_size_{idx}") for idx in range(ndim)]
+                )
+        return self._get_initial_data(pixel_domain)
 
     def __str__(self) -> str:
-        return f"DataLayer: {self.name} ({self.kind})"
+        return f"{self.name} ({self.kind} layer). Data: {self.data.shape if isinstance(self.data, np.ndarray) else self.data}"
 
-    def _decode_and_validate(self, cls, v, meta):
-        data = self.to_data(v)
-        self.validate_data(data, meta)
-        return data
+    def __repr__(self):
+        return self.__str__()
 
-    def update(self, updated_data: np.ndarray) -> np.ndarray:
+    def _validate(self, cls, v, meta, constraints):
+        self.validate_data(v, meta, constraints)
+        return v
+
+    def update(self, updated_data: np.ndarray, updated_meta: Dict) -> np.ndarray:
         self.data = updated_data
+        self.meta = updated_meta
         self.refresh()
 
     def refresh(self):
         pass
 
-    @classmethod
-    @abstractmethod
-    def to_features(cls, data: np.ndarray): ...
+    def pixel_domain(self):
+        pass
+
+    def merge_tile(self, tile_data: np.ndarray, tile_info: Dict):
+        pass
+
+    def get_tile(self, tile_info: Dict):
+        return self.data, self.meta
 
     @classmethod
-    @abstractmethod
-    def to_data(cls, features): ...
-
-    @classmethod
-    def _merge_tile(
-        cls, current_data: np.ndarray, tile_data: np.ndarray, tile_info: dict
-    ) -> np.ndarray:
-        return tile_data
-
-    @classmethod
-    def _get_tile(cls, current_data: np.ndarray, tile_info: dict) -> np.ndarray:
-        return current_data
-
-    @classmethod
-    def _get_initial_data(cls, pixel_domain):
+    def validate_data(cls, data: Any, meta: Dict, constraints: List[Dict]):
         pass
 
     @classmethod
-    def pixel_domain(cls, data: np.ndarray):
-        pass
+    @abstractmethod
+    def serialize(cls, data: Any, client_origin: str): ...
 
     @classmethod
-    def validate_data(cls, data, meta):
+    @abstractmethod
+    def deserialize(cls, serialized_data: Any, client_origin: str): ...
+
+    @classmethod
+    def _get_initial_data(cls, pixel_domain: np.ndarray):
         pass

@@ -79,6 +79,18 @@ class AlgorithmStreamError(Exception):
         super().__init__(self.message)
 
 
+class AlgorithmRuntimeError(Exception):
+    def __init__(
+        self,
+        algorithm: str,
+        error: Exception,
+        message="Algorithm did not run successfully. ",
+    ):
+        self.message = message + f"{algorithm=}, Error: {error}"
+        super().__init__(self.message)
+
+
 def napari_available():
+    """Check if napari-serverkit is installed."""
     spec = importlib.util.find_spec("napari_serverkit")
     return spec is not None

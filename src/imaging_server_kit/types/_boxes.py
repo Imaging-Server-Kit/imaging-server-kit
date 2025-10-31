@@ -2,10 +2,11 @@ from typing import Dict, List, Optional
 import numpy as np
 from geojson import Feature, Polygon
 
+from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
 from imaging_server_kit.types.data_layer import DataLayer
 
 
-def _preprocess_tile_info(current_data: np.ndarray, tile_info: dict):
+def _preprocess_tile_info(boxes: np.ndarray, boxes_meta: Dict, tile_info: Dict):
     tile_info = tile_info.get("tile_params")
     ndim = tile_info.get("ndim")
 
@@ -16,18 +17,43 @@ def _preprocess_tile_info(current_data: np.ndarray, tile_info: dict):
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
     ]
 
-    if len(current_data):
-        coords = np.asarray(current_data)[:, :, :ndim]
-        mask = (coords >= tile_positions) & (coords < tile_max_positions)
-        all_filt = mask.reshape((len(mask), -1)).all(axis=1)
-        filtered_current_data = np.asarray(current_data)[~all_filt]
-    else:
-        filtered_current_data = current_data
+    n_objects = len(boxes)
 
-    return ndim, filtered_current_data, tile_positions
+    if n_objects:
+        # Box coordinates
+        boxes_coords = np.asarray(boxes)[:, :, :ndim]
+
+        # Mask of box coordinates in the tile
+        coords_in_tile = (boxes_coords >= tile_positions) & (
+            boxes_coords < tile_max_positions
+        )
+
+        # All coordinates must be in the tile bounds
+        tile_filter = coords_in_tile.reshape((len(coords_in_tile), -1)).all(axis=1)
+
+        # Select boxes in the tile
+        boxes_tile = np.asarray(boxes)[~tile_filter]
+
+        # Select meta of boxes in the tile
+        boxes_meta_tile = extract_meta_tile(boxes_meta, n_objects, tile_filter)
+    else:
+        boxes_tile = boxes
+        boxes_meta_tile = boxes_meta
+        tile_filter = np.full_like(boxes, fill_value=True, dtype=np.bool_)
+
+    return ndim, boxes_tile, boxes_meta_tile, tile_filter, tile_positions
 
 
 class Boxes(DataLayer):
+    """Data layer used to represent 2D boxes (rectangular bounding boxes).
+
+    Parameters
+    ----------
+    data: A Numpy array of shape (N, 4, 2). data[:, 0, :], data[:, 1, :].. represent the coordinates of the four box corners.
+    """
+
+    kind = "boxes"
+
     def __init__(
         self,
         data: Optional[np.ndarray] = None,
@@ -43,39 +69,73 @@ class Boxes(DataLayer):
             meta=meta,
             data=data,
         )
-        self.kind = "boxes"
         self.dimensionality = (
-            dimensionality if dimensionality is not None else list(np.arange(6))
+            dimensionality if dimensionality is not None else np.arange(6).tolist()
         )
-        if not required:
+        self.required = required
+
+        # Schema contributions
+        main = {}
+        if not self.required:
             self.default = None
+            main["default"] = self.default
+        extra = {
+            "dimensionality": self.dimensionality,
+            "required": self.required,
+        }
+        self.constraints = [main, extra]
 
-    @classmethod
-    def pixel_domain(cls, data: np.ndarray):
-        return np.max(np.asarray(data), axis=(0, 1))
+        if self.data is not None:
+            self.validate_data(data, self.meta, self.constraints)
 
-    @classmethod
-    def _get_tile(cls, current_data: np.ndarray, tile_info: dict) -> np.ndarray:
-        ndim, tile_data, tile_positions = _preprocess_tile_info(current_data, tile_info)
-        tile_data[:, :, :ndim] -= tile_positions
-        return tile_data
+        # TODO: Implement object-specific properties, like max_objects or min_box_area (could be validated).
 
-    @classmethod
-    def _merge_tile(
-        cls, current_data: np.ndarray, tile_data: np.ndarray, tile_info: dict
-    ) -> np.ndarray:
-        ndim, filtered_current_data, tile_positions = _preprocess_tile_info(
-            current_data, tile_info
+    def pixel_domain(self):
+        if self.data is None:
+            return
+        return np.max(np.asarray(self.data), axis=(0, 1))
+
+    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+        ndim, boxes_tile, boxes_meta_tile, _, tile_positions = _preprocess_tile_info(
+            self.data, self.meta, tile_info
         )
-        tile_data[:, :, :ndim] += tile_positions
-        if len(filtered_current_data):
-            current_data = np.vstack((filtered_current_data, tile_data))
+
+        # Offset the boxes by the tile position
+        boxes_tile[:, :, :ndim] = boxes_tile[:, :, :ndim] - tile_positions
+
+        return boxes_tile, boxes_meta_tile
+
+    def merge_tile(self, boxes_tile: np.ndarray, tile_info: Dict):
+        boxes_tile_meta = tile_info
+        ndim, old_boxes_tile, old_boxes_meta_tile, tile_filter, tile_positions = (
+            _preprocess_tile_info(self.data, boxes_tile_meta, tile_info)
+        )
+
+        # Offset the tile data by the tile positions
+        boxes_tile[:, :, :ndim] = boxes_tile[:, :, :ndim] + tile_positions
+
+        n_objects = len(self.data)
+
+        if n_objects:
+            # Remove the boxes from the boxes data that are in the tile
+            boxes_clean = self.data[~tile_filter]
+
+            # Merge the tile data with the cleaned boxes data
+            merged_boxes = np.vstack((boxes_clean, boxes_tile))
+
+            # Do the same for the meta
+            merged_boxes_meta = merge_meta_tile(
+                self.meta, boxes_tile_meta, n_objects, tile_filter
+            )
         else:
-            current_data = tile_data
-        return current_data
+            merged_boxes = boxes_tile
+            merged_boxes_meta = boxes_tile_meta
+
+        self.data = merged_boxes
+        self.meta = merged_boxes_meta
 
     @classmethod
-    def to_features(cls, data):
+    def serialize(cls, data, client_origin):
         features = []
         for i, box in enumerate(data):
             coords = np.array(box)[:, ::-1]  # Invert XY
@@ -91,8 +151,10 @@ class Boxes(DataLayer):
         return features
 
     @classmethod
-    def to_data(cls, features):
-        boxes = np.array([feature["geometry"]["coordinates"] for feature in features])
+    def deserialize(cls, serialized_data, client_origin):
+        boxes = np.array(
+            [feature["geometry"]["coordinates"] for feature in serialized_data]
+        )
         boxes = np.array(
             [box[0] for box in boxes]
         )  # We get back a shape of (N, 1, 5, 2) - so we remove dim. 1
@@ -102,10 +164,16 @@ class Boxes(DataLayer):
 
     @classmethod
     def _get_initial_data(cls, pixel_domain):
+        if pixel_domain is None:
+            return
         return np.zeros((0, 4, len(pixel_domain)), dtype=np.float32)
 
     @classmethod
-    def validate_data(cls, data, meta):
+    def validate_data(cls, data, meta, constraints):
+        main, extra = constraints
+        if extra["required"] is False:
+            return
+
         assert isinstance(
             data, np.ndarray
         ), f"Boxes data ({type(data)}) is not a Numpy array"

@@ -1,6 +1,5 @@
 {
-  "title": "Binary Threshold",
-  "name": "threshold",
+  "name": "Threshold",
   "project_url": "https://github.com/scikit-image/scikit-image",
   "python_version": "3.9"
 }

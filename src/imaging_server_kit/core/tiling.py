@@ -7,6 +7,17 @@ from typing import Iterable
 import numpy as np
 
 
+class TilingError(Exception):
+    def __init__(
+        self,
+        pixel_domain,
+        provided_shape,
+        message="Error during tiling occured. Provided shape (overlap or tile) is inconsistent with the pixel domain: ",
+    ):
+        self.message = message + f"{pixel_domain=}, {provided_shape=}"
+        super().__init__(self.message)
+
+
 def generate_nd_tiles(
     pixel_domain,
     tile_size_px=64,
@@ -17,6 +28,7 @@ def generate_nd_tiles(
     """Yields tile metadata across the pixel domain, partitioned according to the given tile size etc.
     Important: tile_size_px can be an int or a list/tuple, in which case the tiles are anisotropic!
     """
+    first_tile = True
     tiles_info = _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize)
     n_tiles = len(tiles_info)
     for tile_idx, tile_info in enumerate(tiles_info):
@@ -27,6 +39,9 @@ def generate_nd_tiles(
                 "n_tiles": n_tiles,
             }
         }
+        if first_tile:
+            tile_meta["tile_params"]["first_tile"] = True
+            first_tile = False
         yield tile_meta
         time.sleep(delay_sec)
 
@@ -68,26 +83,20 @@ def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> I
     ndim = len(pixel_domain)
 
     # Resolve the tile shape and overlap
-    if isinstance(
-        tile_size_px, (list, tuple)
-    ):  # TODO: also check if it's an array of size 3
+    if isinstance(tile_size_px, (list, tuple)):
         tile_shape = tile_size_px
         if len(tile_shape) != ndim:
-            raise Exception(
-                "Provided tile shape is inconsistent with the pixel domain."
-            )
+            raise TilingError(pixel_domain=pixel_domain, provided_shape=tile_shape)
     else:
-        tile_shape = [tile_size_px] * ndim
+        tile_shape = [tile_size_px] * ndim  # Isotropic tile
 
     if isinstance(overlap_percent, (list, tuple)):
         overlap = overlap_percent
         if len(overlap) != ndim:
-            raise Exception(
-                "Provided tile shape is inconsistent with the pixel domain."
-            )
+            raise TilingError(pixel_domain=pixel_domain, provided_shape=overlap)
     else:
         overlap = [overlap_percent] * ndim
-
+    
     tile_infos_axes = [
         _tiles_info_axis(pixel_domain[axis], tile_shape[axis], overlap[axis])
         for axis in range(ndim)

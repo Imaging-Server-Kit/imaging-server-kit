@@ -31,16 +31,16 @@ def encode_contents(image: np.ndarray) -> str:
     return base64.b64encode(img_byte_arr.getvalue()).decode()
 
 
-def encode_contents_bytes(image: np.ndarray) -> bytes:
-    """Encodes a NumPy array image into bytes.
+# def encode_contents_bytes(image: np.ndarray) -> bytes:
+#     """Encodes a NumPy array image into bytes.
 
-    Args:
-        image (np.ndarray): The image to encode.
+#     Args:
+#         image (np.ndarray): The image to encode.
 
-    Returns:
-        bytes: The bytes representation of the image.
-    """
-    img_byte_arr = io.BytesIO()
-    tifffile.imwrite(img_byte_arr, image)
+#     Returns:
+#         bytes: The bytes representation of the image.
+#     """
+#     img_byte_arr = io.BytesIO()
+#     tifffile.imwrite(img_byte_arr, image)
 
-    return base64.b64encode(img_byte_arr.getvalue())
+#     return base64.b64encode(img_byte_arr.getvalue())
