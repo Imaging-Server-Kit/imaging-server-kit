@@ -12,7 +12,7 @@ def test_empty():
     out = empty()
     assert out is None
     out = empty.run()
-    assert len(out) == 0
+    assert out[0].data is None
 
 
 # Minimal output
@@ -87,7 +87,7 @@ def sample_image(image):
 
 def test_sample_image():
     sample = sample_image.get_sample()
-    image = sample.get("image")
+    image = sample[0].data
     assert isinstance(image, np.ndarray)
 
 
@@ -150,3 +150,12 @@ def test_type_hinted_defaults():
     assert sk_type_hinted.run(5, 3.14)[0].data == 8.14
 
 
+# Setting required=False
+
+@sk.algorithm
+def has_required_image(image=sk.Image(required=False)):
+    return sk.Image(image)  # image is None
+
+def test_required_image():
+    results = has_required_image.run()
+    assert results[0].data is None

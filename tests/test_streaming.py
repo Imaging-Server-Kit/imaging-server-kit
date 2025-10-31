@@ -7,8 +7,8 @@ def basic_stream():
     yield sk.Notification("Success")
 
 def test_basic_stream():
-    assert basic_stream() == "Success"
-    assert basic_stream.run()[0].data == "Success"
+    assert basic_stream()[0] == "Success"
+    assert basic_stream.run().read("Notification").data == "Success"
 
 
 # Loop stream
@@ -18,8 +18,8 @@ def loop_stream():
         yield k
 
 def test_loop_stream():
-    assert loop_stream() == 4
-    assert loop_stream.run()[0].data == 4
+    assert loop_stream()[0] == 4
+    assert loop_stream.run().read("Int").data == 4
 
 
 # yield + return
@@ -57,3 +57,14 @@ def test_multi_stream():
     assert out[0].data == 10
     assert out[1].data == 0.5
     assert out[2].data == "Finished"
+
+
+### Streamed image
+
+### Streamed mask
+
+### Streamed points
+
+### Streamed vectors
+
+### Streamed boxes
