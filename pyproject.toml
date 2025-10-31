@@ -1,7 +1,7 @@
 [project]
 name = "imaging-server-kit"
 dynamic = ["version"]
-description = "Deploy image processing algorithms in FastAPI servers. "
+description = "Convert image processing functions to GUIs, FastAPI servers, and more."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -23,29 +23,29 @@ classifiers = [
 ]
 
 dependencies = [
+    "numpy",
+    "tifffile",  # To encode/decode
+    "tqdm",
+    "pydantic>=2.0",
+    "scikit-image",  # To imread samples and run demo examples
+    "jinja2",  # To template the info endpoint
+    "PyYAML",  # To load the metadata yaml file
+    "cookiecutter",  # To start from a template
+    "imantics",  # To convert masks to features for QuPath
+    "geojson",  # To convert masks and points to features for QuPath 
+    # Used in app
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
-    "httpx",
+    # Used in app + client
     "msgpack",
-    "tifffile",
-    "numpy",
-    "scikit-image",
-    "imantics",
-    "geojson",
-    "jinja2",
-    "PyYAML",
-    "pydantic>=2.0",
-    "cookiecutter",
-    "opencv-contrib-python-headless",
-    "tqdm",
+    "httpx",
 ]
 
 [project.optional-dependencies]
 docs = ["jupyter-book", "jupytext"]
 test = ["pytest"]
-users = ["fastapi-users[sqlalchemy]", "aiosqlite"]
-all = ["imaging-server-kit[docs,test,users]"]
+all = ["imaging-server-kit[docs,test]"]
 
 [project.scripts]
 serverkit = "imaging_server_kit.cli:main"
