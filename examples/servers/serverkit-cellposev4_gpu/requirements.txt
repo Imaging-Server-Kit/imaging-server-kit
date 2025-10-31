@@ -1,0 +1,5 @@
+imaging-server-kit
+cellpose
+torch
+torchvision 
+opencv-contrib-python-headless

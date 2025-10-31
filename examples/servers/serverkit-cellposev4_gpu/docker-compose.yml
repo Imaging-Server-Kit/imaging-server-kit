@@ -1,0 +1,17 @@
+services:
+  cellpose_single:
+    container_name: cellpose_single
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: serverkit_cellpose:gpu-latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - E:\models\cellposev4:/models
+      - .cache:/root/.cellpose/models
+    deploy: 
+      resources: 
+        reservations: 
+          devices: 
+            - capabilities: [gpu]
