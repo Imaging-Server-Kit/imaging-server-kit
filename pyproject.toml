@@ -43,7 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = ["jupyter-book", "jupytext"]
+docs = ["jupyter-book<2.0", "jupytext"]
 test = ["pytest"]
 all = ["imaging-server-kit[docs,test]"]
 
