@@ -21,3 +21,6 @@ parse:
   myst_enable_extensions:
     - linkify
     - html_admonition
+
+execute:
+  execute_notebooks: "off"  

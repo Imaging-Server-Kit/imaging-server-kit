@@ -1,33 +1,49 @@
 # Welcome to the Imaging Server Kit's documentation!
 
-The **Imaging Server Kit** is an open-source Python package for deploying image analysis algorithms as web services.
-
-- Run computations remotely, while client applications remain focused on visualization.
-- Connect to an algorithm server and run algorithms from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), and Python.
-
-## Key Features
-
-- Turn standard Python functions into fully-featured image processing web servers with minimal effort.
+The **Imaging Server Kit** lets you turn Python-based image processing workflows into **algorithms** that gain extra functionalities.
 
 ```python
-@algorithm_server({"image": ImageUI()})
-def segmentation_server(image):
-    segmentation = # your code here
-    return [(segmentation, {}, "mask")]
+@sk.algorithm  # <- Turn your function into an algorithm
+def my_algo(image, parameter):
+  (...)
 ```
 
-## Supported image analysis tasks
+Server Kit algorithms are versatile objects that allow you run computations in a variety of ways.
 
-| Task              | Examples                        | Napari | QuPath |
-|-------------------|---------------------------------| ------ | ------ |
-| Segmentation     | [StarDist](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-stardist), [CellPose](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-cellpose), [Rembg](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-rembg), [SAM-2](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-sam2), [InstanSeg](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-instanseg)               | ✅ | ✅ |
-| Object detection | [YOLO](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-yolo), [Spotiflow](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-spotiflow), [LoG detector](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-skimage-log)    | ✅ | ✅ |
-| Vector fields    | [Orientationpy](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-orientationpy)                   | ✅ | ✅ |
-| Object tracking  | [Trackpy](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-trackpy), [Trackastra]()         | ✅ |  |
-| Image-to-Image   | [SPAM](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-spam), [Noise2Void](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-n2v), [StackReg](https://github.com/Imaging-Server-Kit/imaging-server-kit/tree/main/examples/servers/serverkit-stackreg)         | ✅ |  |
-| Text-to-Image    | [Stable Diffusion](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-stable-diffusion)         | ✅ |  |
-| Image-to-Text    | [Image captioning](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-blip-captioning)         | ✅ |  |
-| Classification   | [ResNet50](https://github.com/Imaging-Server-Kit/extra-examples/tree/main/examples/serverkit-resnet50)         | ✅ |  |
+For example, you can
+
+- [**Turn your algorithm into a web server**](07_server), connect to it and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](08_python) via HTTP requests.
+
+<video width=512 controls loop autoplay>
+  <source src="./_static/stardist_blobs.mp4" type="video/mp4">
+</video>
+
+- [**Generate a dock widget**](01_algorithm) to run your algorithm interactively in Napari.
+
+<video width=512 controls loop autoplay>
+  <source src="./_static/oripy_threshold.mp4" type="video/mp4">
+</video>
+
+- Run your algorithm [**tile-by-tile**](06_tiled) on the input image.
+
+<video width=512 controls loop autoplay>
+  <source src="./_static/tiles.mp4" type="video/mp4">
+</video>
+
+- [**Stream results**](05_streams) to inspect them in real-time.
+
+<video width=512 controls loop autoplay>
+  <source src="./_static/yolo-stream.mp4" type="video/webm">
+</video>
+
+On top of that, you can [**validate data**](08_python) passed as algorithm parameters, provide [**samples**](02_samples), and generate [**documentation**](03_metadata) for your algorithm that you can share with users.
+
+This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](01_algorithm), and give you some [suggestions of use cases](11_examples).
+
+## Contents
+
+```{tableofcontents}
+```
 
 ## Installation
 
@@ -44,6 +60,18 @@ git clone https://github.com/Imaging-Server-Kit/imaging-server-kit.git
 cd imaging-server-kit
 pip install -e .
 ```
+
+**Napari plugin**
+
+Install the [napari-serverkit](https://github.com/Imaging-Server-Kit/napari-serverkit) plugin with `pip` to enable all [Napari](https://napari.org/stable/)-related functionalities.
+
+```sh
+pip install napari-serverkit
+```
+
+**QuPath extention**
+
+To use the Imaging Server Kit in [QuPath](https://qupath.github.io/), follow the installation instructions at [qupath-extension-serverkit](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit).
 
 ## License
 
@@ -65,3 +93,7 @@ BibTeX:
   year         = 2025,
 }
 ```
+
+## Acknowledgements
+
+We thank the [Personalized Health and Related Technologies](https://www.sfa-phrt.ch/) for funding this project.

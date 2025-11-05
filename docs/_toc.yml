@@ -1,9 +1,15 @@
 format: jb-book
 root: index
 chapters:
-- file: sections/getting_started
-- file: sections/algorithm_server
-- file: sections/multi_algo_server
-- file: sections/docker
-- file: sections/examples
-- file: sections/api_endpoints
+  - file: sections/00_getting_started
+  - file: sections/01_algorithm
+  - file: sections/02_samples
+  - file: sections/03_metadata
+  - file: sections/04_multialgo
+  - file: sections/05_streams
+  - file: sections/06_tiled
+  - file: sections/07_server
+  - file: sections/08_python
+  - file: sections/09_docker
+  - file: sections/10_types
+  - file: sections/11_examples
