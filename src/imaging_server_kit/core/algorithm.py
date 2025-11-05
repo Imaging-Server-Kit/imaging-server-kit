@@ -8,6 +8,8 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Type,
+    Union,
 )
 
 import numpy as np
@@ -32,7 +34,7 @@ from imaging_server_kit.core.runner import (
 )
 from imaging_server_kit.types import DATA_TYPES, DataLayer
 
-TYPE_MAPPINGS: Dict[Any, DataLayer] = {
+TYPE_MAPPINGS: Dict[Any, Type[DataLayer]] = {
     int: skt.Integer,
     float: skt.Float,
     bool: skt.Bool,
@@ -71,11 +73,11 @@ def _parse_run_func_signature(
     and the signature of the wrapped Python function."""
 
     def get_data_layer_type(hinted_type, default, param_name) -> DataLayer:
-        cls: DataLayer = TYPE_MAPPINGS[hinted_type]
+        cls: Type[DataLayer] = TYPE_MAPPINGS[hinted_type]
         if default is _empty:
             return cls(name=param_name)
         else:
-            return cls(name=param_name, default=default)
+            return cls(name=param_name, default=default) # type: ignore
 
     resolved = dict(
         parameters
@@ -101,7 +103,7 @@ def _parse_run_func_signature(
             if default is _empty:
                 # Last resort: is the parameter named unambiguously (variable name == parameter `kind`, for example the variable is named `image`)?
                 if param_name in DATA_TYPES:
-                    cls: DataLayer = DATA_TYPES[param_name]
+                    cls: Type[DataLayer] = DATA_TYPES[param_name]
                     resolved[param_name] = cls()  # Initialized with defaults
                 else:
                     raise TypeError(
@@ -138,7 +140,7 @@ def _parse_run_func_signature(
 def _parse_pydantic_params_schema(
     run_algorithm_func: Callable,
     params_from_decorator: Dict,
-) -> BaseModel:
+):
     """Convert the parameters dictionary provided by @algorithm_server to a Pydantic model."""
     # Parse the provided parameters dictionary + run function signature to a dict(str: DataLayer)
     parsed_params: Dict[str, DataLayer] = _parse_run_func_signature(
@@ -177,23 +179,19 @@ def _parse_pydantic_params_schema(
 
 ### Function output parsing ###
 
-
 def _parse_output(payload: Any) -> DataLayer:
     if isinstance(payload, DataLayer):
         return payload
     if isinstance(payload, RECOGNIZED_TYPES):  # Not a datalayer...
-        cls: DataLayer = TYPE_MAPPINGS[type(payload)]
+        cls: Type[DataLayer] = TYPE_MAPPINGS[type(payload)]
         return cls(data=payload)
     else:
-        raise TypeError(
-            f"Algorithm should return DataLayer instances. Instead, got: ",
-            type(payload),
-        )
+        raise TypeError(f"Function should return: List[DataLayer]. Got: {type(payload)}")
 
 
-def _parse_payload(payload: Any):
+def _parse_payload(payload: Any) -> Union[List[DataLayer], DataLayer]:
     if isinstance(payload, (List, Tuple)):  # Multiple returns
-        return [_parse_payload(p) for p in payload]
+        return [_parse_payload(p) for p in payload] # type: ignore
     else:
         return _parse_output(payload)
 
@@ -206,14 +204,9 @@ def _parse_user_func_output(payload: Any) -> Results:
         layers = [layers]
 
     # List[DataLayer] => Results
-    results = Results()
-    for layer in layers:
-        results.create(
-            kind=layer.kind,
-            data=layer.data,
-            name=layer.name,
-            meta=layer.meta,
-        )
+    results = Results(layers)
+    # for l in layers:
+    #     results.create(l.kind, l.data, l.name, l.meta)
     return results
 
 
@@ -247,7 +240,7 @@ class Algorithm(AlgorithmRunner):
         tags: Optional[List[str]] = None,
         project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
         metadata_file: str = "metadata.yaml",
-        samples: Optional[Dict[str, Any]] = None,
+        samples: Optional[List[Dict[str, Any]]] = None,
     ):
         # Initialize mutables
         if tags is None:
@@ -320,11 +313,11 @@ class Algorithm(AlgorithmRunner):
         etc.open_doc_link(algo_params_schema, algo_info=self.algo_info)
 
     @validate_algorithm
-    def get_parameters(self, algorithm=None) -> dict:
+    def get_parameters(self, algorithm=None) -> Dict[str, Any]:
         return self.parameters_model.model_json_schema()
 
     @validate_algorithm
-    def get_sample(self, algorithm=None, idx: int = 0) -> Results:
+    def get_sample(self, algorithm=None, idx: int = 0) -> Optional[Results]:
         n_samples = self.get_n_samples(algorithm)
         if n_samples == 0:
             return
@@ -334,12 +327,12 @@ class Algorithm(AlgorithmRunner):
                 f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!"
             )
 
-        algo_params_defs = self.get_parameters(algorithm).get("properties")
+        algo_params_defs = self.get_parameters(algorithm)["properties"]
         signature_params = self.get_signature_params(algorithm)
         resolved_params = etc.resolve_params(
             algo_param_defs=algo_params_defs,
             signature_params=signature_params,
-            args=[],
+            args=(),
             algo_params=self.samples[idx],
         )
 
@@ -377,11 +370,11 @@ class Algorithm(AlgorithmRunner):
 
     def _tile(
         self,
-        algorithm,
-        tile_size_px,
-        overlap_percent,
-        delay_sec,
-        randomize,
+        algorithm: str,
+        tile_size_px: int,
+        overlap_percent: float,
+        delay_sec: float,
+        randomize: bool,
         param_results: Results,
     ):
         """Process the image sequentially in tiles."""
@@ -419,7 +412,7 @@ def algorithm(
     tags: Optional[List[str]] = None,
     project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
     metadata_file: str = "metadata.yaml",
-    samples: Optional[Dict[str, Any]] = None,
+    samples: Optional[List[Dict[str, Any]]] = None,
 ):
     """Convert a Python function into an algorithm instance (sk.Algorithm).
 

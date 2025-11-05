@@ -5,24 +5,24 @@ import os
 import shutil
 import webbrowser
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import yaml
 from jinja2 import Template
 
-from imaging_server_kit.core.results import Results
+from imaging_server_kit.core.results import Results, LayerStackBase
 from imaging_server_kit.core.tiling import generate_nd_tiles
 
 templates_dir = Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("templates")
+    importlib.resources.files("imaging_server_kit.core").joinpath("templates") # type: ignore
 )
 static_dir = Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("static")
+    importlib.resources.files("imaging_server_kit.core").joinpath("static") # type: ignore
 )
 
 
-def parse_algo_params_schema(algo_params_schema: Dict) -> Dict:
-    algo_params = algo_params_schema.get("properties")
+def parse_algo_params_schema(algo_params_schema: Dict[str, Any]) -> Dict[str, Any]:
+    algo_params: Dict = algo_params_schema["properties"]
     required_params = algo_params_schema.get("required")
     for param in algo_params:
         if required_params is None:
@@ -86,7 +86,7 @@ def parse_algo_info(
 
 
 def generate_tiles(
-    param_results: Results,
+    param_results: LayerStackBase,
     tile_size_px: int,
     overlap_percent: float,
     delay_sec: float,
@@ -122,8 +122,8 @@ def generate_tiles(
 
 def resolve_params(
     algo_param_defs: Dict,
-    signature_params: Dict,
-    args: List,
+    signature_params: List[str],
+    args: Tuple,
     algo_params: Dict,
 ) -> Dict:
     """Implement a parameters resolution strategy from the explicit parameter annotations, and function signature."""
@@ -146,7 +146,7 @@ def resolve_params(
             
     # Default values
     param_defaults = {
-        param_name: algo_param_defs.get(param_name).get("default")
+        param_name: algo_param_defs[param_name].get("default")
         for param_name in algo_param_defs.keys()
     }
 

@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.runner import AlgorithmRunner
@@ -17,7 +17,7 @@ class MultiAlgorithm(AlgorithmRunner):
         self.name = name
 
     @property
-    def algorithms_dict(self) -> Dict:
+    def algorithms_dict(self) -> Dict[str, Algorithm]:
         return {sk_algo.name: sk_algo for sk_algo in self.sk_algorithms}
 
     @property
@@ -26,40 +26,33 @@ class MultiAlgorithm(AlgorithmRunner):
 
     @validate_algorithm
     def info(self, algorithm: str):
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.info(algorithm.name)
+        return self.algorithms_dict[algorithm].info(algorithm)
 
     @validate_algorithm
     def get_parameters(self, algorithm: str) -> Dict:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.get_parameters(algorithm.name)
+        return self.algorithms_dict[algorithm].get_parameters(algorithm)
 
     @validate_algorithm
-    def get_sample(self, algorithm: str, idx: int = 0) -> Results:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.get_sample(algorithm.name, idx=idx)
+    def get_sample(self, algorithm: str, idx: int = 0) -> Optional[Results]:
+        return self.algorithms_dict[algorithm].get_sample(algorithm, idx=idx)
 
     @validate_algorithm
     def get_n_samples(self, algorithm: str) -> int:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.get_n_samples(algorithm.name)
+        return self.algorithms_dict[algorithm].get_n_samples(algorithm)
 
     @validate_algorithm
     def get_signature_params(self, algorithm: str) -> List[str]:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.get_signature_params(algorithm.name)
+        return self.algorithms_dict[algorithm].get_signature_params(algorithm)
 
+    @validate_algorithm
     def __call__(self, algorithm: str, *args, **kwargs):
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm.__call__(*args, **kwargs)
+        return self.algorithms_dict[algorithm].__call__(*args, **kwargs)
 
     def _is_stream(self, algorithm: str) -> bool:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm._is_stream(algorithm.name)
+        return self.algorithms_dict[algorithm]._is_stream(algorithm)
 
     def _stream(self, algorithm: str, param_results: Results):
-        algorithm = self.algorithms_dict[algorithm]
-        for results in algorithm._stream(algorithm.name, param_results):
+        for results in self.algorithms_dict[algorithm]._stream(algorithm, param_results):
             yield results
 
     def _tile(
@@ -72,9 +65,8 @@ class MultiAlgorithm(AlgorithmRunner):
         param_results: Results,
     ):
         """Breaks down the image into tiles before sequentially processing them."""
-        algorithm = self.algorithms_dict[algorithm]
-        for results in algorithm._tile(
-            algorithm.name,
+        for results in self.algorithms_dict[algorithm]._tile(
+            algorithm,
             tile_size_px,
             overlap_percent,
             delay_sec,
@@ -84,8 +76,7 @@ class MultiAlgorithm(AlgorithmRunner):
             yield results
 
     def _run(self, algorithm: str, param_results: Results) -> Results:
-        algorithm = self.algorithms_dict[algorithm]
-        return algorithm._run(algorithm.name, param_results)
+        return self.algorithms_dict[algorithm]._run(algorithm, param_results)
 
 
 def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgorithm:

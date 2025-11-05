@@ -27,7 +27,7 @@ import imaging_server_kit as sk
     },
     samples=[
         {
-            "image": Path(__file__).parent / "sample_images" / "blobs.tif",
+            "image": Path(__file__).parent / "samples" / "blobs.tif",
             "threshold": 0.7,
         }
     ],

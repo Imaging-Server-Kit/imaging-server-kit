@@ -20,7 +20,7 @@ class Notification(DataLayer):
         data: Optional[str] = None,
         name="Notification",
         description="Text notification",
-        default: str = None,
+        default: Optional[str] = None,
         meta: Optional[Dict] = None,
     ):
         super().__init__(

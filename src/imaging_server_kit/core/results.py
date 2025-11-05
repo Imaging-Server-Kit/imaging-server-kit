@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
 
 import numpy as np
 
@@ -26,12 +26,9 @@ class LayerStackBase(ABC):
     """
     Base class representing a layer stack.
     """
-
-    @abstractmethod
-    def __iter__(self): ...
-
-    @abstractmethod
-    def __getitem__(self) -> DataLayer: ...
+    @property
+    def layers(self):
+        return []
 
     @abstractmethod
     def create(
@@ -43,11 +40,14 @@ class LayerStackBase(ABC):
 
     @abstractmethod
     def update(
-        self, layer_name: str, layer_data: np.ndarray, layer_meta: Dict
+        self, layer_name: str, layer_data: Optional[np.ndarray], layer_meta: Dict
     ) -> Optional[DataLayer]: ...
 
     @abstractmethod
     def delete(self, layer_name: str): ...
+
+    @abstractmethod
+    def get_pixel_domain(self) -> np.ndarray: ...
 
     def __len__(self):
         return len(self.layers)
@@ -102,16 +102,16 @@ class LayerStackBase(ABC):
 
             if (layer.is_tiled) & (tiles_callback is not None):
                 tiles_callback(
-                    tile_idx=layer.meta.get("tile_params").get("tile_idx"),
-                    n_tiles=layer.meta.get("tile_params").get("n_tiles"),
-                )
+                    tile_idx=layer.meta["tile_params"]["tile_idx"],
+                    n_tiles=layer.meta["tile_params"]["n_tiles"],
+                ) # type: ignore
 
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
         serialized_results = []
         for layer in self.layers:
-            datalayer_class: DataLayer = type(layer)
-            data = datalayer_class.serialize(layer.data, client_origin)
+            cls: Type[DataLayer] = DATA_TYPES[layer.kind]
+            data = cls.serialize(layer.data, client_origin)
             meta = _serialize_meta(layer.meta)
             serialized_results.append(
                 {
@@ -160,9 +160,12 @@ class Results(LayerStackBase):
         Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
     """
 
-    def __init__(self):
+    def __init__(self, layers: Optional[List[DataLayer]] = None):
         super().__init__()
-        self.layers: List[DataLayer] = []
+        self._layers: List[DataLayer] = []
+        if layers is not None:
+            for l in layers:
+                self.create(l.kind, l.data, l.name, l.meta)
 
     def __str__(self):
         message = f"Results (Layers: {len(self.layers)})"
@@ -173,13 +176,17 @@ class Results(LayerStackBase):
 
     def __repr__(self):
         return self.__str__()
+    
+    @property
+    def layers(self) -> List[DataLayer]:
+        return self._layers
 
     def create(
         self,
         kind: str,
         data: Any,
         name: Optional[str] = None,
-        meta: Optional[str] = None,
+        meta: Optional[Dict] = None,
         **kwargs,
     ) -> DataLayer:
         """Create a new layer in the results stack.
@@ -208,7 +215,7 @@ class Results(LayerStackBase):
             meta = {}
 
         # Get layer class to instanciate
-        cls: DataLayer = DATA_TYPES.get(kind)
+        cls: Optional[Type[DataLayer]] = DATA_TYPES.get(kind)
         if cls is None:
             raise ValueError(f"{kind} layers cannot be handled.")
 
@@ -216,7 +223,7 @@ class Results(LayerStackBase):
         layer = cls(name=name, data=data, meta=meta, **kwargs)
 
         # Add layer to the stack
-        self.layers.append(layer)
+        self._layers.append(layer)
 
         return layer
 
@@ -239,7 +246,7 @@ class Results(LayerStackBase):
         """Delete a layer by name."""
         for idx, layer in enumerate(self.layers):
             if layer.name == layer_name:
-                self.layers.pop(idx)
+                self._layers.pop(idx)
 
     def get_pixel_domain(self) -> np.ndarray:
         domains = []

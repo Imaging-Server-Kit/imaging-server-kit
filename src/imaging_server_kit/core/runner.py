@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from tqdm import tqdm
 
@@ -68,7 +68,7 @@ def update_pbar(tile_idx, n_tiles, tqdm_pbar):
 
 
 class AlgorithmRunner(ABC):
-    @property
+    @property # type: ignore
     @abstractmethod
     def algorithms(): ...
 
@@ -96,12 +96,12 @@ class AlgorithmRunner(ABC):
     @abstractmethod
     def _tile(
         self,
-        algorithm,
-        tile_size_px,
-        overlap_percent,
-        delay_sec,
-        randomize,
-        param_results,
+        algorithm: Optional[str],
+        tile_size_px: int,
+        overlap_percent: float,
+        delay_sec: float,
+        randomize: bool,
+        param_results: Results,
     ): ...
 
     @abstractmethod
@@ -110,15 +110,15 @@ class AlgorithmRunner(ABC):
     def run(
         self,
         *args,
-        algorithm=None,
+        algorithm: Optional[str]=None,
         tiled: bool = False,
         tile_size_px: int = 64,
         overlap_percent: float = 0.0,
         delay_sec: float = 0.0,
         randomize: bool = False,
-        results: Union[LayerStackBase, "napari.Viewer"] = None,
+        results: Union[LayerStackBase, "napari.Viewer"] = None, # type: ignore
         **algo_params,
-    ) -> Union[LayerStackBase, "napari.Viewer"]:
+    ) -> Union[LayerStackBase, "napari.Viewer"]: # type: ignore
         """
         Execute an algorithm with a set of parameters.
         
@@ -135,7 +135,7 @@ class AlgorithmRunner(ABC):
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 
         # Parameters from the Pydantic model => gives defaults from the {parameters=} definition
-        algo_param_defs = self.get_parameters(algorithm).get("properties")
+        algo_param_defs = self.get_parameters(algorithm)["properties"]
 
         # Ordered list of parameter names based on the run function signature (args + kwargs)
         signature_params = self.get_signature_params(algorithm)
@@ -152,10 +152,10 @@ class AlgorithmRunner(ABC):
         # Convert the resolved parameters to a Results object
         param_results = Results()
         for param_name, param_value in resolved_params.items():
-            kind = algo_param_defs.get(param_name).get("param_type")
+            kind = algo_param_defs[param_name].get("param_type")
             if kind == "image":
                 # TODO: this is a special case for RGB... how else could we handle that?
-                rgb = algo_param_defs.get(param_name).get("rgb")
+                rgb = algo_param_defs[param_name].get("rgb")
                 param_results.create(kind, param_value, param_name, rgb=rgb)
             else:
                 param_results.create(kind, param_value, param_name)
@@ -188,7 +188,7 @@ class AlgorithmRunner(ABC):
                 delay_sec,
                 randomize,
                 param_results,
-            ):
+            ): # type: ignore
                 results.merge(
                     tile_results,
                     tiles_callback=lambda tile_idx, n_tiles: update_pbar(
@@ -206,6 +206,6 @@ class AlgorithmRunner(ABC):
                 results.merge(run_results)
 
         if special_napari_case:
-            return results.viewer
+            return results.viewer # type: ignore
         else:
             return results

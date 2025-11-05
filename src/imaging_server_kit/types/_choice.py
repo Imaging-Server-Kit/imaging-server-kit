@@ -25,7 +25,7 @@ class Choice(DataLayer):
         name="Choice",
         description="Dropdown selection",
         items: Optional[List] = None,
-        default: str = None,
+        default: Optional[str] = None,
         auto_call: bool = False,
         meta: Optional[Dict] = None,
     ):
@@ -38,7 +38,7 @@ class Choice(DataLayer):
         if items is None:
             items = []
         # Special: type defined here because it depends on items...
-        self.type = Literal.__getitem__(tuple(items))
+        self.type = Literal.__getitem__(tuple(items)) # type: ignore
         self.default = default
         self.auto_call = auto_call
         

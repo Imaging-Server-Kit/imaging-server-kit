@@ -1,3 +1,4 @@
+from typing import Dict, Type
 from .data_layer import DataLayer
 from ._image import Image
 from ._mask import Mask
@@ -14,7 +15,7 @@ from ._choice import Choice
 from ._notification import Notification
 from ._null import Null
 
-DATA_TYPES = {
+DATA_TYPES: Dict[str, Type[DataLayer]] = {
     c.kind: c
     for c in [
         Image,

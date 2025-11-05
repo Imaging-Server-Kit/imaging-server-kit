@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from geojson import Feature, LineString
 
@@ -8,13 +8,13 @@ from imaging_server_kit.types.common import merge_meta_tile, extract_meta_tile
 
 
 def _preprocess_tile_info(vectors: np.ndarray, vectors_meta: Dict, tile_info: Dict):
-    tile_info = tile_info.get("tile_params")
-    ndim = tile_info.get("ndim")
+    tile_info = tile_info["tile_params"]
+    ndim = tile_info["ndim"]
     if ndim != vectors.shape[2]:
-        raise Exception("Tile info does not match with data shape")
+        raise ValueError(f"ndim from tile info ({ndim}) is incompatible with data shape ({vectors.shape})")
 
-    tile_sizes = [tile_info.get(f"tile_size_{idx}") for idx in range(ndim)]
-    tile_positions = [tile_info.get(f"pos_{idx}") for idx in range(ndim)]
+    tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
+    tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
     tile_max_positions = [
         tile_pos + tile_size
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
@@ -100,14 +100,12 @@ class Vectors(DataLayer):
             return
         return np.max(self.data[:, 0], axis=0)
 
-    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+    def get_tile(self, tile_info: Dict) -> Tuple[np.ndarray, Dict]:
         ndim, vectors_tile, vectors_meta_tile, tile_filter, tile_positions = (
             _preprocess_tile_info(self.data, self.meta, tile_info)
         )
-
         # Offset the vectors in the tile by the tile position
         vectors_tile[:, 0, :ndim] = vectors_tile[:, 0, :ndim] - tile_positions
-
         return vectors_tile, vectors_meta_tile
 
     def merge_tile(self, vectors_tile: np.ndarray, tile_info: Dict):
@@ -172,7 +170,7 @@ class Vectors(DataLayer):
         return vectors
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain):
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         ndim = len(pixel_domain)

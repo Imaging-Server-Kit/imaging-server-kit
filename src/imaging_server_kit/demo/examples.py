@@ -59,6 +59,7 @@ def threshold_algo(image, threshold, dark_background):
     description="Implementation of an automatic threshold algorithm.",
     tags=["Segmentation", "Scikit-image", "Demo"],
     parameters={
+        "image": sk.Image(),
         "method": sk.Choice(
             name="Method",
             default="Otsu",
@@ -91,6 +92,7 @@ def auto_threshold(image, method):
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.gaussian",
     tags=["Filtering", "Scikit-image", "Demo"],
     parameters={
+        "image": sk.Image(),
         "sigma": sk.Float(
             name="Sigma",
             min=0,
@@ -164,7 +166,7 @@ def sobel_algo(image):
         "size": sk.Integer(name="Size", default=1, min=1, max=10, auto_call=True),
     },
 )
-def fibonacci_sphere(N, r, color, size) -> np.ndarray:
+def fibonacci_sphere(N, r, color, size):
     golden_angle = np.pi * (3.0 - np.sqrt(5.0))
     i = np.arange(N, dtype=np.float64)
 
@@ -191,22 +193,22 @@ def fibonacci_sphere(N, r, color, size) -> np.ndarray:
     tags=["Scikit-image", "Demo"],
     parameters={
         "image": sk.Image(description="Input image (2D, 3D).", dimensionality=[2, 3]),
-        "min_sigma": sk.Float(
+        "min_sigma": sk.Integer(
             name="Min sigma",
             description="Minimum standard deviation of the Gaussian kernel, in pixels.",
-            default=5.0,
-            min=0.1,
-            max=100.0,
-            step=0.1,
+            default=5,
+            min=1,
+            max=100,
+            step=1,
             auto_call=True,
         ),
-        "max_sigma": sk.Float(
+        "max_sigma": sk.Integer(
             name="Max sigma",
             description="Maximum standard deviation of the Gaussian kernel, in pixels.",
-            default=10.0,
-            min=0.1,
-            max=100.0,
-            step=0.1,
+            default=10,
+            min=1,
+            max=100,
+            step=1,
             auto_call=True,
         ),
         "num_sigma": sk.Integer(
@@ -240,19 +242,17 @@ def fibonacci_sphere(N, r, color, size) -> np.ndarray:
     },
     samples=[
         {"image": Path(__file__).parent / "sample_images" / "blobs.tif"},
-        {
-            "image": "/home/wittwer/code/serverkit-project/extra-examples/examples/serverkit-skimage-log/sample_images/tracks.tif"
-        },
+        {"image": Path(__file__).parent / "sample_images" / "tracks.tif"},
     ],
 )
 def blob_detector_algo(
     image: np.ndarray,
-    max_sigma: float,
+    max_sigma: int,
     num_sigma: int,
     threshold: float,
     invert_image: bool,
     time_dim: bool,
-    min_sigma: float,
+    min_sigma: int,
 ):
     if invert_image:
         image = -image
@@ -287,8 +287,8 @@ def blob_detector_algo(
             num_sigma=num_sigma,
             threshold=threshold,
         )
-        points = results[:, :2]
-        sigmas = results[:, 2]
+        points = results[:, :image.ndim]
+        sigmas = results[:, image.ndim]
 
     points_params = {
         "opacity": 0.7,
@@ -396,7 +396,7 @@ def nl_means_denoise(
 
 ## SLIC
 @sk.algorithm(
-    name="SLIC superpixels",
+    name="Superpixels (RGB)",
     description="SLIC algorithm (Scikit-image implementation). Segment an image using k-means clustering in Color-(x,y,z) space.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.segmentation.html#skimage.segmentation.slic",
     tags=["Segmentation", "Scikit-image", "Demo"],
@@ -459,6 +459,7 @@ def notif_stream(time_delay, n_times, level):
 
 ## Background subtraction
 @sk.algorithm(
+    name="Background subtraction",
     parameters={
         "image": sk.Image(dimensionality=[2, 3]),
         "sigma": sk.Float(name="Sigma", min=0, default=30, step=5, auto_call=True),
@@ -497,7 +498,9 @@ def background_subtract(image, sigma, method):
     name="Projections (3D -> 2D)",
     parameters={
         "image": sk.Image(name="3D image", dimensionality=[3], required=True),
-        "method": sk.Choice(name="Method", items=["max", "min", "mean"], default="max", auto_call=True),
+        "method": sk.Choice(
+            name="Method", items=["max", "min", "mean"], default="max", auto_call=True
+        ),
         "axis": sk.Choice(name="Axis", items=["0", "1", "2"], auto_call=True),
     },
     samples=[{"image": skimage.data.brain()}],

@@ -3,7 +3,7 @@ Client interface for the Imaging Server Kit.
 """
 
 import webbrowser
-from typing import Any, Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -41,7 +41,7 @@ class Client(AlgorithmRunner):
     info(): Access algorithm documentation.
     get_parameters(): Get the algorithm parameters schema.    
     """
-    def __init__(self, server_url: str = "") -> None:
+    def __init__(self, server_url: Optional[str] = None) -> None:
         self.server_url = server_url
         self._algorithms = []
         if server_url:
@@ -57,11 +57,11 @@ class Client(AlgorithmRunner):
         self._algorithms = algorithms
 
     @property
-    def server_url(self) -> str:
+    def server_url(self) -> Optional[str]:
         return self._server_url
 
     @server_url.setter
-    def server_url(self, server_url: str):
+    def server_url(self, server_url: Optional[str]):
         self._server_url = server_url
 
     def connect(self, server_url: str) -> None:
@@ -80,7 +80,7 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     @validate_algorithm
-    def get_sample(self, algorithm=None, idx: int = 0) -> Dict[str, Any]:
+    def get_sample(self, algorithm=None, idx: int = 0) -> Results:
         n_samples = self.get_n_samples(algorithm)
         if (idx < 0) | (idx > n_samples - 1):
             raise ValueError(
@@ -121,7 +121,7 @@ class Client(AlgorithmRunner):
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.token}",
                         "accept": "application/msgpack",
-                        "User-Agent": "Python-Napari",
+                        "User-Agent": "Python/Napari",
                     },
                     stream=True,
                 )

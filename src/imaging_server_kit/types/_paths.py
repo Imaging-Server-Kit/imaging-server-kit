@@ -49,19 +49,19 @@ class Paths(DataLayer):
         # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
     def pixel_domain(self):
-        raise NotImplementedError("Not implemented")
-
-    def get_tile(
-        self, paths: np.ndarray, paths_meta: Dict, tile_info: Dict
-    ) -> List[np.ndarray]:
-        raise NotImplementedError("Not implemented")
-
-    def merge_tile(self, paths_tile: np.ndarray, tile_info: Dict):
-        raise NotImplementedError("Not implemented")
+        if self.data is None:
+            return
+        path_domains = []
+        for path in self.data:
+            path_domain = np.max(path, axis=0)
+            path_domains.append(list(path_domain))
+        path_domains = np.asarray(path_domains)
+        pixel_domain = np.max(path_domains, axis=0)
+        return pixel_domain
 
     @classmethod
-    def serialize(cls, data, client_origin):
-        return [encode_contents(arr.astype(np.float32) for arr in data)]
+    def serialize(cls, data: List[np.ndarray], client_origin):
+        return [encode_contents(arr.astype(np.float32)) for arr in data]
 
     @classmethod
     def deserialize(cls, serialized_data, client_origin):
@@ -69,9 +69,11 @@ class Paths(DataLayer):
         for f in serialized_data:
             if isinstance(f, str):
                 f = decode_contents(f)
-            data.append(f.astype(float))
+                data.append(f.astype(float))
         return data
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain):
-        raise NotImplementedError("Not implemented")
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if pixel_domain is None:
+            return
+        return np.asarray([])

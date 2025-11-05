@@ -3,7 +3,7 @@ Serialization module for the Imaging Server Kit.
 """
 
 import base64
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 from imaging_server_kit.core.results import Results, DataLayer
 from imaging_server_kit.types import DATA_TYPES
 
@@ -51,15 +51,13 @@ def deserialize_results(serialized_results: List[Dict], client_origin: str) -> R
     results = Results()
     
     for ser in serialized_results:
-        kind = ser.get("kind")
-        name = ser.get("name")
-        meta = ser.get("meta")
-        data = ser.get("data")
+        kind = ser["kind"]
+        name = ser["name"]
+        meta = ser["meta"]
+        data = ser["data"]
 
-        datalayer_class: DataLayer = DATA_TYPES.get(kind)
-        
-        decoded_data = datalayer_class.deserialize(data, client_origin)
-        
+        cls: Type[DataLayer] = DATA_TYPES[kind]
+        decoded_data = cls.deserialize(data, client_origin)
         decoded_meta = _deserialize_meta(meta)
 
         results.create(

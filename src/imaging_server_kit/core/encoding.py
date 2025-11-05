@@ -16,7 +16,7 @@ def decode_contents(contents: str) -> np.ndarray:
     return tifffile.imread(io.BytesIO(base64.b64decode(contents)))
 
 
-def encode_contents(image: np.ndarray) -> str:
+def encode_contents(arr: np.ndarray) -> str:
     """Encodes a NumPy array image into a base64 string.
 
     Args:
@@ -26,7 +26,7 @@ def encode_contents(image: np.ndarray) -> str:
         str: The base64 encoded string representation of the image.
     """
     img_byte_arr = io.BytesIO()
-    tifffile.imwrite(img_byte_arr, image)
+    tifffile.imwrite(img_byte_arr, arr)
 
     return base64.b64encode(img_byte_arr.getvalue()).decode()
 

@@ -34,7 +34,7 @@ class DataLayer(ABC):
         Reconstructs an instance from a JSON representation.
     """
 
-    kind = None
+    kind: str = ""
     type = Union[str, np.ndarray, type(None)]
 
     def __init__(
@@ -50,19 +50,17 @@ class DataLayer(ABC):
         self.data = data
 
         # Schema contributions
-        main = {}
-        extra = {}
-        self.constraints = [main, extra]
+        self.constraints = [{}, {}]
 
     @property
     def is_tiled(self) -> bool:
         return self.meta.get("tile_params") is not None
 
     @property
-    def is_first_tile(self):
+    def is_first_tile(self) -> bool:
         if not self.is_tiled:
             return False
-        tile_params = self.meta.get("tile_params")
+        tile_params = self.meta["tile_params"]
         is_first_tile = tile_params.get("first_tile")
         return is_first_tile is not None
 
@@ -70,13 +68,13 @@ class DataLayer(ABC):
         # Figure out the pixel domain
         pixel_domain = self.pixel_domain()
         if self.is_tiled:
-            tile_params = self.meta.get("tile_params")
-            ndim = tile_params.get("ndim")
+            tile_params = self.meta["tile_params"]
+            ndim = tile_params["ndim"]
             if ndim is not None:
                 pixel_domain = tuple(
                     [tile_params.get(f"domain_size_{idx}") for idx in range(ndim)]
                 )
-        return self._get_initial_data(pixel_domain)
+        return self._get_initial_data(pixel_domain) # type: ignore
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Data: {self.data.shape if isinstance(self.data, np.ndarray) else self.data}"
@@ -88,7 +86,7 @@ class DataLayer(ABC):
         self.validate_data(v, meta, constraints)
         return v
 
-    def update(self, updated_data: np.ndarray, updated_meta: Dict) -> np.ndarray:
+    def update(self, updated_data: np.ndarray, updated_meta: Dict) -> None:
         self.data = updated_data
         self.meta = updated_meta
         self.refresh()
@@ -96,7 +94,7 @@ class DataLayer(ABC):
     def refresh(self):
         pass
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> None:
         pass
 
     def merge_tile(self, tile_data: np.ndarray, tile_info: Dict):
@@ -111,12 +109,12 @@ class DataLayer(ABC):
 
     @classmethod
     @abstractmethod
-    def serialize(cls, data: Any, client_origin: str): ...
+    def serialize(cls, data: Any, client_origin: str) -> Any: ...
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, serialized_data: Any, client_origin: str): ...
+    def deserialize(cls, serialized_data: Any, client_origin: str) -> Any: ...
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: np.ndarray):
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
         pass

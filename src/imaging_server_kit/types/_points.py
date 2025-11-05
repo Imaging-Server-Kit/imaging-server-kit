@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from geojson import Feature, Point
 
@@ -8,13 +8,13 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 
 def _preprocess_tile_info(points: np.ndarray, points_meta: Dict, tile_info: Dict):
-    tile_info = tile_info.get("tile_params")
-    ndim = tile_info.get("ndim")
+    tile_info = tile_info["tile_params"]
+    ndim = tile_info["ndim"]
     if ndim != points.shape[1]:
-        raise Exception("Tile info does not match with data shape")
+        raise ValueError(f"ndim from tile info ({ndim}) is incompatible with data shape ({points.shape})")
 
-    tile_sizes = [tile_info.get(f"tile_size_{idx}") for idx in range(ndim)]
-    tile_positions = [tile_info.get(f"pos_{idx}") for idx in range(ndim)]
+    tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
+    tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
     tile_max_positions = [
         tile_pos + tile_size
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
@@ -47,25 +47,26 @@ def _preprocess_tile_info(points: np.ndarray, points_meta: Dict, tile_info: Dict
     return ndim, points_tile, points_meta_tile, tile_filter, tile_positions
 
 
-def decode_features(features):
+def decode_point_features(features: List[Feature]) -> np.ndarray:
     if len(features):
         points = np.array([feature["geometry"]["coordinates"] for feature in features])
         points = points[:, 0, :]  # Remove an extra dimension
         points = points[:, ::-1]  # Invert XY
         return points.astype(float)
     else:
-        return features
+        return np.asarray(features)
 
 
-def encode_features(data: np.ndarray):
-    features = []
-    point_coords = np.array(data)[:, ::-1]  # Invert XY
-    for i, point in enumerate(point_coords):
+def encode_point_features(points: np.ndarray) -> List[Feature]:
+    point_features = []
+    point_coords = np.asarray(points)[:, ::-1]  # Invert XY
+    for detection_id, point in enumerate(point_coords):
         try:
-            geom = Point(coordinates=[np.array(point).tolist()])
-            features.append(Feature(geometry=geom, properties={"Detection ID": i}))
+            geom = Point(coordinates=[np.asarray(point).tolist()])
+            point_features.append(Feature(geometry=geom, properties={"Detection ID": detection_id}))
         except:
             print("Invalid point geometry.")
+    return point_features
 
 
 class Points(DataLayer):
@@ -119,7 +120,7 @@ class Points(DataLayer):
             return
         return np.max(self.data, axis=0)
 
-    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+    def get_tile(self, tile_info: Dict) -> Tuple[np.ndarray, Dict]:
         ndim, points_tile, points_meta_tile, tile_filter, tile_positions = (
             _preprocess_tile_info(self.data, self.meta, tile_info)
         )
@@ -127,9 +128,9 @@ class Points(DataLayer):
         # Offset the points in the tile by the tile position
         points_tile[:, :ndim] = points_tile[:, :ndim] - tile_positions
 
-        return points_tile, points_meta_tile
+        return (points_tile, points_meta_tile)
 
-    def merge_tile(self, points_tile: np.ndarray, tile_info: Dict):
+    def merge_tile(self, points_tile: np.ndarray, tile_info: Dict) -> None:
         points_tile_meta = tile_info
         ndim, old_points_tile, old_points_meta_tile, tile_filter, tile_positions = (
             _preprocess_tile_info(self.data, points_tile_meta, tile_info)
@@ -159,28 +160,26 @@ class Points(DataLayer):
         self.meta = merged_points_meta
 
     @classmethod
-    def serialize(cls, data, client_origin):
+    def serialize(cls, points: np.ndarray, client_origin: str):
         if client_origin == "Python/Napari":
-            features = encode_contents(data.astype(np.float32))
+            point_features = encode_contents(points.astype(np.float32))
         elif client_origin == "Java/QuPath":
-            features = encode_features(data)
+            point_features = encode_point_features(points)
         else:
             raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return features
+        return point_features
 
     @classmethod
-    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
-        if isinstance(serialized_data, str):
+    def deserialize(cls, serialized_points: Union[np.ndarray, str], client_origin: str) -> np.ndarray:
+        if isinstance(serialized_points, str):
             if client_origin == "Python/Napari":
-                data = decode_contents(serialized_data).astype(float)
-            elif client_origin == "Java/QuPath":
-                data = decode_features(serialized_data)
+                points = decode_contents(serialized_points).astype(float)
             else:
                 raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return data
+        return points
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain):
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.zeros((0, len(pixel_domain)), dtype=np.float32)

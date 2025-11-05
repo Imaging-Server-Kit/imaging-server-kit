@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -6,10 +6,10 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 
 def _get_tile_slices(tile_info: Dict):
-    tile_info = tile_info.get("tile_params")
-    ndim = tile_info.get("ndim")
-    tile_sizes = [tile_info.get(f"tile_size_{idx}") for idx in range(ndim)]
-    tile_positions = [tile_info.get(f"pos_{idx}") for idx in range(ndim)]
+    tile_info = tile_info["tile_params"]
+    ndim = tile_info["ndim"]
+    tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
+    tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
     tile_max_positions = [
         tile_pos + tile_size
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
@@ -77,15 +77,19 @@ class Image(DataLayer):
         else:
             return self.data.shape
 
-    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
+    def get_tile(self, tile_info: Dict) -> Tuple[Optional[np.ndarray], Dict]:
         tile_slices = _get_tile_slices(tile_info)
-        tile_data = self.data[tile_slices]
+        if self.data is not None:
+            tile_data = self.data[tile_slices]
+        else:
+            tile_data = None
         return tile_data, self.meta
 
     def merge_tile(self, image_tile: np.ndarray, tile_info: Dict):
         tile_slices = _get_tile_slices(tile_info)
         # TODO: implement a linear blending strategy instead of this.
-        self.data[tile_slices] = image_tile
+        if self.data is not None:
+            self.data[tile_slices] = image_tile
         # For this, we'd need a mask representing how many tiles are already overlapping at a given pixel,
         # so that we can compute a running average.
 
@@ -100,7 +104,7 @@ class Image(DataLayer):
         return serialized_data.astype(float)
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain):
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.zeros(pixel_domain, dtype=np.float32)

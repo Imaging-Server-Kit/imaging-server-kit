@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import imantics
 import numpy as np
@@ -160,14 +160,14 @@ def features2instance_mask_3d(features, image_shape):
     return segmentation_mask
 
 
-def _get_slices(current_data: np.ndarray, tile_info: Dict):
-    tile_info = tile_info.get("tile_params")
-    ndim = tile_info.get("ndim")
-    if ndim != current_data.ndim:
-        raise Exception("Tile info does not match with data shape")
+def _get_slices(mask: np.ndarray, tile_info: Dict):
+    tile_info = tile_info["tile_params"]
+    ndim = tile_info["ndim"]
+    if ndim != mask.ndim:
+        raise ValueError(f"ndim from tile info ({ndim}) is incompatible with data shape ({mask.shape})")
 
-    tile_sizes = [tile_info.get(f"tile_size_{idx}") for idx in range(ndim)]
-    tile_positions = [tile_info.get(f"pos_{idx}") for idx in range(ndim)]
+    tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
+    tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
     tile_max_positions = [
         tile_pos + tile_size
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
@@ -175,8 +175,7 @@ def _get_slices(current_data: np.ndarray, tile_info: Dict):
     slices = [
         slice(pos, max_pos) for pos, max_pos in zip(tile_positions, tile_max_positions)
     ]
-    slices = tuple(slices)
-    return slices
+    return tuple(slices)
 
 
 class Mask(DataLayer):
@@ -229,21 +228,25 @@ class Mask(DataLayer):
             return
         return self.data.shape
 
-    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
-        tile_silces = _get_slices(self.data, tile_info)
-        tile_data = self.data[tile_silces]
+    def get_tile(self, tile_info: Dict) -> Tuple[Optional[np.ndarray], Dict]:
+        if self.data is not None:
+            tile_silces = _get_slices(self.data, tile_info)
+            tile_data = self.data[tile_silces]
+        else:
+            tile_data = None
         return tile_data, self.meta
 
-    def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict):
-        tile_slices = _get_slices(self.data, tile_info)
-        self.data[tile_slices] = mask_tile
+    def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict) -> None:
+        if self.data is not None:
+            tile_slices = _get_slices(self.data, tile_info)
+            self.data[tile_slices] = mask_tile
 
     @classmethod
     def serialize(cls, data, client_origin):
         if client_origin == "Python/Napari":
             features = encode_contents(data.astype(np.uint16))
         elif client_origin == "Java/QuPath":
-            features = features2mask(data)
+            features = mask2features(data)
         else:
             raise ValueError(f"Unrecognized client origin: {client_origin}")
         return features
@@ -253,14 +256,12 @@ class Mask(DataLayer):
         if isinstance(serialized_data, str):
             if client_origin == "Python/Napari":
                 data = decode_contents(serialized_data).astype(int)
-            elif client_origin == "Java/QuPath":
-                data = mask2features(serialized_data)
             else:
                 raise ValueError(f"Unrecognized client origin: {client_origin}")
         return data
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: np.ndarray) -> np.ndarray:
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.zeros(pixel_domain, dtype=np.uint16)

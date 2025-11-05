@@ -3,7 +3,7 @@ nD-Tiling module for the Imaging Server Kit.
 """
 
 import time
-from typing import Iterable
+from typing import Dict, Iterable, List
 import numpy as np
 
 
@@ -78,7 +78,7 @@ def _get_tile_pos_and_size_i(coord_i_, n_pix_i, shift_i, half_pad_i, tile_shape_
     return pos_i, tile_size_i
 
 
-def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> Iterable:
+def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> List[Dict]:
     """Tiling in N-dimensions."""
     ndim = len(pixel_domain)
 

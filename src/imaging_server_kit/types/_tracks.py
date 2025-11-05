@@ -48,15 +48,6 @@ class Tracks(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or min_track_length (could be validated).
 
-    def pixel_domain(self):
-        raise NotImplementedError("Not implemented")
-    
-    def get_tile(self, tile_info: Dict) -> List[np.ndarray]:
-        raise NotImplementedError("Not implemented")
-
-    def merge_tile(self, tracks_tile: np.ndarray, tile_info: Dict):
-        raise NotImplementedError("Not implemented")
-
     @classmethod
     def serialize(cls, data, client_origin):
         return encode_contents(data.astype(np.float32))
@@ -68,5 +59,12 @@ class Tracks(DataLayer):
         return serialized_data.astype(float)
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain):
-        raise NotImplementedError("Not implemented")
+    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if pixel_domain is None:
+            return
+        return np.zeros((1, len(pixel_domain)+2), dtype=np.float32)
+
+    def pixel_domain(self):
+        if self.data is None:
+            return
+        return np.max(self.data, axis=0)[2:]
