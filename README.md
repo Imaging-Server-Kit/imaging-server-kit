@@ -3,19 +3,19 @@
 
 Turn Python-based image processing workflows into **algorithms** that gain extra functionalities.
 
-- [**Turn your algorithms into web servers**]() and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](08_python) via HTTP requests.
+- [**Turn your algorithms into web servers**](https://imaging-server-kit.github.io/imaging-server-kit/sections/07_server.html) and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](./sections/08_python) via HTTP requests.
 
 https://github.com/user-attachments/assets/36bda69d-996e-4240-9a53-7e76d9ea3894
 
-- [**Generate dock widgets**]() to run your algorithms interactively in Napari.
+- [**Generate dock widgets**](https://imaging-server-kit.github.io/imaging-server-kit/sections/01_algorithm.html) to run your algorithms interactively in Napari.
 
 https://github.com/user-attachments/assets/1ff572f7-f159-4f5a-afd4-7a157de3d9f8
 
-- Run your algorithms [**tile-by-tile**]() on the input data.
+- Run your algorithms [**tile-by-tile**](https://imaging-server-kit.github.io/imaging-server-kit/sections/06_tiled.html) on the input data.
 
 https://github.com/user-attachments/assets/47c2f734-5683-49d9-8aea-388c3a2bc16d
 
-- [**Stream results**]() to inspect them in real-time.
+- [**Stream results**](https://imaging-server-kit.github.io/imaging-server-kit/sections/05_streams.html) to inspect them in real-time.
 
 https://github.com/user-attachments/assets/a3f69a9f-fb68-4580-a804-6c57d5807b9a
 

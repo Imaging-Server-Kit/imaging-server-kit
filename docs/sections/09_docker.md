@@ -53,5 +53,5 @@ Congratulations! You have seen all of the main features of *Imaging Server Kit*.
 
 The last two sections of this documentation explore:
 
-- [Data layers](10_types) - A reference of all available data layers.
-- [Examples](11_examples) - A gallery of example Server Kit algorithms for selected projects.
+- [Data layers](./10_types) - A reference of all available data layers.
+- [Examples](./11_examples) - A gallery of example Server Kit algorithms for selected projects.

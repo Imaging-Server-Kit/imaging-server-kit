@@ -12,33 +12,33 @@ Server Kit algorithms are versatile objects that allow you run computations in a
 
 For example, you can
 
-- [**Turn your algorithm into a web server**](07_server), connect to it and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](08_python) via HTTP requests.
+- [**Turn your algorithm into a web server**](./sections/07_server.md), connect to it and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](./sections/08_python) via HTTP requests.
 
 <video width=512 controls loop autoplay>
   <source src="./_static/stardist_blobs.mp4" type="video/mp4">
 </video>
 
-- [**Generate a dock widget**](01_algorithm) to run your algorithm interactively in Napari.
+- [**Generate a dock widget**](./sections/01_algorithm) to run your algorithm interactively in Napari.
 
 <video width=512 controls loop autoplay>
   <source src="./_static/oripy_threshold.mp4" type="video/mp4">
 </video>
 
-- Run your algorithm [**tile-by-tile**](06_tiled) on the input image.
+- Run your algorithm [**tile-by-tile**](./sections/06_tiled) on the input image.
 
 <video width=512 controls loop autoplay>
   <source src="./_static/tiles.mp4" type="video/mp4">
 </video>
 
-- [**Stream results**](05_streams) to inspect them in real-time.
+- [**Stream results**](./sections/05_streams) to inspect them in real-time.
 
 <video width=512 controls loop autoplay>
   <source src="./_static/yolo-stream.mp4" type="video/webm">
 </video>
 
-On top of that, you can [**validate data**](08_python) passed as algorithm parameters, provide [**samples**](02_samples), and generate [**documentation**](03_metadata) for your algorithm that you can share with users.
+On top of that, you can [**validate data**](./sections/08_python) passed as algorithm parameters, provide [**samples**](./sections/02_samples), and generate [**documentation**](./sections/03_metadata) for your algorithm that you can share with users.
 
-This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](01_algorithm), and give you some [suggestions of use cases](11_examples).
+This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](./sections/01_algorithm), and give you some [suggestions of use cases](./sections/11_examples).
 
 ## Contents
 
