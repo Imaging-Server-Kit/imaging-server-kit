@@ -22,7 +22,7 @@ jobs:
         cache: pip # Implicitly uses requirements.txt for cache key
         
     - name: Install dependencies
-      run: pip install jupyter-book
+      run: pip install jupyter-book jupytext
 
     - name: Build the book
       run: |
