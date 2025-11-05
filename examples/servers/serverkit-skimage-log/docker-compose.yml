@@ -1,6 +1,0 @@
-services:
-  skimage-log:
-    build:
-      context: .
-    ports:
-      - "8000:8000"

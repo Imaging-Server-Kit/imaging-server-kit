@@ -1,2 +1,0 @@
-imaging-server-kit
-scikit-image

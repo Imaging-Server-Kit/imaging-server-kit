@@ -1,4 +1,0 @@
-imaging-server-kit
-orientationpy
-matplotlib
-scikit-image

@@ -1,6 +1,0 @@
-imaging-server-kit
-cellpose
-torch
-torchvision 
-torchaudio
-opencv-contrib-python-headless
