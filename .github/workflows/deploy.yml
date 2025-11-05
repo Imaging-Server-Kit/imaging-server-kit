@@ -26,7 +26,7 @@ jobs:
 
     - name: Build the book
       run: |
-        jb build docs
+        jupyter-book build docs
 
     # Upload the book's HTML as an artifact
     - name: Upload artifact
