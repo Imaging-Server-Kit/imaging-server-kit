@@ -234,7 +234,7 @@ class Results(LayerStackBase):
                 return layer
 
     def update(
-        self, layer_name: str, updated_data: np.ndarray, updated_meta: Dict
+        self, layer_name: str, updated_data: Any, updated_meta: Dict
     ) -> Optional[DataLayer]:
         """Update the data and meta attributes of a layer."""
         layer = self.read(layer_name)

@@ -22,6 +22,9 @@ from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.serialization import deserialize_results
 
 
+TIMEOUT_SEC = 3600  # Timeout for the /process route (in seconds)
+
+
 class Client(AlgorithmRunner):
     """Client to connect to and interact with algorithm servers.
     
@@ -181,7 +184,7 @@ class Client(AlgorithmRunner):
 
     def _run(self, algorithm: str, param_results: Results) -> Results:
         endpoint = f"{self.server_url}/{algorithm}/process"
-        with httpx.Client(base_url=self.server_url) as client:
+        with httpx.Client(base_url=self.server_url, timeout=TIMEOUT_SEC) as client:
             try:
                 response = client.post(
                     endpoint,
