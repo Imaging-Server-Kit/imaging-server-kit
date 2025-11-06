@@ -35,11 +35,11 @@ class Null(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
     @classmethod
-    def serialize(cls, data, client_origin):
+    def serialize(cls, data, client_origin: str):
         if data is not None:
             raise ValueError(f"Cannot serialize this object: {data}")
         return None
 
     @classmethod
-    def deserialize(cls, serialized_data, client_origin):
+    def deserialize(cls, serialized_data, client_origin: str):
         return None

@@ -60,11 +60,14 @@ class Paths(DataLayer):
         return pixel_domain
 
     @classmethod
-    def serialize(cls, data: List[np.ndarray], client_origin):
-        return [encode_contents(arr.astype(np.float32)) for arr in data]
+    def serialize(cls, data: Optional[List[np.ndarray]], client_origin:str):
+        if data is not None:
+            return [encode_contents(arr.astype(np.float32)) for arr in data]
 
     @classmethod
-    def deserialize(cls, serialized_data, client_origin):
+    def deserialize(cls, serialized_data: Optional[str], client_origin: str) -> Optional[List[np.ndarray]]:
+        if serialized_data is None:
+            return None
         data = []
         for f in serialized_data:
             if isinstance(f, str):

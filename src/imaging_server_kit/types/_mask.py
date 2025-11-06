@@ -242,17 +242,21 @@ class Mask(DataLayer):
             self.data[tile_slices] = mask_tile
 
     @classmethod
-    def serialize(cls, data, client_origin):
+    def serialize(cls, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:
+        if mask is None:
+            return None
         if client_origin == "Python/Napari":
-            features = encode_contents(data.astype(np.uint16))
+            features = encode_contents(mask.astype(np.uint16))
         elif client_origin == "Java/QuPath":
-            features = mask2features(data)
+            features = mask2features(mask)
         else:
             raise ValueError(f"Unrecognized client origin: {client_origin}")
         return features
 
     @classmethod
-    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
+    def deserialize(cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_data is None:
+            return None
         if isinstance(serialized_data, str):
             if client_origin == "Python/Napari":
                 data = decode_contents(serialized_data).astype(int)

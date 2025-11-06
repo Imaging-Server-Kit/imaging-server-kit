@@ -51,9 +51,11 @@ class Choice(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
     @classmethod
-    def serialize(cls, data, client_origin):
-        return str(data)
+    def serialize(cls, data: Optional[str], client_origin: str):
+        if data is not None:
+            return str(data)
 
     @classmethod
-    def deserialize(cls, serialized_data, client_origin):
-        return str(serialized_data)
+    def deserialize(cls, serialized_data: Optional[str], client_origin: str):
+        if serialized_data is not None:
+            return str(serialized_data)

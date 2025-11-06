@@ -160,7 +160,9 @@ class Points(DataLayer):
         self.meta = merged_points_meta
 
     @classmethod
-    def serialize(cls, points: np.ndarray, client_origin: str):
+    def serialize(cls, points: Optional[np.ndarray], client_origin: str) -> Optional[Union[str, List[Feature]]]:
+        if points is None:
+            return None
         if client_origin == "Python/Napari":
             point_features = encode_contents(points.astype(np.float32))
         elif client_origin == "Java/QuPath":
@@ -170,12 +172,16 @@ class Points(DataLayer):
         return point_features
 
     @classmethod
-    def deserialize(cls, serialized_points: Union[np.ndarray, str], client_origin: str) -> np.ndarray:
+    def deserialize(cls, serialized_points: Optional[Union[np.ndarray, str]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_points is None:
+            return None
         if isinstance(serialized_points, str):
             if client_origin == "Python/Napari":
                 points = decode_contents(serialized_points).astype(float)
             else:
                 raise ValueError(f"Unrecognized client origin: {client_origin}")
+        else:
+            points = serialized_points
         return points
 
     @classmethod

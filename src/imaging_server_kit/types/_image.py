@@ -94,11 +94,14 @@ class Image(DataLayer):
         # so that we can compute a running average.
 
     @classmethod
-    def serialize(cls, data, client_origin):
-        return encode_contents(data.astype(np.float32))
+    def serialize(cls, data: Optional[np.ndarray], client_origin: str):
+        if data is not None:
+            return encode_contents(data.astype(np.float32))
 
     @classmethod
-    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
+    def deserialize(cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin:str):
+        if serialized_data is None:
+            return None
         if isinstance(serialized_data, str):
             serialized_data = decode_contents(serialized_data)
         return serialized_data.astype(float)

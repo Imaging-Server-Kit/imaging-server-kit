@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from geojson import Feature, LineString
 
@@ -141,7 +141,9 @@ class Vectors(DataLayer):
         self.meta = merged_vectors_meta
 
     @classmethod
-    def serialize(cls, vectors, client_origin):
+    def serialize(cls, vectors: Optional[np.ndarray], client_origin: str) -> Optional[List[Feature]]:
+        if vectors is None:
+            return None
         serialized_vectors = []
         vectors = vectors[:, :, ::-1]  # Invert XY
         for i, vector in enumerate(vectors):
@@ -158,7 +160,10 @@ class Vectors(DataLayer):
         return serialized_vectors
 
     @classmethod
-    def deserialize(cls, serialized_vectors, client_origin: str) -> np.ndarray:
+    def deserialize(cls, serialized_vectors: Optional[List[Dict[str, Any]]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_vectors is None:
+            return None
+        
         vectors_arr = np.array(
             [feature["geometry"]["coordinates"] for feature in serialized_vectors]
         )

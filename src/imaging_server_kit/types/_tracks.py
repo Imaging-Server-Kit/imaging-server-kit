@@ -49,11 +49,14 @@ class Tracks(DataLayer):
         # TODO: Implement object-specific properties, like max_objects or min_track_length (could be validated).
 
     @classmethod
-    def serialize(cls, data, client_origin):
-        return encode_contents(data.astype(np.float32))
+    def serialize(cls, data, client_origin: str) -> Optional[str]:
+        if data is not None:
+            return encode_contents(data.astype(np.float32))
 
     @classmethod
-    def deserialize(cls, serialized_data: Union[np.ndarray, str], client_origin):
+    def deserialize(cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_data is None:
+            return None
         if isinstance(serialized_data, str):
             serialized_data = decode_contents(serialized_data)
         return serialized_data.astype(float)

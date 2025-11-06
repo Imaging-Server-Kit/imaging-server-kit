@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from geojson import Feature, Polygon
 
@@ -133,9 +133,12 @@ class Boxes(DataLayer):
         self.meta = merged_boxes_meta
 
     @classmethod
-    def serialize(cls, data, client_origin):
+    def serialize(cls, boxes: Optional[np.ndarray], client_origin: str) -> Optional[List[Feature]]:
+        if boxes is None:
+            return None
+        
         features = []
-        for i, box in enumerate(data):
+        for i, box in enumerate(boxes):
             coords = np.array(box)[:, ::-1]  # Invert XY
             coords = coords.tolist()
             coords.append(coords[0])  # Close the Polygon
@@ -149,15 +152,18 @@ class Boxes(DataLayer):
         return features
 
     @classmethod
-    def deserialize(cls, serialized_data, client_origin):
+    def deserialize(cls, serialized_data: Optional[List[Dict[str, Any]]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_data is None:
+            return None
         boxes = np.array(
             [feature["geometry"]["coordinates"] for feature in serialized_data]
         )
         boxes = np.array(
             [box[0] for box in boxes]
         )  # We get back a shape of (N, 1, 5, 2) - so we remove dim. 1
-        boxes = boxes[:, :-1]  # Remove the last element
-        boxes = boxes[:, :, ::-1]  # Invert XY
+        if len(boxes) > 0:
+            boxes = boxes[:, :-1]  # Remove the last element
+            boxes = boxes[:, :, ::-1]  # Invert XY
         return boxes
 
     @classmethod
@@ -175,4 +181,5 @@ class Boxes(DataLayer):
         assert isinstance(
             data, np.ndarray
         ), f"Boxes data ({type(data)}) is not a Numpy array"
+        
         assert len(data.shape) == 3, "Boxes data should have shape (N, 4, D)"

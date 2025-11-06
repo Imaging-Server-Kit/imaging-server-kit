@@ -36,9 +36,11 @@ class Bool(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
     @classmethod
-    def serialize(cls, data, client_origin):
-        return bool(data)
+    def serialize(cls, data: Optional[bool], client_origin: str):
+        if data is not None:
+            return bool(data)
 
     @classmethod
-    def deserialize(cls, serialized_data, client_origin):
-        return bool(serialized_data)
+    def deserialize(cls, serialized_data: Optional[str], client_origin: str):
+        if serialized_data is not None:
+            return bool(serialized_data)
