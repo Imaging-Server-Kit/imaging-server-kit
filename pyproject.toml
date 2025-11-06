@@ -27,11 +27,12 @@ dependencies = [
     "tifffile",  # To encode/decode
     "tqdm",
     "pydantic>=2.0",
-    "scikit-image",  # To imread samples and run demo examples
+    "scikit-image[optional]",  # To imread samples and run demo examples
     "jinja2",  # To template the info endpoint
     "PyYAML",  # To load the metadata yaml file
     "cookiecutter",  # To start from a template
-    "imantics",  # To convert masks to features for QuPath
+    "opencv-contrib-python-headless",  # We need this instead of opencv-python to be able to run servers in docker.
+    "imantics",  # To convert masks to features for QuPath. Comes with opencv-python.
     "geojson",  # To convert masks and points to features for QuPath 
     # Used in app
     "fastapi",
