@@ -15,20 +15,20 @@ import imaging_server_kit as sk
     project_url="{{ cookiecutter.project_url }}",
     tags=["Segmentation"],
     parameters={
-        "image": sk.Image(dimensionality=[2, 3]),
+        "image": sk.Image(),
         "threshold": sk.Float(
             name="Threshold",
-            default=0.5,
-            min=0.0,
-            max=1.0,
-            step=0.1,
-            auto_call=True,
+            default=128,
+            min=0,
+            max=255,
+            step=1,
+            auto_call=False,
         ),
     },
     samples=[
         {
             "image": Path(__file__).parent / "samples" / "blobs.tif",
-            "threshold": 0.7,
+            "threshold": 140,
         }
     ],
 )
