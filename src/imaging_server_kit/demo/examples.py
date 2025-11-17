@@ -50,7 +50,7 @@ def threshold_algo(image, threshold, dark_background):
         mask = image > thresh_rel
     else:
         mask = image <= thresh_rel
-    return sk.Mask(mask, name="Binary mask (manual)")
+    return sk.Mask(mask, name="Binarized image")
 
 
 ## Automatic threshold
