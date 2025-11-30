@@ -517,3 +517,39 @@ def project(image, method, axis: str):
         name=f"Projection",
         meta={"contrast_limits": [proj.min(), proj.max()], "colormap": "viridis"},
     )
+
+
+## Conway's game of life (inspired by: https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/)
+@sk.algorithm(
+    name="Game of Life",
+    description="Conway's game of life.",
+    project_url="https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/",
+)
+def conway_algo(max_iter=200, delay=0.1):
+    min_val = 0
+    max_val = 255
+    
+    N=100  # Size of the grid
+
+    def update(grid: np.ndarray, N: int) -> np.ndarray:
+        newGrid = grid.copy()
+        for i in range(N):
+            for j in range(N):
+                total = int((grid[i, (j-1)%N] + grid[i, (j+1)%N] + 
+                            grid[(i-1)%N, j] + grid[(i+1)%N, j] + 
+                            grid[(i-1)%N, (j-1)%N] + grid[(i-1)%N, (j+1)%N] + 
+                            grid[(i+1)%N, (j-1)%N] + grid[(i+1)%N, (j+1)%N]))
+                total = total / max_val
+                if grid[i, j] == max_val:
+                    if (total < 2) or (total > 3):
+                        newGrid[i, j] = min_val
+                else:
+                    if total == 3:
+                        newGrid[i, j] = max_val
+        return newGrid
+
+    grid = np.random.choice([min_val, max_val], N*N, p=[0.5, 0.5]).reshape(N, N)
+    for k in range(max_iter):
+        grid = update(grid, N)
+        time.sleep(delay)
+        yield sk.Mask(grid), f"Iterations: {k} / {max_iter}"
