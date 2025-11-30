@@ -340,7 +340,7 @@ class Algorithm(AlgorithmRunner):
         sample_results = Results()
         for param_name, param_value in resolved_params.items():
             kind = algo_params_defs.get(param_name).get("param_type")
-            if (kind == "image") & (not isinstance(param_value, np.ndarray)):
+            if (kind in ["image", "mask"]) & (not isinstance(param_value, np.ndarray)):
                 param_value = skimage.io.imread(param_value)
             sample_results.create(kind, param_value, param_name)
         return sample_results
