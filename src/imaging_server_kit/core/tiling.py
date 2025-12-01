@@ -134,6 +134,7 @@ def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> L
             tile_info = tile_info | {
                 f"pos_{axis}": int(pos_i),
                 f"tile_size_{axis}": int(tile_size_i),
+                f"overlap_px_{axis}": int(tile_shape_i - shift_i)
             }
 
             if pos_i >= n_pix_i:  # This sometimes happens..
