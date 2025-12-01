@@ -23,7 +23,7 @@ class MultiAlgorithm(AlgorithmRunner):
     @property
     def algorithms(self) -> List[str]:
         return list(self.algorithms_dict.keys())
-
+    
     @validate_algorithm
     def info(self, algorithm: str):
         return self.algorithms_dict[algorithm].info(algorithm)
@@ -39,6 +39,10 @@ class MultiAlgorithm(AlgorithmRunner):
     @validate_algorithm
     def get_n_samples(self, algorithm: str) -> int:
         return self.algorithms_dict[algorithm].get_n_samples(algorithm)
+    
+    @validate_algorithm
+    def is_tileable(self, algorithm: str) -> bool:
+        return self.algorithms_dict[algorithm].is_tileable(algorithm)
 
     @validate_algorithm
     def get_signature_params(self, algorithm: str) -> List[str]:

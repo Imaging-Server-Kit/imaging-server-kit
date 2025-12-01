@@ -241,6 +241,7 @@ class Algorithm(AlgorithmRunner):
         project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
         metadata_file: str = "metadata.yaml",
         samples: Optional[List[Dict[str, Any]]] = None,
+        tileable: bool = True,
     ):
         # Initialize mutables
         if tags is None:
@@ -261,6 +262,9 @@ class Algorithm(AlgorithmRunner):
 
         # Samples
         self.samples = samples
+        
+        # Tileability
+        self.tileable = tileable
 
         # Resolve the Pydantic parameters model
         self.parameters_model = _parse_pydantic_params_schema(
@@ -277,7 +281,7 @@ class Algorithm(AlgorithmRunner):
     @property
     def algorithms(self) -> Iterable[str]:
         return self._algorithms
-
+    
     @algorithms.setter
     def algorithms(self, algorithms: Iterable[str]):
         self._algorithms = algorithms
@@ -348,6 +352,9 @@ class Algorithm(AlgorithmRunner):
     def get_n_samples(self, algorithm=None):
         return len(self.samples)
 
+    def is_tileable(self, algorithm=None):
+        return self.tileable
+    
     @validate_algorithm
     def get_signature_params(self, algorithm=None) -> List[str]:
         """List parameter names of the algo run function."""
@@ -413,7 +420,8 @@ def algorithm(
     project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
     metadata_file: str = "metadata.yaml",
     samples: Optional[List[Dict[str, Any]]] = None,
-):
+    tileable: bool = True,
+) -> Algorithm:
     """Convert a Python function into an algorithm instance (sk.Algorithm).
 
     Parameters
@@ -426,7 +434,8 @@ def algorithm(
     project_url: A link to a related, or the original project (gets displayed on the algo doc page).
     metadata_file: A path to a metadata.yaml file with algorithm metadata.
     samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimag.io.imread`.
-
+    tileable: Whether to allow running the algorithm tile-by-tile. Can be set to False to explicitely disable that functionality.
+    
     Returns
     -------
     An algorithm instance (sk.Algorithm).
@@ -442,6 +451,7 @@ def algorithm(
             project_url=project_url,
             metadata_file=metadata_file,
             samples=samples,
+            tileable=tileable,
         )
 
     if func is not None and callable(func):

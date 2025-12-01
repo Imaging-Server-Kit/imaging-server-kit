@@ -252,6 +252,17 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             n_samples = algorithm.get_n_samples(algorithm=algorithm_name)
             return {"n_samples": n_samples}
+        
+        @self.app.get(
+            "/{algorithm_name}/tileable",
+            response_model=dict,
+            summary="Whether the algorithm is tileable.",
+            tags=["algorithm"],
+        )
+        def is_tileable(algorithm_name: str):
+            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
+            tileable = algorithm.is_tileable(algorithm=algorithm_name)
+            return {"tileable": tileable}
 
         @self.app.get("/{algorithm_name}/signature", tags=["algorithm"])
         def get_signature(algorithm_name: str):

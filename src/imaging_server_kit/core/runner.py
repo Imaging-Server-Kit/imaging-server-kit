@@ -83,6 +83,9 @@ class AlgorithmRunner(ABC):
 
     @abstractmethod
     def get_n_samples(self, algorithm: str) -> int: ...
+    
+    @abstractmethod
+    def is_tileable(self, algorithm: str) -> bool: ...
 
     @abstractmethod
     def get_signature_params(self, algorithm: str) -> List[str]: ...
@@ -175,6 +178,11 @@ class AlgorithmRunner(ABC):
         stream = self._is_stream(algorithm)
 
         if tiled:
+            if self.tileable is False:
+                raise AlgorithmRuntimeError(
+                    algorithm,
+                    message="Algorithm cannot be run in tiled mode.",
+                )
             if stream:
                 raise AlgorithmStreamError(
                     algorithm,
