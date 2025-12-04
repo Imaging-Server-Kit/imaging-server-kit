@@ -1,4 +1,5 @@
 import importlib.util
+from typing import Optional
 
 class AlgorithmNotFoundError(Exception):
     """Exception raised when a specified algorithm is not found."""
@@ -83,10 +84,12 @@ class AlgorithmRuntimeError(Exception):
     def __init__(
         self,
         algorithm: str,
-        error: Exception,
+        error: Optional[Exception] = None,
         message="Algorithm did not run successfully. ",
     ):
-        self.message = message + f"{algorithm=}, Error: {error}"
+        self.message = message + f"{algorithm=}"
+        if error is not None:
+            self.message = self.message + ", Error: {error}"
         super().__init__(self.message)
 
 

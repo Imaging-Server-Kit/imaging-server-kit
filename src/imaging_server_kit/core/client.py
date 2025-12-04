@@ -103,6 +103,13 @@ class Client(AlgorithmRunner):
         json_response = self._access_algo_get_endpoint(endpoint)
         n_samples = json_response.get("n_samples")
         return n_samples
+    
+    @validate_algorithm
+    def is_tileable(self, algorithm=None) -> bool:
+        endpoint = f"{self.server_url}/{algorithm}/tileable"
+        json_response = self._access_algo_get_endpoint(endpoint)
+        is_tileable = json_response.get("tileable")
+        return is_tileable
 
     @validate_algorithm
     def get_signature_params(self, algorithm: str) -> List[str]:
