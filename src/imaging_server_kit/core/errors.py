@@ -89,7 +89,7 @@ class AlgorithmRuntimeError(Exception):
     ):
         self.message = message + f"{algorithm=}"
         if error is not None:
-            self.message = self.message + ", Error: {error}"
+            self.message = self.message + f", Error: {error}"
         super().__init__(self.message)
 
 
