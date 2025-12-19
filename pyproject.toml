@@ -41,6 +41,7 @@ dependencies = [
     # Used in app + client
     "msgpack",
     "httpx",
+    "networkx",
 ]
 
 [project.optional-dependencies]
