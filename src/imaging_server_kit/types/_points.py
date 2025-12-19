@@ -7,20 +7,20 @@ from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
 from imaging_server_kit.types.data_layer import DataLayer
 
 
-def _preprocess_tile_info(points: np.ndarray, points_meta: Dict, tile_info: Dict):
+def _preprocess_tile_info(points: Optional[np.ndarray], points_meta: Dict, tile_info: Dict):
     tile_info = tile_info["tile_params"]
     ndim = tile_info["ndim"]
-    if ndim != points.shape[1]:
-        raise ValueError(f"ndim from tile info ({ndim}) is incompatible with data shape ({points.shape})")
-
     tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
     tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
     tile_max_positions = [
         tile_pos + tile_size
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
     ]
-
-    n_objects = len(points)
+    
+    if points is None:
+        n_objects = 0
+    else:
+        n_objects = len(points)
 
     if n_objects:
         # Coordinates of the points
@@ -125,12 +125,16 @@ class Points(DataLayer):
             _preprocess_tile_info(self.data, self.meta, tile_info)
         )
 
-        # Offset the points in the tile by the tile position
-        points_tile[:, :ndim] = points_tile[:, :ndim] - tile_positions
+        if points_tile is not None:
+            # Offset the points in the tile by the tile position
+            points_tile[:, :ndim] = points_tile[:, :ndim] - tile_positions
 
         return (points_tile, points_meta_tile)
 
     def merge_tile(self, points_tile: np.ndarray, tile_info: Dict) -> None:
+        if points_tile is None:
+            return
+        
         points_tile_meta = tile_info
         ndim, old_points_tile, old_points_meta_tile, tile_filter, tile_positions = (
             _preprocess_tile_info(self.data, points_tile_meta, tile_info)

@@ -6,7 +6,7 @@ from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
 from imaging_server_kit.types.data_layer import DataLayer
 
 
-def _preprocess_tile_info(boxes: np.ndarray, boxes_meta: Dict, tile_info: Dict):
+def _preprocess_tile_info(boxes: Optional[np.ndarray], boxes_meta: Dict, tile_info: Dict):
     tile_info = tile_info["tile_params"]
     ndim = tile_info["ndim"]
 
@@ -17,7 +17,10 @@ def _preprocess_tile_info(boxes: np.ndarray, boxes_meta: Dict, tile_info: Dict):
         for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
     ]
 
-    n_objects = len(boxes)
+    if boxes is None:
+        n_objects = 0
+    else:
+        n_objects = len(boxes)
 
     if n_objects:
         # Box coordinates
@@ -99,11 +102,15 @@ class Boxes(DataLayer):
         ndim, boxes_tile, boxes_meta_tile, _, tile_positions = _preprocess_tile_info(
             self.data, self.meta, tile_info
         )
-        # Offset the boxes by the tile position
-        boxes_tile[:, :, :ndim] = boxes_tile[:, :, :ndim] - tile_positions
+        if boxes_tile is not None:
+            # Offset the boxes by the tile position
+            boxes_tile[:, :, :ndim] = boxes_tile[:, :, :ndim] - tile_positions
         return boxes_tile, boxes_meta_tile
 
     def merge_tile(self, boxes_tile: np.ndarray, tile_info: Dict):
+        if boxes_tile is None:
+            return
+        
         boxes_tile_meta = tile_info
         ndim, old_boxes_tile, old_boxes_meta_tile, tile_filter, tile_positions = (
             _preprocess_tile_info(self.data, boxes_tile_meta, tile_info)
