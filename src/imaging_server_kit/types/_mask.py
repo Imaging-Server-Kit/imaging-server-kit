@@ -179,36 +179,6 @@ def _get_slices(mask: np.ndarray, tile_info: Dict):
     return tuple(slices)
 
 
-
-def simple_instance_merge(dst_data, N, mask_tile, tile_info):
-    # Instance merging strategy
-    # TODO: Avoid having to recompute data.max() at every iteration
-    # TODO: A way to avoid label holes? Quite tricky...   
-    mask_tile[mask_tile != 0] = mask_tile[mask_tile != 0] + N
-
-    overlaps_px = tuple([tile_info["tile_params"][f"overlap_px_{idx}"] for idx in range(tile_info["tile_params"]["ndim"])])
-    overlap_mask = np.ones_like(mask_tile)
-    overlap_slices = tuple([slice(pos, max_pos-pos) for pos, max_pos in zip(overlaps_px, mask_tile.shape)])
-    overlap_mask[overlap_slices] = 0
-    overlap_mask = overlap_mask == 1
-    
-    labels_to_check = np.unique(mask_tile[overlap_mask]).tolist()
-    for l in labels_to_check:
-        if l == 0:  # Ignore the background
-            continue
-        src_filt = mask_tile == l
-        dst_label_candidates = dst_data[np.logical_and(overlap_mask, src_filt)]
-        dst_label_candidates = dst_label_candidates[dst_label_candidates != 0]
-        if len(dst_label_candidates) > 0:
-            unique_vals, counts = np.unique(dst_label_candidates, return_counts=True)
-            majority_label_candidate = unique_vals[np.argmax(counts)]
-            mask_tile[src_filt] = majority_label_candidate
-    
-    new_N = mask_tile.max()
-    
-    return mask_tile, new_N
-
-
 class Mask(DataLayer):
     """Data layer used to represent segmentation masks.
 
@@ -266,16 +236,13 @@ class Mask(DataLayer):
         else:
             tile_data = None
         return tile_data, self.meta
-
+    
     def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict) -> None:
         if self.data is not None:
             tile_slices = _get_slices(self.data, tile_info)
             
-            dst_data = self.data[tile_slices]  # Data to merge "into"
-            N = self.data.max()  # Current number of instances (TODO: avoid having to recompute it at every tile...)
-            mask_tile, new_N = simple_instance_merge(dst_data, N, mask_tile, tile_info)
-
-            self.data[tile_slices] = mask_tile
+            # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
+            self.data[tile_slices] = mask_tile  
 
     @classmethod
     def serialize(cls, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:

@@ -19,6 +19,7 @@ from .core import (
 from .types import (
     Image,
     Mask,
+    InstanceMask,
     Paths,
     Boxes,
     Points,
