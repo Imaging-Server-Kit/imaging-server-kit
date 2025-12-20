@@ -64,7 +64,7 @@ def _get_tile_pos_and_size_i(coord_i_, n_pix_i, shift_i, half_pad_i, tile_shape_
     coord_i = coord_i_ * shift_i - half_pad_i
     if coord_i < 0:
         pos_i = 0
-        di_left = -pos_i
+        di_left = -coord_i
     else:
         pos_i = coord_i
         di_left = 0
