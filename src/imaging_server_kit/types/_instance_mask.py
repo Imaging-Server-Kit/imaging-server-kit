@@ -34,8 +34,9 @@ class InstanceTileTracker:
         self.G = nx.Graph()
 
     def add_N_to_tile(self, labels: np.ndarray) -> np.ndarray:
-        labels[labels != 0] = labels[labels != 0] + self.N
-        self.N = labels.max()
+        if labels.sum() > 0:
+            labels[labels != 0] = labels[labels != 0] + self.N
+            self.N = labels.max()
         return labels
 
     def add_node(self, lab):
@@ -55,7 +56,6 @@ class InstanceTileTracker:
     def resolve(self, arr):
         if not hasattr(self, "_mapping"):
             self.build_mapping()
-        # map_array wants parallel arrays:
         input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
         output_vals = np.array([self._mapping[k] for k in input_vals], dtype=np.int64)
         return map_array(arr, input_vals=input_vals, output_vals=output_vals)
