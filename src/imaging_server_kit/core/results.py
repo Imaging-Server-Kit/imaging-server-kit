@@ -40,7 +40,7 @@ class LayerStackBase(ABC):
 
     @abstractmethod
     def update(
-        self, layer_name: str, layer_data: Optional[np.ndarray], layer_meta: Dict
+        self, layer_name: str, updated_data: Optional[np.ndarray], updated_meta: Dict
     ) -> Optional[DataLayer]: ...
 
     @abstractmethod
@@ -86,8 +86,8 @@ class LayerStackBase(ABC):
                 if layer.is_first_tile:
                     self.update(
                         layer_name=existing_layer.name,
-                        layer_data=layer.get_initial_data(),
-                        layer_meta=layer.meta,
+                        updated_data=layer.get_initial_data(),
+                        updated_meta=layer.meta,
                     )
 
             if layer.is_tiled:

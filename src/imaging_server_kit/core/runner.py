@@ -178,7 +178,7 @@ class AlgorithmRunner(ABC):
         stream = self._is_stream(algorithm)
 
         if tiled:
-            if self.tileable is False:
+            if self.is_tileable is False:
                 raise AlgorithmRuntimeError(
                     algorithm,
                     message="Algorithm cannot be run in tiled mode.",
