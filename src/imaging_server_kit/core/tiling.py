@@ -3,7 +3,7 @@ nD-Tiling module for the Imaging Server Kit.
 """
 
 import time
-from typing import Dict, Iterable, List
+from typing import Dict, List
 import numpy as np
 
 
@@ -46,15 +46,56 @@ def generate_nd_tiles(
         time.sleep(delay_sec)
 
 
+def overlap_count_map(tile_info: Dict) -> np.ndarray:
+    """Returns an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
+    ndim = tile_info["tile_params"]["ndim"]
+
+    overlaps_px = tuple(
+        [tile_info["tile_params"][f"overlap_px_{idx}"] for idx in range(ndim)]
+    )
+
+    tile_shape = tuple(
+        [tile_info["tile_params"][f"tile_size_{idx}"] for idx in range(ndim)]
+    )
+
+    is_first_tile = tuple(
+        [tile_info["tile_params"][f"first_tile_{idx}"] for idx in range(ndim)]
+    )
+
+    is_last_tile = tuple(
+        [tile_info["tile_params"][f"last_tile_{idx}"] for idx in range(ndim)]
+    )
+
+    per_axis = []
+    for n, ov, first_tile, last_tile in zip(
+        tile_shape, overlaps_px, is_first_tile, is_last_tile
+    ):
+        i = np.arange(n)
+        c = 1
+        if not first_tile:
+            c = c + (i < ov).astype(np.int16)
+        if not last_tile:
+            c = c + (i >= n - ov).astype(np.int16)
+        per_axis.append(
+            c.reshape((1,) * len(per_axis) + (n,) + (1,) * (ndim - len(per_axis) - 1))
+        )
+
+    overlap_count_arr = np.ones(tile_shape, dtype=np.int16)
+    for c in per_axis:
+        overlap_count_arr *= c
+
+    return overlap_count_arr
+
+
 def _tiles_info_axis(n_pix_i, tile_shape_i, overlap_i):
     overlap_px_i = np.round(overlap_i * tile_shape_i, decimals=0).astype(int)
-    pad_i = n_pix_i % (tile_shape_i - overlap_px_i) + overlap_px_i
 
-    n_tiles_i = np.ceil(
-        (n_pix_i + pad_i - overlap_px_i) / (tile_shape_i - overlap_px_i)
-    ).astype(int)
+    n_tiles_i = np.ceil(n_pix_i / (tile_shape_i - overlap_px_i)).astype(int)
 
-    half_pad_i = pad_i // 2
+    pad_i = n_tiles_i * (tile_shape_i - overlap_px_i) - n_pix_i
+
+    half_pad_i = np.round(pad_i / 2, decimals=0).astype(int)
+
     shift_i = tile_shape_i - overlap_px_i
 
     return n_pix_i, n_tiles_i, shift_i, half_pad_i
@@ -65,20 +106,26 @@ def _get_tile_pos_and_size_i(coord_i_, n_pix_i, shift_i, half_pad_i, tile_shape_
     if coord_i < 0:
         pos_i = 0
         di_left = -coord_i
+        first_tile_i = True
     else:
         pos_i = coord_i
         di_left = 0
+        first_tile_i = False
     if (coord_i + tile_shape_i) >= n_pix_i:
         di_right = coord_i + tile_shape_i - n_pix_i
+        last_tile_i = True
     else:
         di_right = 0
+        last_tile_i = False
 
     tile_size_i = tile_shape_i - di_left - di_right
 
-    return pos_i, tile_size_i
+    return pos_i, tile_size_i, first_tile_i, last_tile_i
 
 
-def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> List[Dict]:
+def _get_tiles_info(
+    pixel_domain, tile_size_px, overlap_percent, randomize
+) -> List[Dict]:
     """Tiling in N-dimensions."""
     ndim = len(pixel_domain)
 
@@ -96,7 +143,7 @@ def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> L
             raise TilingError(pixel_domain=pixel_domain, provided_shape=overlap)
     else:
         overlap = [overlap_percent] * ndim
-    
+
     tile_infos_axes = [
         _tiles_info_axis(pixel_domain[axis], tile_shape[axis], overlap[axis])
         for axis in range(ndim)
@@ -123,7 +170,7 @@ def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> L
         ):
             tile_shape_i = tile_shape[axis]
 
-            pos_i, tile_size_i = _get_tile_pos_and_size_i(
+            pos_i, tile_size_i, first_tile_i, last_tile_i = _get_tile_pos_and_size_i(
                 coord_i,
                 n_pix_i,
                 shift_i,
@@ -134,7 +181,9 @@ def _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize) -> L
             tile_info = tile_info | {
                 f"pos_{axis}": int(pos_i),
                 f"tile_size_{axis}": int(tile_size_i),
-                f"overlap_px_{axis}": int(tile_shape_i - shift_i)
+                f"overlap_px_{axis}": int(tile_shape_i - shift_i),
+                f"first_tile_{axis}": first_tile_i,
+                f"last_tile_{axis}": last_tile_i,
             }
 
             if pos_i >= n_pix_i:  # This sometimes happens..

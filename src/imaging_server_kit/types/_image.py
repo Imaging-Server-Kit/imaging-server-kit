@@ -3,6 +3,7 @@ import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.core.tiling import overlap_count_map
 
 
 def _get_tile_slices(tile_info: Dict):
@@ -86,12 +87,10 @@ class Image(DataLayer):
         return tile_data, self.meta
 
     def merge_tile(self, image_tile: np.ndarray, tile_info: Dict):
-        tile_slices = _get_tile_slices(tile_info)
-        # TODO: implement a linear blending strategy instead of this.
+        tile_slices = _get_tile_slices(tile_info)  
         if self.data is not None:
-            self.data[tile_slices] = image_tile
-        # For this, we'd need a mask representing how many tiles are already overlapping at a given pixel,
-        # so that we can compute a running average.
+            overlap_mask = overlap_count_map(tile_info)
+            self.data[tile_slices] = self.data[tile_slices] + image_tile / overlap_mask
 
     @classmethod
     def serialize(cls, data: Optional[np.ndarray], client_origin: str):
