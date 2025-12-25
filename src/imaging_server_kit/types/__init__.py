@@ -2,6 +2,7 @@ from typing import Dict, Type
 from .data_layer import DataLayer
 from ._image import Image
 from ._mask import Mask
+from ._instance_mask import InstanceMask
 from ._points import Points
 from ._vectors import Vectors
 from ._boxes import Boxes
@@ -20,6 +21,7 @@ DATA_TYPES: Dict[str, Type[DataLayer]] = {
     for c in [
         Image,
         Mask,
+        InstanceMask,
         Points,
         Vectors,
         Boxes,
@@ -40,6 +42,7 @@ __all__ = [
     "DataLayer",
     "Image",
     "Mask",
+    "InstanceMask",
     "Points",
     "Vectors",
     "Boxes",

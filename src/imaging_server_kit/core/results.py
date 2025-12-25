@@ -40,14 +40,14 @@ class LayerStackBase(ABC):
 
     @abstractmethod
     def update(
-        self, layer_name: str, layer_data: Optional[np.ndarray], layer_meta: Dict
+        self, layer_name: str, updated_data: Optional[np.ndarray], updated_meta: Dict
     ) -> Optional[DataLayer]: ...
 
     @abstractmethod
     def delete(self, layer_name: str): ...
 
     @abstractmethod
-    def get_pixel_domain(self) -> np.ndarray: ...
+    def get_pixel_domain(self) -> List[int]: ...
 
     def __len__(self):
         return len(self.layers)
@@ -86,8 +86,8 @@ class LayerStackBase(ABC):
                 if layer.is_first_tile:
                     self.update(
                         layer_name=existing_layer.name,
-                        layer_data=layer.get_initial_data(),
-                        layer_meta=layer.meta,
+                        updated_data=layer.get_initial_data(),
+                        updated_meta=layer.meta,
                     )
 
             if layer.is_tiled:
@@ -98,8 +98,10 @@ class LayerStackBase(ABC):
                 updated_data = layer.data
                 updated_meta = layer.meta
 
+            # TODO: simplify by calling existing_layer.update()
             self.update(existing_layer.name, updated_data, updated_meta)
 
+            # TODO: this should use a Progress mechanism instead
             if (layer.is_tiled) & (tiles_callback is not None):
                 tiles_callback(
                     tile_idx=layer.meta["tile_params"]["tile_idx"],
@@ -248,7 +250,7 @@ class Results(LayerStackBase):
             if layer.name == layer_name:
                 self._layers.pop(idx)
 
-    def get_pixel_domain(self) -> np.ndarray:
+    def get_pixel_domain(self) -> List[int]:
         domains = []
         for data_layer in self.layers:
             domain = data_layer.pixel_domain()
@@ -256,6 +258,6 @@ class Results(LayerStackBase):
                 domains.append(domain)
         if len(domains):
             # Final domain is the max bound of all parameter domains (Note: this assumes shared world coordinates, etc.)
-            return np.max(np.stack(domains), axis=0)
+            return np.max(np.stack(domains), axis=0).tolist()
         else:
             raise Exception("Could not compute pixel domain.")

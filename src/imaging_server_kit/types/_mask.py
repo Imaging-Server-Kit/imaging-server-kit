@@ -175,6 +175,7 @@ def _get_slices(mask: np.ndarray, tile_info: Dict):
     slices = [
         slice(pos, max_pos) for pos, max_pos in zip(tile_positions, tile_max_positions)
     ]
+    
     return tuple(slices)
 
 
@@ -223,7 +224,7 @@ class Mask(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         return self.data.shape
@@ -235,11 +236,13 @@ class Mask(DataLayer):
         else:
             tile_data = None
         return tile_data, self.meta
-
+    
     def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict) -> None:
         if self.data is not None:
             tile_slices = _get_slices(self.data, tile_info)
-            self.data[tile_slices] = mask_tile
+            
+            # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
+            self.data[tile_slices] = mask_tile  
 
     @classmethod
     def serialize(cls, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:

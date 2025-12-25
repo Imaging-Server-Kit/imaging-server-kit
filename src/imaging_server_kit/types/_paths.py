@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -48,7 +48,7 @@ class Paths(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         path_domains = []
