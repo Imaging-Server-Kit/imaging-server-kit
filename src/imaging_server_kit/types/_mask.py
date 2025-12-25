@@ -224,7 +224,7 @@ class Mask(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         return self.data.shape

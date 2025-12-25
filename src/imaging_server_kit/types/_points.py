@@ -115,7 +115,7 @@ class Points(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or min_point_distance (could be validated).
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         return np.max(self.data, axis=0)

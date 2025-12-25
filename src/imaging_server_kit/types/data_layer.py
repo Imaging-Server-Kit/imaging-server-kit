@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
+
+from imaging_server_kit.core.tiling import is_first_tile, is_last_tile
 
 
 class DataLayer(ABC):
@@ -60,12 +62,15 @@ class DataLayer(ABC):
     def is_first_tile(self) -> bool:
         if not self.is_tiled:
             return False
-        tile_params = self.meta["tile_params"]
-        is_first_tile = tile_params.get("first_tile")
-        return is_first_tile is not None
+        return is_first_tile(self.meta)
+
+    @property
+    def is_last_tile(self) -> bool:
+        if not self.is_tiled:
+            return False
+        return is_last_tile(self.meta)
 
     def get_initial_data(self):
-        # Figure out the pixel domain
         pixel_domain = self.pixel_domain()
         if self.is_tiled:
             tile_params = self.meta["tile_params"]
@@ -74,7 +79,7 @@ class DataLayer(ABC):
                 pixel_domain = tuple(
                     [tile_params.get(f"domain_size_{idx}") for idx in range(ndim)]
                 )
-        return self._get_initial_data(pixel_domain) # type: ignore
+        return self._get_initial_data(pixel_domain)  # type: ignore
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Data: {self.data.shape if isinstance(self.data, np.ndarray) else self.data}"
@@ -94,7 +99,7 @@ class DataLayer(ABC):
     def refresh(self):
         pass
 
-    def pixel_domain(self) -> None:
+    def pixel_domain(self) -> Optional[Tuple]:
         pass
 
     def merge_tile(self, tile_data: np.ndarray, tile_info: Dict):
@@ -116,5 +121,7 @@ class DataLayer(ABC):
     def deserialize(cls, serialized_data: Any, client_origin: str) -> Any: ...
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    def _get_initial_data(
+        cls, pixel_domain: Optional[np.ndarray]
+    ) -> Optional[np.ndarray]:
         pass

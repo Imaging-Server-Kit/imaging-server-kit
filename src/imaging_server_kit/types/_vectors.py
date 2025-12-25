@@ -95,7 +95,7 @@ class Vectors(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or max_vector_length (could be validated).
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         return np.max(self.data[:, 0], axis=0)

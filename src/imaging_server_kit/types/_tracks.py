@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -67,7 +67,7 @@ class Tracks(DataLayer):
             return
         return np.zeros((1, len(pixel_domain)+2), dtype=np.float32)
 
-    def pixel_domain(self):
+    def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         return np.max(self.data, axis=0)[2:]

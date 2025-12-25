@@ -4,7 +4,7 @@ import numpy as np
 import networkx as nx
 from skimage.util import map_array
 
-from imaging_server_kit.core.tiling import generate_nd_tiles
+from imaging_server_kit.core.tiling import is_first_tile, is_last_tile
 from ._mask import _get_slices, Mask
 
 
@@ -25,11 +25,14 @@ def overlap_border_mask(tile_info: Dict, tile_shape: Tuple) -> np.ndarray:
     )
     mask = np.ones(tile_shape)
     mask[overlap_slices] = 0
-    return mask == 1  # Make it bool type
+    return mask == 1
 
 
 class InstanceTileTracker:
     def __init__(self) -> None:
+        self.initialize()
+        
+    def initialize(self):
         self.N = 0  # Current number of objects
         self.G = nx.Graph()
 
@@ -98,8 +101,8 @@ class InstanceMask(Mask):
         if self.data is None:
             return
         
-        if tile_info["tile_params"].get("first_tile") is True:
-            self.tile_tracker = InstanceTileTracker()
+        if is_first_tile(tile_info):
+            self.tile_tracker.initialize()
         
         tile_slices = _get_slices(self.data, tile_info)
         src_arr = self.tile_tracker.add_N_to_tile(mask_tile)
@@ -119,15 +122,14 @@ class InstanceMask(Mask):
                     self.tile_tracker.add_edge(dst_lab, src_lab)
         
         # Do the graph merging at the last iteration
-        # Progress might freeze at 100% for a while, but that's OK for now..
-        is_last_tile = tile_info["tile_params"]["tile_idx"] == tile_info["tile_params"]["n_tiles"]-1
-        if is_last_tile:
-            pixel_domain = self.pixel_domain()
-            instance_mask = Mask(self._get_initial_data(pixel_domain))
-            for tile_info in generate_nd_tiles(pixel_domain, tile_size_px=512):
-                mask_tile, _ = self.get_tile(tile_info)
-                resolved_mask_tile = self.tile_tracker.resolve(mask_tile)
-                instance_mask.merge_tile(resolved_mask_tile, tile_info)
-            
-            # Update the data
-            self.data = instance_mask.data
+        # => Progress might freeze at 100% for a while (OK for now..)
+        if is_last_tile(tile_info):
+            self.data = self.tile_tracker.resolve(self.data)  # Implies processing the whole mask at once (OK for now..)
+            # # Alternatively: resolve tile-by-tile
+            # pixel_domain = self.pixel_domain()
+            # instance_mask = Mask(self._get_initial_data(pixel_domain))
+            # for tile_info in generate_nd_tiles(pixel_domain, tile_size_px=512):  # 512?
+            #     mask_tile, _ = self.get_tile(tile_info)
+            #     resolved_mask_tile = self.tile_tracker.resolve(mask_tile)
+            #     instance_mask.merge_tile(resolved_mask_tile, tile_info)
+            # self.data = instance_mask.data
