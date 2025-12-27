@@ -7,7 +7,7 @@ import numpy as np
 
 from imaging_server_kit.types import DATA_TYPES, DataLayer
 from imaging_server_kit.core.encoding import encode_contents
-from imaging_server_kit.core.tiling import TileMeta, generate_nd_tiles
+from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
 
 
 def _serialize_value(obj: Any) -> Any:
@@ -261,13 +261,13 @@ class Results(LayerStackBase):
             if layer.name == layer_name:
                 self._layers.pop(idx)
 
-    def generate_tiles(self, tile_size_px, overlap_percent, delay_sec, randomize):
+    def generate_tiles(self, ctx: TilingContext):
         for tile_meta in generate_nd_tiles(
             pixel_domain=self.pixel_domain,
-            tile_size_px=tile_size_px,
-            overlap_percent=overlap_percent,
-            delay_sec=delay_sec,
-            randomize=randomize,
+            tile_size_px=ctx.tile_size_px,
+            overlap_percent=ctx.overlap_percent,
+            delay_sec=ctx.delay_sec,
+            randomize=ctx.randomize,
         ):
             tile_results = self.get_tile(tile_meta)
             tile_idx = tile_meta.tile_idx

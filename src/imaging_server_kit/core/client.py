@@ -20,6 +20,7 @@ from imaging_server_kit.core.errors import (
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.serialization import deserialize_results
+from imaging_server_kit.core.tiling import TilingContext
 
 
 TIMEOUT_SEC = 3600  # Timeout for the /process route (in seconds)
@@ -27,7 +28,7 @@ TIMEOUT_SEC = 3600  # Timeout for the /process route (in seconds)
 
 class Client(AlgorithmRunner):
     """Client to connect to and interact with algorithm servers.
-    
+
     Attributes
     ----------
     server_url: Address of the algorithm server.
@@ -37,13 +38,14 @@ class Client(AlgorithmRunner):
     ----------
     connect(): Connect to an algorithm server.
     run(): Execute the algorithm with a set of parameters.
-        Set `tiled=True` for tiled inference. 
+        Set `tiled=True` for tiled inference.
         Raises a ValidationError when parameters are invalidated.
     get_n_samples(): Get the number of samples available.
     get_sample(): Get a sample by index.
     info(): Access algorithm documentation.
-    get_parameters(): Get the algorithm parameters schema.    
+    get_parameters(): Get the algorithm parameters schema.
     """
+
     def __init__(self, server_url: Optional[str] = None) -> None:
         self.server_url = server_url
         self._algorithms = []
@@ -103,7 +105,7 @@ class Client(AlgorithmRunner):
         json_response = self._access_algo_get_endpoint(endpoint)
         n_samples = json_response.get("n_samples")
         return n_samples
-    
+
     @validate_algorithm
     def is_tileable(self, algorithm=None) -> bool:
         endpoint = f"{self.server_url}/{algorithm}/tileable"
@@ -151,21 +153,13 @@ class Client(AlgorithmRunner):
     def _tile(
         self,
         algorithm: str,
-        tile_size_px: int,
-        overlap_percent: float,
-        delay_sec: float,
-        randomize: bool,
+        tiling_ctx: TilingContext,
         param_results: Results,
     ):
         """Breaks down the 2D image parameter into tiles before sequentially postiong to /process."""
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
-            for algo_params_tile, tile_idx, n_tiles in param_results.generate_tiles(
-                tile_size_px,
-                overlap_percent,
-                delay_sec,
-                randomize,
-            ):
+            for algo_params_tile, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
                 try:
                     response = client.post(
                         endpoint,

@@ -2,6 +2,7 @@
 nD-Tiling module for the Imaging Server Kit.
 """
 
+from dataclasses import dataclass
 import time
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -18,12 +19,20 @@ class TilingError(Exception):
         super().__init__(self.message)
 
 
+@dataclass
+class TilingContext:
+    tile_size_px: Union[int, Tuple, List] = 64
+    overlap_percent: Union[float, Tuple, List] = 0.0
+    randomize: bool = False
+    delay_sec: float = 0.0
+
+
 class TileMeta:
     def __init__(self, tile_idx: int, n_tiles: int, tile_info: Dict) -> None:
         self.tile_idx = tile_idx
         self.n_tiles = n_tiles
         self.tile_info = tile_info
-    
+
     @property
     def ndim(self) -> int:
         return self.tile_info["ndim"]
@@ -44,7 +53,7 @@ class TileMeta:
                 for (tile_pos, tile_size) in zip(self.coords_min, self.shape)
             ]
         )
-    
+
     @property
     def overlap_px(self) -> Tuple:
         return tuple(
@@ -62,12 +71,15 @@ class TileMeta:
                 for pos, max_pos in zip(self.coords_min, self.coords_max)
             ]
         )
-    
+
     @property
     def overlap_border_mask(self) -> np.ndarray:
         """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
         overlap_slices = tuple(
-            [slice(pos, max_pos - pos) for pos, max_pos in zip(self.overlap_px, self.shape)]
+            [
+                slice(pos, max_pos - pos)
+                for pos, max_pos in zip(self.overlap_px, self.shape)
+            ]
         )
         mask = np.ones(self.shape)
         mask[overlap_slices] = 0
@@ -76,10 +88,18 @@ class TileMeta:
     @property
     def overlap_count_map(self) -> np.ndarray:
         """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
-        overlaps_px = tuple([self.tile_info[f"overlap_px_{idx}"] for idx in range(self.ndim)])
-        tile_shape = tuple([self.tile_info[f"tile_size_{idx}"] for idx in range(self.ndim)])
-        is_first_tile = tuple([self.tile_info[f"first_tile_{idx}"] for idx in range(self.ndim)])
-        is_last_tile = tuple([self.tile_info[f"last_tile_{idx}"] for idx in range(self.ndim)])
+        overlaps_px = tuple(
+            [self.tile_info[f"overlap_px_{idx}"] for idx in range(self.ndim)]
+        )
+        tile_shape = tuple(
+            [self.tile_info[f"tile_size_{idx}"] for idx in range(self.ndim)]
+        )
+        is_first_tile = tuple(
+            [self.tile_info[f"first_tile_{idx}"] for idx in range(self.ndim)]
+        )
+        is_last_tile = tuple(
+            [self.tile_info[f"last_tile_{idx}"] for idx in range(self.ndim)]
+        )
 
         per_axis = []
         for n, ov, first_tile, last_tile in zip(
@@ -93,7 +113,9 @@ class TileMeta:
                 c = c + (i >= n - ov).astype(np.int16)
             # TODO: check this
             per_axis.append(
-                c.reshape((1,) * len(per_axis) + (n,) + (1,) * (self.ndim - len(per_axis) - 1))
+                c.reshape(
+                    (1,) * len(per_axis) + (n,) + (1,) * (self.ndim - len(per_axis) - 1)
+                )
             )
 
         overlap_count_arr = np.ones(tile_shape, dtype=np.int16)
@@ -115,7 +137,7 @@ class TileMeta:
         ndim = self.tile_info.get("ndim")
         if ndim is not None:
             return [self.tile_info[f"domain_size_{idx}"] for idx in range(ndim)]
-    
+
     def serialize(self) -> Dict:
         return self.tile_info | {
             "tile_idx": self.tile_idx,
@@ -198,7 +220,14 @@ def generate_nd_tiles(
             f"Invalid tile size: {tile_size_px}. Expected a positive integer, or list/tuple of positive integers compatible with the pixel domain ({pixel_domain})."
         )
 
-    tiles_info = _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize)
+    tiling_ctx = TilingContext(
+        tile_size_px=tile_size_px,
+        overlap_percent=overlap_percent,
+        randomize=randomize,
+        delay_sec=delay_sec,
+    )
+
+    tiles_info = _get_tiles_info(pixel_domain, tiling_ctx)
     n_tiles = len(tiles_info)
     for tile_idx, tile_info in enumerate(tiles_info):
         yield TileMeta(
@@ -252,29 +281,24 @@ def _get_tile_pos_and_size_i(
     return pos_i, tile_size_i, is_first_tile_i, is_last_tile_i
 
 
-def _get_tiles_info(
-    pixel_domain: Union[Tuple, List],
-    tile_size_px: Union[int, Tuple, List],
-    overlap_percent: Union[float, Tuple, List],
-    randomize: bool,
-) -> List[Dict]:
+def _get_tiles_info(pixel_domain: Union[Tuple, List], ctx: TilingContext) -> List[Dict]:
     """Tiling in N-dimensions."""
     ndim = len(pixel_domain)
 
     # Resolve the tile shape and overlap
-    if isinstance(tile_size_px, (list, tuple)):
-        tile_shape = tile_size_px
+    if isinstance(ctx.tile_size_px, (list, tuple)):
+        tile_shape = ctx.tile_size_px
         if len(tile_shape) != ndim:
             raise TilingError(pixel_domain=pixel_domain, provided_shape=tile_shape)
     else:
-        tile_shape = [tile_size_px] * ndim  # Isotropic tile
+        tile_shape = [ctx.tile_size_px] * ndim  # Isotropic tile
 
-    if isinstance(overlap_percent, (list, tuple)):
-        overlap = overlap_percent
+    if isinstance(ctx.overlap_percent, (list, tuple)):
+        overlap = ctx.overlap_percent
         if len(overlap) != ndim:
             raise TilingError(pixel_domain=pixel_domain, provided_shape=overlap)
     else:
-        overlap = [overlap_percent] * ndim
+        overlap = [ctx.overlap_percent] * ndim
 
     # Overlap in pixels (TODO: we could allow users to pass an overlap in pixels directly)
     overlap_px = [
@@ -294,7 +318,7 @@ def _get_tiles_info(
     grid = np.meshgrid(*[np.arange(n) for n in n_tiles_ax], indexing="ij")
     tile_coords_idx = np.stack([g.ravel() for g in grid], axis=1)
 
-    if randomize:
+    if ctx.randomize:
         np.random.shuffle(tile_coords_idx)
 
     tile_infos = []

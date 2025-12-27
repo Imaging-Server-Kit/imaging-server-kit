@@ -24,6 +24,7 @@ from pydantic import (
 )
 from imaging_server_kit.core.errors import AlgorithmRuntimeError
 import imaging_server_kit.core._etc as etc
+from imaging_server_kit.core.tiling import TilingContext
 import imaging_server_kit.types as skt
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.runner import (
@@ -77,7 +78,7 @@ def _parse_run_func_signature(
         if default is _empty:
             return cls(name=param_name)
         else:
-            return cls(name=param_name, default=default) # type: ignore
+            return cls(name=param_name, default=default)  # type: ignore
 
     resolved = dict(
         parameters
@@ -179,6 +180,7 @@ def _parse_pydantic_params_schema(
 
 ### Function output parsing ###
 
+
 def _parse_output(payload: Any) -> DataLayer:
     if isinstance(payload, DataLayer):
         return payload
@@ -186,12 +188,14 @@ def _parse_output(payload: Any) -> DataLayer:
         cls: Type[DataLayer] = TYPE_MAPPINGS[type(payload)]
         return cls(data=payload)
     else:
-        raise TypeError(f"Function should return: List[DataLayer]. Got: {type(payload)}")
+        raise TypeError(
+            f"Function should return: List[DataLayer]. Got: {type(payload)}"
+        )
 
 
 def _parse_payload(payload: Any) -> Union[List[DataLayer], DataLayer]:
     if isinstance(payload, (List, Tuple)):  # Multiple returns
-        return [_parse_payload(p) for p in payload] # type: ignore
+        return [_parse_payload(p) for p in payload]  # type: ignore
     else:
         return _parse_output(payload)
 
@@ -259,7 +263,7 @@ class Algorithm(AlgorithmRunner):
 
         # Samples
         self.samples = samples
-        
+
         # Tileability
         self.tileable = tileable
 
@@ -278,7 +282,7 @@ class Algorithm(AlgorithmRunner):
     @property
     def algorithms(self) -> Iterable[str]:
         return self._algorithms
-    
+
     @algorithms.setter
     def algorithms(self, algorithms: Iterable[str]):
         self._algorithms = algorithms
@@ -351,7 +355,7 @@ class Algorithm(AlgorithmRunner):
 
     def is_tileable(self, algorithm=None):
         return self.tileable
-    
+
     @validate_algorithm
     def get_signature_params(self, algorithm=None) -> List[str]:
         """List parameter names of the algo run function."""
@@ -375,19 +379,11 @@ class Algorithm(AlgorithmRunner):
     def _tile(
         self,
         algorithm: str,
-        tile_size_px: int,
-        overlap_percent: float,
-        delay_sec: float,
-        randomize: bool,
+        tiling_ctx: TilingContext,
         param_results: Results,
     ):
         """Process the image sequentially in tiles."""
-        for tile_results, tile_idx, n_tiles in param_results.generate_tiles(
-            tile_size_px,
-            overlap_percent,
-            delay_sec,
-            randomize,
-        ):
+        for tile_results, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
             if tile_results is not None:
                 results = self._run(algorithm, tile_results)
                 # Copy the tile metadata from the inputs to the outputs (TODO: a bit weird)
@@ -432,7 +428,7 @@ def algorithm(
     metadata_file: A path to a metadata.yaml file with algorithm metadata.
     samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimag.io.imread`.
     tileable: Whether to allow running the algorithm tile-by-tile. Can be set to False to explicitely disable that functionality.
-    
+
     Returns
     -------
     An algorithm instance (sk.Algorithm).

@@ -11,6 +11,7 @@ from imaging_server_kit.core.errors import (
     napari_available,
 )
 from imaging_server_kit.core.results import LayerStackBase, Results
+from imaging_server_kit.core.tiling import TilingContext
 
 NAPARI_INSTALLED = napari_available()
 
@@ -94,10 +95,7 @@ class AlgorithmRunner(ABC):
     def _tile(
         self,
         algorithm: Optional[str],
-        tile_size_px: int,
-        overlap_percent: float,
-        delay_sec: float,
-        randomize: bool,
+        tiling_ctx: TilingContext,
         param_results: Results,
     ): ...
 
@@ -182,14 +180,15 @@ class AlgorithmRunner(ABC):
                     algorithm,
                     message="Algorithm is a stream. It cannot be run in tiled mode.",
                 )
+            tiling_ctx = TilingContext(
+                tile_size_px=tile_size_px,
+                overlap_percent=overlap_percent,
+                randomize=randomize,
+                delay_sec=delay_sec,
+            )
             tqdm_pbar = tqdm()
             for tile_results, tile_idx, n_tiles in self._tile(
-                algorithm,
-                tile_size_px,
-                overlap_percent,
-                delay_sec,
-                randomize,
-                param_results,
+                algorithm, tiling_ctx, param_results
             ):
                 if tile_results is not None:
                     results.merge_tile(tile_results)

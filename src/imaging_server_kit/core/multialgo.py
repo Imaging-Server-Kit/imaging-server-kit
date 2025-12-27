@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
+from imaging_server_kit.core.tiling import TilingContext
 
 
 class MultiAlgorithm(AlgorithmRunner):
@@ -23,7 +24,7 @@ class MultiAlgorithm(AlgorithmRunner):
     @property
     def algorithms(self) -> List[str]:
         return list(self.algorithms_dict.keys())
-    
+
     @validate_algorithm
     def info(self, algorithm: str):
         return self.algorithms_dict[algorithm].info(algorithm)
@@ -39,7 +40,7 @@ class MultiAlgorithm(AlgorithmRunner):
     @validate_algorithm
     def get_n_samples(self, algorithm: str) -> int:
         return self.algorithms_dict[algorithm].get_n_samples(algorithm)
-    
+
     @validate_algorithm
     def is_tileable(self, algorithm: str) -> bool:
         return self.algorithms_dict[algorithm].is_tileable(algorithm)
@@ -56,25 +57,21 @@ class MultiAlgorithm(AlgorithmRunner):
         return self.algorithms_dict[algorithm]._is_stream(algorithm)
 
     def _stream(self, algorithm: str, param_results: Results):
-        for results in self.algorithms_dict[algorithm]._stream(algorithm, param_results):
+        for results in self.algorithms_dict[algorithm]._stream(
+            algorithm, param_results
+        ):
             yield results
 
     def _tile(
         self,
         algorithm: str,
-        tile_size_px: int,
-        overlap_percent: float,
-        delay_sec: float,
-        randomize: bool,
+        tiling_ctx: TilingContext,
         param_results: Results,
     ):
         """Breaks down the image into tiles before sequentially processing them."""
         for tile_results, tile_idx, n_tiles in self.algorithms_dict[algorithm]._tile(
             algorithm,
-            tile_size_px,
-            overlap_percent,
-            delay_sec,
-            randomize,
+            tiling_ctx,
             param_results,
         ):
             yield tile_results, tile_idx, n_tiles
