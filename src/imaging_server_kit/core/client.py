@@ -160,8 +160,7 @@ class Client(AlgorithmRunner):
         """Breaks down the 2D image parameter into tiles before sequentially postiong to /process."""
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
-            for algo_params_tile, tile_info in etc.generate_tiles(
-                param_results,
+            for algo_params_tile, tile_idx, n_tiles in param_results.generate_tiles(
                 tile_size_px,
                 overlap_percent,
                 delay_sec,
@@ -183,9 +182,9 @@ class Client(AlgorithmRunner):
 
                 if response.status_code == 201:
                     results = deserialize_results(response.json(), "Python/Napari")
-                    for layer in results:
-                        layer.meta = layer.meta | tile_info
-                    yield results
+                    for l in results:
+                        l.tile_meta = algo_params_tile[0].tile_meta
+                    yield results, tile_idx, n_tiles
                 else:
                     self._handle_response_errored(response)
 

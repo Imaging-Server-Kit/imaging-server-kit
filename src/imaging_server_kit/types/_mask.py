@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Dict, List, Optional, Tuple, Union
 
 import imantics
@@ -6,6 +8,7 @@ from geojson import Feature, Polygon
 from skimage.draw import polygon2mask
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -150,7 +153,9 @@ def features2instance_mask_3d(features, image_shape):
     _, ry, rx = image_shape
     for feature in features:
         feature_xy_coordinates = np.array(feature["geometry"]["coordinates"])
-        feature_xy_coordinates = feature_xy_coordinates[0, :, :]  # Remove an extra dimension
+        feature_xy_coordinates = feature_xy_coordinates[
+            0, :, :
+        ]  # Remove an extra dimension
         feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
         feature_z_idx = feature["properties"]["z_idx"]
@@ -158,25 +163,6 @@ def features2instance_mask_3d(features, image_shape):
         feature_id = feature_properites.get("Detection ID")
         segmentation_mask[feature_z_idx][feature_mask] = feature_id
     return segmentation_mask
-
-
-def _get_slices(mask: np.ndarray, tile_info: Dict):
-    tile_info = tile_info["tile_params"]
-    ndim = tile_info["ndim"]
-    if ndim != mask.ndim:
-        raise ValueError(f"ndim from tile info ({ndim}) is incompatible with data shape ({mask.shape})")
-
-    tile_sizes = [tile_info[f"tile_size_{idx}"] for idx in range(ndim)]
-    tile_positions = [tile_info[f"pos_{idx}"] for idx in range(ndim)]
-    tile_max_positions = [
-        tile_pos + tile_size
-        for (tile_pos, tile_size) in zip(tile_positions, tile_sizes)
-    ]
-    slices = [
-        slice(pos, max_pos) for pos, max_pos in zip(tile_positions, tile_max_positions)
-    ]
-    
-    return tuple(slices)
 
 
 class Mask(DataLayer):
@@ -198,12 +184,14 @@ class Mask(DataLayer):
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         super().__init__(
             name=name,
             description=description,
             meta=meta,
             data=data,
+            tile_meta=tile_meta,
         )
         self.dimensionality = (
             dimensionality if dimensionality is not None else np.arange(6).tolist()
@@ -224,28 +212,38 @@ class Mask(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
 
+    @property
     def pixel_domain(self) -> Optional[Tuple]:
-        if self.data is None:
-            return
-        return self.data.shape
+        if isinstance(self.data, np.ndarray):
+            return self.data.shape
 
-    def get_tile(self, tile_info: Dict) -> Tuple[Optional[np.ndarray], Dict]:
+    def get_tile(self, tile_meta: TileMeta) -> Optional[Mask]:
+        if (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
+            print("Could not get a mask tile from that tile meta.")
+            return
+        
         if self.data is not None:
-            tile_silces = _get_slices(self.data, tile_info)
-            tile_data = self.data[tile_silces]
+            tile_data = self.data[tile_meta.slices]
         else:
             tile_data = None
-        return tile_data, self.meta
-    
-    def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict) -> None:
-        if self.data is not None:
-            tile_slices = _get_slices(self.data, tile_info)
-            
+        return Mask(
+            data=tile_data,
+            name=self.name,
+            meta=self.meta,
+            tile_meta=tile_meta,
+        )
+
+    def merge_tile(self, mask_tile: Mask) -> None:
+        if (self.data is not None) and (mask_tile.tile_meta is not None):
             # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
-            self.data[tile_slices] = mask_tile  
+            self.data[mask_tile.tile_meta.slices] = mask_tile.data
+        else:
+            raise RuntimeError("Invalid attempt to merge a mask tile.")
 
     @classmethod
-    def serialize(cls, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:
+    def serialize(
+        cls, mask: Optional[np.ndarray], client_origin: str
+    ) -> Optional[Union[List[Feature], str]]:
         if mask is None:
             return None
         if client_origin == "Python/Napari":
@@ -257,7 +255,9 @@ class Mask(DataLayer):
         return features
 
     @classmethod
-    def deserialize(cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str) -> Optional[np.ndarray]:
+    def deserialize(
+        cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
+    ) -> Optional[np.ndarray]:
         if serialized_data is None:
             return None
         if isinstance(serialized_data, str):
@@ -268,10 +268,11 @@ class Mask(DataLayer):
         return data
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        if pixel_domain is None:
-            return
-        return np.zeros(pixel_domain, dtype=np.uint16)
+    def _get_initial_data(
+        cls, pixel_domain: Optional[np.ndarray]
+    ) -> Optional[np.ndarray]:
+        if pixel_domain is not None:
+            return np.zeros(pixel_domain, dtype=np.uint16)
 
     @classmethod
     def validate_data(cls, data, meta, constraints):

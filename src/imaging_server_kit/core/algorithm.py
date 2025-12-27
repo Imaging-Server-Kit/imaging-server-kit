@@ -204,10 +204,7 @@ def _parse_user_func_output(payload: Any) -> Results:
         layers = [layers]
 
     # List[DataLayer] => Results
-    results = Results(layers)
-    # for l in layers:
-    #     results.create(l.kind, l.data, l.name, l.meta)
-    return results
+    return Results(layers)
 
 
 class Algorithm(AlgorithmRunner):
@@ -385,18 +382,18 @@ class Algorithm(AlgorithmRunner):
         param_results: Results,
     ):
         """Process the image sequentially in tiles."""
-        for tile_results, tile_info in etc.generate_tiles(
-            param_results,
+        for tile_results, tile_idx, n_tiles in param_results.generate_tiles(
             tile_size_px,
             overlap_percent,
             delay_sec,
             randomize,
         ):
-            results = self._run(algorithm, tile_results)
-            if results is not None:
-                for layer in results:
-                    layer.meta = layer.meta | tile_info
-                yield results
+            if tile_results is not None:
+                results = self._run(algorithm, tile_results)
+                # Copy the tile metadata from the inputs to the outputs (TODO: a bit weird)
+                for l in results:
+                    l.tile_meta = tile_results[0].tile_meta
+                yield results, tile_idx, n_tiles
 
     def _run(self, algorithm, param_results: Results) -> Results:
         algo_params = param_results.to_params_dict()
@@ -421,7 +418,7 @@ def algorithm(
     metadata_file: str = "metadata.yaml",
     samples: Optional[List[Dict[str, Any]]] = None,
     tileable: bool = True,
-) -> Algorithm:
+) -> Union[Algorithm, Callable]:
     """Convert a Python function into an algorithm instance (sk.Algorithm).
 
     Parameters

@@ -69,7 +69,7 @@ class MultiAlgorithm(AlgorithmRunner):
         param_results: Results,
     ):
         """Breaks down the image into tiles before sequentially processing them."""
-        for results in self.algorithms_dict[algorithm]._tile(
+        for tile_results, tile_idx, n_tiles in self.algorithms_dict[algorithm]._tile(
             algorithm,
             tile_size_px,
             overlap_percent,
@@ -77,7 +77,7 @@ class MultiAlgorithm(AlgorithmRunner):
             randomize,
             param_results,
         ):
-            yield results
+            yield tile_results, tile_idx, n_tiles
 
     def _run(self, algorithm: str, param_results: Results) -> Results:
         return self.algorithms_dict[algorithm]._run(algorithm, param_results)

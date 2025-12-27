@@ -1,31 +1,16 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import networkx as nx
 from skimage.util import map_array
 
-from imaging_server_kit.core.tiling import is_first_tile, is_last_tile
-from ._mask import _get_slices, Mask
+from imaging_server_kit.core.tiling import TileMeta
+
+from ._mask import Mask
 
 
 def unique_positive(labels: np.ndarray) -> np.ndarray:
     return np.unique(labels[labels > 0])
-
-
-def overlap_border_mask(tile_info: Dict, tile_shape: Tuple) -> np.ndarray:
-    """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
-    overlaps_px = tuple(
-        [
-            tile_info["tile_params"][f"overlap_px_{idx}"]
-            for idx in range(tile_info["tile_params"]["ndim"])
-        ]
-    )
-    overlap_slices = tuple(
-        [slice(pos, max_pos - pos) for pos, max_pos in zip(overlaps_px, tile_shape)]
-    )
-    mask = np.ones(tile_shape)
-    mask[overlap_slices] = 0
-    return mask == 1
 
 
 class InstanceTileTracker:
@@ -84,6 +69,7 @@ class InstanceMask(Mask):
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
         min_intersecting_px: int=5,
     ):
         super().__init__(
@@ -93,29 +79,34 @@ class InstanceMask(Mask):
             dimensionality=dimensionality,
             required=required,
             meta=meta,
+            tile_meta=tile_meta,
         )
         self.tile_tracker = InstanceTileTracker()
         self.min_intersecting_px = min_intersecting_px
     
-    def merge_tile(self, mask_tile: np.ndarray, tile_info: Dict) -> None:
-        if self.data is None:
-            return
+    def merge_tile(self, mask_tile: Mask) -> None:
+        if (self.data is None) or (mask_tile.tile_meta is None):
+            raise RuntimeError("Invalid attempt to merge an instance mask tile.")
         
-        if is_first_tile(tile_info):
+        dst_tile = self.get_tile(mask_tile.tile_meta)
+        if dst_tile is None:
+            raise RuntimeError("Invalid attempt to merge an instance mask tile.")
+        
+        if mask_tile.tile_meta.is_first_tile:
             self.tile_tracker.initialize()
         
-        tile_slices = _get_slices(self.data, tile_info)
-        src_arr = self.tile_tracker.add_N_to_tile(mask_tile)
-        dst_arr = self.data[tile_slices].copy()
-        self.data[tile_slices] = src_arr
+        src_arr = self.tile_tracker.add_N_to_tile(mask_tile.data)
+        
+        self.data[mask_tile.tile_meta.slices] = src_arr
         
         for new_label in unique_positive(src_arr):
             self.tile_tracker.add_node(new_label)
         
-        border_mask = overlap_border_mask(tile_info, src_arr.shape)
+        border_mask = mask_tile.tile_meta.overlap_border_mask
+        
         for src_lab in unique_positive(src_arr[border_mask]):
             lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
-            lab_filt_dst_in_overlap = dst_arr[lab_filt_src_in_overlap]
+            lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
             for dst_lab in unique_positive(lab_filt_dst_in_overlap):
                 n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
                 if n_intersecting_px > self.min_intersecting_px:
@@ -123,13 +114,15 @@ class InstanceMask(Mask):
         
         # Do the graph merging at the last iteration
         # => Progress might freeze at 100% for a while (OK for now..)
-        if is_last_tile(tile_info):
+        if mask_tile.tile_meta.is_last_tile:
             self.data = self.tile_tracker.resolve(self.data)  # Implies processing the whole mask at once (OK for now..)
+            
+            # TODO: check this
             # # Alternatively: resolve tile-by-tile
-            # pixel_domain = self.pixel_domain()
-            # instance_mask = Mask(self._get_initial_data(pixel_domain))
-            # for tile_info in generate_nd_tiles(pixel_domain, tile_size_px=512):  # 512?
-            #     mask_tile, _ = self.get_tile(tile_info)
-            #     resolved_mask_tile = self.tile_tracker.resolve(mask_tile)
-            #     instance_mask.merge_tile(resolved_mask_tile, tile_info)
+            # instance_mask = Mask(self._get_initial_data(self.pixel_domain))
+            # for tile_meta in generate_nd_tiles(self.pixel_domain, tile_size_px=512):  # 512?
+            #     mask_tile = self.get_tile(tile_meta)
+            #     resolved_mask_tile_data = self.tile_tracker.resolve(mask_tile.data)
+            #     rmtd = Mask(data=resolved_mask_tile_data, tile_meta=tile_meta)
+            #     instance_mask.merge_tile(rmtd)
             # self.data = instance_mask.data

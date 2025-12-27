@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 import numpy as np
 
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -21,12 +22,14 @@ class Float(DataLayer):
         default: float = 0.0,
         auto_call: bool = False,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         super().__init__(
             name=name,
             description=description,
             meta=meta,
             data=data,
+            tile_meta=tile_meta,
         )
         self.min = min
         self.max = max

@@ -3,7 +3,7 @@ nD-Tiling module for the Imaging Server Kit.
 """
 
 import time
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 
@@ -16,6 +16,111 @@ class TilingError(Exception):
     ):
         self.message = message + f"{pixel_domain=}, {provided_shape=}"
         super().__init__(self.message)
+
+
+class TileMeta:
+    def __init__(self, tile_idx: int, n_tiles: int, tile_info: Dict) -> None:
+        self.tile_idx = tile_idx
+        self.n_tiles = n_tiles
+        self.tile_info = tile_info
+    
+    @property
+    def ndim(self) -> int:
+        return self.tile_info["ndim"]
+
+    @property
+    def shape(self) -> Tuple:
+        return tuple([self.tile_info[f"tile_size_{idx}"] for idx in range(self.ndim)])
+
+    @property
+    def coords_min(self) -> Tuple:
+        return tuple([self.tile_info[f"pos_{idx}"] for idx in range(self.ndim)])
+
+    @property
+    def coords_max(self) -> Tuple:
+        return tuple(
+            [
+                tile_pos + tile_size
+                for (tile_pos, tile_size) in zip(self.coords_min, self.shape)
+            ]
+        )
+    
+    @property
+    def overlap_px(self) -> Tuple:
+        return tuple(
+            [
+                self.tile_info[f"overlap_px_{idx}"]
+                for idx in range(self.tile_info["ndim"])
+            ]
+        )
+
+    @property
+    def slices(self) -> Tuple:
+        return tuple(
+            [
+                slice(pos, max_pos)
+                for pos, max_pos in zip(self.coords_min, self.coords_max)
+            ]
+        )
+    
+    @property
+    def overlap_border_mask(self) -> np.ndarray:
+        """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
+        overlap_slices = tuple(
+            [slice(pos, max_pos - pos) for pos, max_pos in zip(self.overlap_px, self.shape)]
+        )
+        mask = np.ones(self.shape)
+        mask[overlap_slices] = 0
+        return mask == 1
+
+    @property
+    def overlap_count_map(self) -> np.ndarray:
+        """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
+        overlaps_px = tuple([self.tile_info[f"overlap_px_{idx}"] for idx in range(self.ndim)])
+        tile_shape = tuple([self.tile_info[f"tile_size_{idx}"] for idx in range(self.ndim)])
+        is_first_tile = tuple([self.tile_info[f"first_tile_{idx}"] for idx in range(self.ndim)])
+        is_last_tile = tuple([self.tile_info[f"last_tile_{idx}"] for idx in range(self.ndim)])
+
+        per_axis = []
+        for n, ov, first_tile, last_tile in zip(
+            tile_shape, overlaps_px, is_first_tile, is_last_tile
+        ):
+            i = np.arange(n)
+            c = 1
+            if not first_tile:
+                c = c + (i < ov).astype(np.int16)
+            if not last_tile:
+                c = c + (i >= n - ov).astype(np.int16)
+            # TODO: check this
+            per_axis.append(
+                c.reshape((1,) * len(per_axis) + (n,) + (1,) * (self.ndim - len(per_axis) - 1))
+            )
+
+        overlap_count_arr = np.ones(tile_shape, dtype=np.int16)
+        for c in per_axis:
+            overlap_count_arr *= c
+
+        return overlap_count_arr
+
+    @property
+    def is_first_tile(self) -> bool:
+        return self.tile_idx == 0
+
+    @property
+    def is_last_tile(self) -> bool:
+        return self.tile_idx == self.n_tiles - 1
+
+    @property
+    def pixel_domain(self) -> Optional[List[int]]:
+        ndim = self.tile_info.get("ndim")
+        if ndim is not None:
+            return [self.tile_info[f"domain_size_{idx}"] for idx in range(ndim)]
+    
+    def serialize(self) -> Dict:
+        return self.tile_info | {
+            "tile_idx": self.tile_idx,
+            "n_tiles": self.n_tiles,
+        }
 
 
 def valid_tile_size(
@@ -48,16 +153,6 @@ def valid_overlap(
             if (o < 0.0) or (o > 1):
                 return False
     return True
-
-
-def is_first_tile(tile_info: Dict) -> bool:
-    return tile_info["tile_params"]["tile_idx"] == 0
-
-
-def is_last_tile(tile_info: Dict) -> bool:
-    return (
-        tile_info["tile_params"]["tile_idx"] == tile_info["tile_params"]["n_tiles"] - 1
-    )
 
 
 def generate_nd_tiles(
@@ -106,45 +201,12 @@ def generate_nd_tiles(
     tiles_info = _get_tiles_info(pixel_domain, tile_size_px, overlap_percent, randomize)
     n_tiles = len(tiles_info)
     for tile_idx, tile_info in enumerate(tiles_info):
-        tile_meta = {
-            "tile_params": tile_info
-            | {
-                "tile_idx": tile_idx,
-                "n_tiles": n_tiles,
-            }
-        }
-        yield tile_meta
-        time.sleep(delay_sec)
-
-
-def overlap_count_map(tile_info: Dict) -> np.ndarray:
-    """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
-    tile_params = tile_info["tile_params"]
-    ndim = tile_params["ndim"]
-    overlaps_px = tuple([tile_params[f"overlap_px_{idx}"] for idx in range(ndim)])
-    tile_shape = tuple([tile_params[f"tile_size_{idx}"] for idx in range(ndim)])
-    is_first_tile = tuple([tile_params[f"first_tile_{idx}"] for idx in range(ndim)])
-    is_last_tile = tuple([tile_params[f"last_tile_{idx}"] for idx in range(ndim)])
-
-    per_axis = []
-    for n, ov, first_tile, last_tile in zip(
-        tile_shape, overlaps_px, is_first_tile, is_last_tile
-    ):
-        i = np.arange(n)
-        c = 1
-        if not first_tile:
-            c = c + (i < ov).astype(np.int16)
-        if not last_tile:
-            c = c + (i >= n - ov).astype(np.int16)
-        per_axis.append(
-            c.reshape((1,) * len(per_axis) + (n,) + (1,) * (ndim - len(per_axis) - 1))
+        yield TileMeta(
+            tile_idx=tile_idx,
+            n_tiles=n_tiles,
+            tile_info=tile_info,
         )
-
-    overlap_count_arr = np.ones(tile_shape, dtype=np.int16)
-    for c in per_axis:
-        overlap_count_arr *= c
-
-    return overlap_count_arr
+        time.sleep(delay_sec)
 
 
 def _tiles_info_axis(size_i: int, tile_size_i: int, overlap_px_i: int):

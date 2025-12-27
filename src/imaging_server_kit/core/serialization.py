@@ -53,18 +53,21 @@ def deserialize_results(serialized_results: List[Dict], client_origin: str) -> R
     for ser in serialized_results:
         kind = ser["kind"]
         name = ser["name"]
-        meta = ser["meta"]
         data = ser["data"]
+        meta = ser["meta"]
+        tile_meta = ser["tile_meta"]
 
         cls: Type[DataLayer] = DATA_TYPES[kind]
         decoded_data = cls.deserialize(data, client_origin)
         decoded_meta = _deserialize_meta(meta)
+        decoded_tile_meta = _deserialize_meta(tile_meta)
 
         results.create(
             kind=kind,
             name=name,
             data=decoded_data,
             meta=decoded_meta,
+            tile_meta=decoded_tile_meta,
         )
     
     return results

@@ -10,9 +10,6 @@ from typing import Any, Dict, List, Tuple, Union
 import yaml
 from jinja2 import Template
 
-from imaging_server_kit.core.results import Results, LayerStackBase
-from imaging_server_kit.core.tiling import generate_nd_tiles
-
 templates_dir = Path(
     importlib.resources.files("imaging_server_kit.core").joinpath("templates") # type: ignore
 )
@@ -83,41 +80,6 @@ def parse_algo_info(
             "tags": tags,
         }
     return algo_info
-
-
-def generate_tiles(
-    param_results: LayerStackBase,
-    tile_size_px: int,
-    overlap_percent: float,
-    delay_sec: float,
-    randomize: bool,
-):
-    """Yield (tile_results, tile_info) for valid tiles."""
-    pixel_domain = param_results.get_pixel_domain()
-    for tile_info in generate_nd_tiles(
-        pixel_domain=pixel_domain,
-        tile_size_px=tile_size_px,
-        overlap_percent=overlap_percent,
-        delay_sec=delay_sec,
-        randomize=randomize,
-    ):
-        collected = []
-        for layer in param_results:
-            data, meta = layer.get_tile(tile_info)
-            if hasattr(data, "shape"):
-                if not all(data.shape):
-                    break
-            collected.append((layer, data, meta))
-        else:
-            tile_results = Results()
-            for layer, data, meta in collected:
-                tile_results.create(
-                    kind=layer.kind,
-                    data=data,
-                    name=layer.name,
-                    meta=meta,
-                )
-            yield tile_results, tile_info
 
 
 def resolve_params(

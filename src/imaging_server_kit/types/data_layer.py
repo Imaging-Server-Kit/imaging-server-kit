@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import is_first_tile, is_last_tile
+from imaging_server_kit.core.tiling import TileMeta, generate_nd_tiles
 
 
 class DataLayer(ABC):
@@ -41,45 +43,40 @@ class DataLayer(ABC):
 
     def __init__(
         self,
-        data=None,
+        data: Any = None,
         name: str = "",
         description: str = "",
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         self.name = name
         self.description = description
         self.meta = meta if meta is not None else {}
         self.data = data
+        self.tile_meta = tile_meta
 
         # Schema contributions
         self.constraints = [{}, {}]
 
     @property
-    def is_tiled(self) -> bool:
-        return self.meta.get("tile_params") is not None
+    def shape(self) -> Optional[Tuple]:
+        if isinstance(self.data, np.ndarray):
+            return self.data.shape
+    
+    @property
+    def pixel_domain(self) -> Optional[Tuple]:
+        pass
 
     @property
-    def is_first_tile(self) -> bool:
-        if not self.is_tiled:
-            return False
-        return is_first_tile(self.meta)
-
-    @property
-    def is_last_tile(self) -> bool:
-        if not self.is_tiled:
-            return False
-        return is_last_tile(self.meta)
+    def is_tile(self) -> bool:
+        return self.tile_meta is not None
 
     def get_initial_data(self):
-        pixel_domain = self.pixel_domain()
-        if self.is_tiled:
-            tile_params = self.meta["tile_params"]
-            ndim = tile_params["ndim"]
-            if ndim is not None:
-                pixel_domain = tuple(
-                    [tile_params.get(f"domain_size_{idx}") for idx in range(ndim)]
-                )
-        return self._get_initial_data(pixel_domain)  # type: ignore
+        if self.tile_meta is not None:
+            pixel_domain = self.tile_meta.pixel_domain
+        else:
+            pixel_domain = self.pixel_domain
+        return self._get_initial_data(pixel_domain)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Data: {self.data.shape if isinstance(self.data, np.ndarray) else self.data}"
@@ -91,7 +88,7 @@ class DataLayer(ABC):
         self.validate_data(v, meta, constraints)
         return v
 
-    def update(self, updated_data: np.ndarray, updated_meta: Dict) -> None:
+    def update(self, updated_data: Any, updated_meta: Dict) -> None:
         self.data = updated_data
         self.meta = updated_meta
         self.refresh()
@@ -99,14 +96,27 @@ class DataLayer(ABC):
     def refresh(self):
         pass
 
-    def pixel_domain(self) -> Optional[Tuple]:
+    def merge_tile(self, tile: DataLayer) -> None:
         pass
 
-    def merge_tile(self, tile_data: np.ndarray, tile_info: Dict):
-        pass
+    def get_tile(self, tile_meta: TileMeta) -> Optional[DataLayer]:
+        return self
 
-    def get_tile(self, tile_info: Dict):
-        return self.data, self.meta
+    def generate_tiles(self, tile_size_px, overlap_percent, delay_sec, randomize):
+        if self.pixel_domain is None:
+            raise RuntimeError("Could not generate tiles; pixel domain is not defined.")
+        
+        for tile_meta in generate_nd_tiles(
+            pixel_domain=self.pixel_domain,
+            tile_size_px=tile_size_px,
+            overlap_percent=overlap_percent,
+            delay_sec=delay_sec,
+            randomize=randomize,
+        ):
+            tile = self.get_tile(tile_meta)
+            tile_idx = tile_meta.tile_idx
+            n_tiles = tile_meta.n_tiles
+            yield tile, tile_idx, n_tiles
 
     @classmethod
     def validate_data(cls, data: Any, meta: Dict, constraints: List[Dict]):
@@ -122,6 +132,6 @@ class DataLayer(ABC):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[List[int], Tuple[int]]]
     ) -> Optional[np.ndarray]:
         pass

@@ -61,14 +61,8 @@ def algo_stream_gen(algo_stream: AlgoStream):
     yield algo_stream.value
 
 
-def update_pbar(tile_idx, n_tiles, tqdm_pbar):
-    tqdm_pbar.n = tile_idx + 1
-    tqdm_pbar.total = n_tiles
-    tqdm_pbar.refresh()
-
-
 class AlgorithmRunner(ABC):
-    @property # type: ignore
+    @property  # type: ignore
     @abstractmethod
     def algorithms(): ...
 
@@ -83,7 +77,7 @@ class AlgorithmRunner(ABC):
 
     @abstractmethod
     def get_n_samples(self, algorithm: str) -> int: ...
-    
+
     @abstractmethod
     def is_tileable(self, algorithm: str) -> bool: ...
 
@@ -113,18 +107,18 @@ class AlgorithmRunner(ABC):
     def run(
         self,
         *args,
-        algorithm: Optional[str]=None,
+        algorithm: Optional[str] = None,
         tiled: bool = False,
         tile_size_px: int = 64,
         overlap_percent: float = 0.0,
         delay_sec: float = 0.0,
         randomize: bool = False,
-        results: Union[LayerStackBase, "napari.Viewer"] = None, # type: ignore
+        results: Union[LayerStackBase, "napari.Viewer"] = None,  # type: ignore
         **algo_params,
-    ) -> Union[LayerStackBase, "napari.Viewer"]: # type: ignore
+    ) -> Union[LayerStackBase, "napari.Viewer"]:  # type: ignore
         """
         Execute an algorithm with a set of parameters.
-        
+
         Parameters
         ----------
         algorithm: The algorithm to run (only used with algorithm collections).
@@ -189,31 +183,32 @@ class AlgorithmRunner(ABC):
                     message="Algorithm is a stream. It cannot be run in tiled mode.",
                 )
             tqdm_pbar = tqdm()
-            for tile_results in self._tile(
+            for tile_results, tile_idx, n_tiles in self._tile(
                 algorithm,
                 tile_size_px,
                 overlap_percent,
                 delay_sec,
                 randomize,
                 param_results,
-            ): # type: ignore
-                results.merge(
-                    tile_results,
-                    tiles_callback=lambda tile_idx, n_tiles: update_pbar(
-                        tile_idx, n_tiles, tqdm_pbar
-                    ),
-                )
+            ):
+                if tile_results is not None:
+                    results.merge_tile(tile_results)
+                tqdm_pbar.n = tile_idx + 1
+                tqdm_pbar.total = n_tiles
+                tqdm_pbar.refresh()
         else:
             if stream:
                 tqdm_pbar = tqdm()
                 wrap = AlgoStream(self._stream(algorithm, param_results))
                 for frame_results in algo_stream_gen(wrap):
-                    results.merge(frame_results)
+                    if frame_results is not None:
+                        results.merge(frame_results)
             else:
                 run_results = self._run(algorithm, param_results)
-                results.merge(run_results)
+                if run_results is not None:
+                    results.merge(run_results)
 
         if special_napari_case:
-            return results.viewer # type: ignore
+            return results.viewer  # type: ignore
         else:
             return results

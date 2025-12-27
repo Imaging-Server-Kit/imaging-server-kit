@@ -5,6 +5,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -28,12 +29,14 @@ class Choice(DataLayer):
         default: Optional[str] = None,
         auto_call: bool = False,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         super().__init__(
             name=name,
             description=description,
             meta=meta,
             data=data,
+            tile_meta=tile_meta,
         )
         if items is None:
             items = []

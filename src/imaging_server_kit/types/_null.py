@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -17,12 +18,14 @@ class Null(DataLayer):
         description="Null (None) type",
         default=None,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         super().__init__(
             name=name,
             description=description,
             meta=meta,
             data=data,
+            tile_meta=tile_meta,
         )
         self.default = default
         

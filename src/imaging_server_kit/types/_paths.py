@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -24,12 +25,14 @@ class Paths(DataLayer):
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
         meta: Optional[Dict] = None,
+        tile_meta: Optional[TileMeta] = None,
     ):
         super().__init__(
             name=name,
             description=description,
             meta=meta,
             data=data,
+            tile_meta=tile_meta,
         )
         self.dimensionality = (
             dimensionality if dimensionality is not None else np.arange(6).tolist()
@@ -48,6 +51,7 @@ class Paths(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
+    @property
     def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
