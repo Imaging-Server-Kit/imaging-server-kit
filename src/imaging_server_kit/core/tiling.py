@@ -106,12 +106,11 @@ class TileMeta:
             tile_shape, overlaps_px, is_first_tile, is_last_tile
         ):
             i = np.arange(n)
-            c = 1
+            c = np.ones(n, dtype=np.int16)
             if not first_tile:
                 c = c + (i < ov).astype(np.int16)
             if not last_tile:
                 c = c + (i >= n - ov).astype(np.int16)
-            # TODO: check this
             per_axis.append(
                 c.reshape(
                     (1,) * len(per_axis) + (n,) + (1,) * (self.ndim - len(per_axis) - 1)
