@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from geojson import Feature, LineString
 
@@ -88,7 +88,7 @@ class Vectors(DataLayer):
     @property
     def pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
-            return np.max(self.data[:, 0], axis=0)
+            return tuple(np.max(self.data[:, 0], axis=0))
 
     def get_tile(self, tile_meta: TileMeta) -> Vectors:
         if self.data is None:
@@ -185,7 +185,7 @@ class Vectors(DataLayer):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

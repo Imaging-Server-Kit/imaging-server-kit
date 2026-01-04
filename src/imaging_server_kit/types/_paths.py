@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -61,7 +61,7 @@ class Paths(DataLayer):
             path_domains.append(list(path_domain))
         path_domains = np.asarray(path_domains)
         pixel_domain = np.max(path_domains, axis=0)
-        return pixel_domain
+        return tuple(pixel_domain)
 
     @classmethod
     def serialize(cls, data: Optional[List[np.ndarray]], client_origin:str):
@@ -80,7 +80,7 @@ class Paths(DataLayer):
         return data
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    def _get_initial_data(cls, pixel_domain: Optional[Union[Tuple, List]]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.asarray([])

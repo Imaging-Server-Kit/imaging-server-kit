@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from geojson import Feature, Polygon
 
@@ -85,7 +85,7 @@ class Boxes(DataLayer):
     @property
     def pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
-            return np.max(np.asarray(self.data), axis=(0, 1))
+            return tuple(np.max(np.asarray(self.data), axis=(0, 1)))
 
     def get_tile(self, tile_meta: TileMeta) -> Boxes:
         if self.data is None:
@@ -179,7 +179,7 @@ class Boxes(DataLayer):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

@@ -107,12 +107,16 @@ class Image(DataLayer):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.zeros(pixel_domain, dtype=np.float32)
 
+    @classmethod
+    def initialize(cls, pixel_domain: Union[Tuple, List]) -> Image:
+        return cls(data=cls._get_initial_data(pixel_domain))
+    
     @classmethod
     def validate_data(cls, data, meta, constraints):
         main, extra = constraints

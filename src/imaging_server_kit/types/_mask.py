@@ -269,10 +269,14 @@ class Mask(DataLayer):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is not None:
             return np.zeros(pixel_domain, dtype=np.uint16)
+
+    @classmethod
+    def initialize(cls, pixel_domain: Union[Tuple, List]) -> Mask:
+        return cls(data=cls._get_initial_data(pixel_domain))
 
     @classmethod
     def validate_data(cls, data, meta, constraints):

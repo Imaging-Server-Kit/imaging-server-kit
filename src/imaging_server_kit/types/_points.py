@@ -110,7 +110,7 @@ class Points(DataLayer):
     @property
     def pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
-            return np.max(self.data, axis=0)
+            return tuple(np.max(self.data, axis=0))
 
     def get_tile(self, tile_meta: TileMeta) -> Points:
         if self.data is None:
@@ -195,7 +195,7 @@ class Points(DataLayer):
 
     @classmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[np.ndarray]
+        cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

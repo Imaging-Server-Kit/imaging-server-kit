@@ -65,7 +65,7 @@ class Tracks(DataLayer):
         return serialized_data.astype(float)
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    def _get_initial_data(cls, pixel_domain: Optional[Union[Tuple, List]]) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.zeros((1, len(pixel_domain)+2), dtype=np.float32)
@@ -74,4 +74,4 @@ class Tracks(DataLayer):
     def pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
-        return np.max(self.data, axis=0)[2:]
+        return tuple(np.max(self.data, axis=0)[2:])
