@@ -52,7 +52,7 @@ class Paths(DataLayer):
         # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
+    def _pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         path_domains = []

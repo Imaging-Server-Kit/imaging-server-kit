@@ -67,7 +67,7 @@ def parse_algo_info(
     name: str,
     description: str,
     project_url: str,
-    tags: List[str],
+    tags: List,
 ):
     if Path(metadata_file).exists():
         with open(metadata_file, "r") as file:
@@ -84,7 +84,7 @@ def parse_algo_info(
 
 def resolve_params(
     algo_param_defs: Dict,
-    signature_params: List[str],
+    signature_params: List,
     args: Tuple,
     algo_params: Dict,
 ) -> Dict:

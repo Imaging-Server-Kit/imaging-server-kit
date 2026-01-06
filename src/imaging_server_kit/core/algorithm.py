@@ -383,13 +383,15 @@ class Algorithm(AlgorithmRunner):
         param_results: Results,
     ):
         """Process the image sequentially in tiles."""
-        for tile_results, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
+        # for tile_results, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
+        for tile_results in param_results.generate_tiles(tiling_ctx):
             if tile_results is not None:
                 results = self._run(algorithm, tile_results)
-                # Copy the tile metadata from the inputs to the outputs (TODO: a bit weird)
+                # Copy the tile metadata from the inputs to the outputs (TODO: really weird..)
                 for l in results:
                     l.tile_meta = tile_results[0].tile_meta
-                yield results, tile_idx, n_tiles
+                    # l._is_tile = True
+                yield results#, tile_idx, n_tiles
 
     def _run(self, algorithm, param_results: Results) -> Results:
         algo_params = param_results.to_params_dict()

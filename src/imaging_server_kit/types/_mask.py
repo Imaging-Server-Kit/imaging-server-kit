@@ -213,7 +213,7 @@ class Mask(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
+    def _pixel_domain(self) -> Optional[Tuple]:
         if isinstance(self.data, np.ndarray):
             return self.data.shape
 

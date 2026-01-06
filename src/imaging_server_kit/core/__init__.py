@@ -2,6 +2,7 @@ from .client import Client
 from .algorithm import Algorithm, algorithm
 from .results import Results, LayerStackBase
 from .multialgo import MultiAlgorithm, combine
+from .tiling import generate_nd_tiles, TileMeta
 
 __all__ = [
     "Client",
@@ -11,4 +12,6 @@ __all__ = [
     "algorithm",
     "MultiAlgorithm",
     "combine",
+    "generate_nd_tiles",
+    "TileMeta",
 ]

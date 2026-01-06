@@ -83,9 +83,10 @@ class Boxes(DataLayer):
             return len(self.data)
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
+    def _pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
-            return tuple(np.max(np.asarray(self.data), axis=(0, 1)))
+            if self.n_objects > 0:
+                return tuple(np.max(np.asarray(self.data), axis=(0, 1)))
 
     def get_tile(self, tile_meta: TileMeta) -> Boxes:
         if self.data is None:

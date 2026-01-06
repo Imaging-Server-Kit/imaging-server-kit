@@ -187,14 +187,20 @@ class AlgorithmRunner(ABC):
                 delay_sec=delay_sec,
             )
             tqdm_pbar = tqdm()
-            for tile_results, tile_idx, n_tiles in self._tile(
+            # for tile_results, tile_idx, n_tiles in self._tile(
+            for tile_results in self._tile(
                 algorithm, tiling_ctx, param_results
-            ):
+            ): # type: ignore
                 if tile_results is not None:
                     results.merge_tile(tile_results)
-                tqdm_pbar.n = tile_idx + 1
-                tqdm_pbar.total = n_tiles
-                tqdm_pbar.refresh()
+                    # TODO: replace this with at sk.Progress type => 
+                    # on refresh, its self.data (=tqdm_pbar) increments current value to its self.tile_meta
+                    tile_idx = results[0].tile_meta.tile_idx
+                    n_tiles = results[0].tile_meta.n_tiles
+                    if tile_idx is not None:
+                        tqdm_pbar.n = tile_idx + 1
+                        tqdm_pbar.total = n_tiles
+                        tqdm_pbar.refresh()
         else:
             if stream:
                 tqdm_pbar = tqdm()
@@ -203,6 +209,15 @@ class AlgorithmRunner(ABC):
                     if frame_results is not None:
                         results.merge(frame_results)
             else:
+                # # TODO: could we do _tile here, in fact?
+                # _tile_size_px = param_results.pixel_domain
+                # tiling_ctx = TilingContext(tile_size_px=_tile_size_px)
+                # for tile_results, tile_idx, n_tiles in self._tile(
+                #     algorithm, tiling_ctx, param_results
+                # ): # type: ignore
+                #     if tile_results is not None:
+                #         results.merge_tile(tile_results)
+                
                 run_results = self._run(algorithm, param_results)
                 if run_results is not None:
                     results.merge(run_results)

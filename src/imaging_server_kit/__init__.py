@@ -14,6 +14,8 @@ from .core import (
     combine,
     LayerStackBase,
     Results,
+    generate_nd_tiles,
+    TileMeta,
 )
 
 from .types import (

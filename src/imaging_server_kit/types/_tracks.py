@@ -71,7 +71,14 @@ class Tracks(DataLayer):
         return np.zeros((1, len(pixel_domain)+2), dtype=np.float32)
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
+    def n_objects(self) -> int:
         if self.data is None:
-            return
-        return tuple(np.max(self.data, axis=0)[2:])
+            return 0
+        else:
+            return len(self.data)
+
+    @property
+    def _pixel_domain(self) -> Optional[Tuple]:
+        if self.data is None:
+            if self.n_objects > 0:
+                return tuple(np.max(self.data, axis=0)[2:])

@@ -31,6 +31,7 @@ class Image(DataLayer):
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
     ):
+        self.rgb = rgb
         super().__init__(
             name=name,
             description=description,
@@ -41,7 +42,6 @@ class Image(DataLayer):
         self.dimensionality = (
             dimensionality if dimensionality is not None else np.arange(6).tolist()
         )
-        self.rgb = rgb
         self.required = required
 
         # Schema contributions
@@ -60,7 +60,7 @@ class Image(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
+    def _pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         if self.rgb:
