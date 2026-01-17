@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Generator, List, Optional, Type
 
 import numpy as np
 
@@ -51,7 +51,7 @@ class LayerStackBase(ABC):
     ) -> Optional[DataLayer]: ...
 
     @abstractmethod
-    def delete(self, layer_name: str): ...
+    def delete(self, layer_name: str) -> None: ...
 
     @property
     @abstractmethod
@@ -83,7 +83,7 @@ class LayerStackBase(ABC):
             dst_layer = self.read(tile_layer.name)
             first_tile = tile_layer.tile_meta.is_first_tile
             last_tile = tile_layer.tile_meta.is_last_tile
-            
+
             if dst_layer is None:
                 dst_layer = self.create(
                     kind=tile_layer.kind,
@@ -92,17 +92,17 @@ class LayerStackBase(ABC):
                     meta=tile_layer.meta,
                     tile_meta=None,  # Important!
                 )
-            
+
             if first_tile:
                 dst_layer.first_tile_hook()
-                
+
                 # Erase the layer data to re-initialize it
                 self.update(
                     layer_name=dst_layer.name,
                     updated_data=tile_layer._get_initial_data(tile_layer.pixel_domain),
                     updated_meta=tile_layer.meta,  # TODO: Not `initial_meta`?
                 )
-            
+
             # Merge the tile in the destination layer
             dst_layer.merge(tile_layer)
 
@@ -112,10 +112,9 @@ class LayerStackBase(ABC):
                 updated_data=dst_layer.data,
                 updated_meta=dst_layer.meta,
             )
-            
+
             if last_tile:
                 dst_layer.last_tile_hook()
-            
 
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
@@ -205,7 +204,7 @@ class Results(LayerStackBase):
             # TODO: we should be able to track it via _update_result_pixel_domain()
             return np.max(np.stack(domains), axis=0).tolist()
 
-    def _update_result_pixel_domain(self, layer: DataLayer):
+    def _update_result_pixel_domain(self, layer: DataLayer) -> None:
         if (self.pixel_domain is not None) or (layer.pixel_domain is not None):
             if self.pixel_domain is None:
                 for l in self.layers:
@@ -215,7 +214,9 @@ class Results(LayerStackBase):
             else:
                 _pixel_domain_arr_results = np.asarray(self.pixel_domain)
                 _pixel_domain_arr_layer = np.asarray(layer.pixel_domain)
-                _filt = _pixel_domain_arr_results > _pixel_domain_arr_layer  # TODO: bug `operands could not be broadcast together with shapes (2,) (3,)`
+                _filt = (
+                    _pixel_domain_arr_results > _pixel_domain_arr_layer
+                )  # TODO: bug `operands could not be broadcast together with shapes (2,) (3,)`
                 if _filt.sum() > 0:
                     _pixel_domain_arr_layer[_filt] = _pixel_domain_arr_results[_filt]
                     layer.tile_meta.pixel_domain = _pixel_domain_arr_layer.tolist()
@@ -291,7 +292,7 @@ class Results(LayerStackBase):
             self._update_result_pixel_domain(layer)
         return layer
 
-    def delete(self, layer_name: str):
+    def delete(self, layer_name: str) -> None:
         """Delete a layer by name."""
         for idx, layer in enumerate(self.layers):
             if layer.name == layer_name:
@@ -300,7 +301,7 @@ class Results(LayerStackBase):
         for l in self.layers:
             l.tile_meta.pixel_domain = self.pixel_domain
 
-    def generate_tiles(self, ctx: Optional[TilingContext]):
+    def generate_tiles(self, ctx: Optional[TilingContext]) -> Generator[Results, None, None]:
         if ctx is None:
             tile_meta = TileMeta()
             yield self.get_tile(tile_meta)

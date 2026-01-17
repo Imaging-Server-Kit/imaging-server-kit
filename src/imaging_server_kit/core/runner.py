@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, Generator, List, Optional, Union
 
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import (
@@ -13,7 +13,7 @@ from imaging_server_kit.core.tiling import TilingContext
 NAPARI_INSTALLED = napari_available()
 
 
-def _check_algorithm_available(algorithm, algorithms):
+def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) -> str:
     if algorithm is None:
         if len(algorithms) > 0:
             return algorithms[0]
@@ -26,8 +26,8 @@ def _check_algorithm_available(algorithm, algorithms):
             return algorithm
 
 
-def validate_algorithm(func):
-    def wrapper(self, algorithm=None, *args, **kwargs):
+def validate_algorithm(func: Callable) -> Callable:
+    def wrapper(self, algorithm: Optional[str]=None, *args, **kwargs):
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
         return func(self, algorithm, *args, **kwargs)
 
@@ -37,10 +37,10 @@ def validate_algorithm(func):
 class AlgorithmRunner(ABC):
     @property  # type: ignore
     @abstractmethod
-    def algorithms(): ...
+    def algorithms() -> List[str]: ...
 
     @abstractmethod
-    def info(self, algorithm: str): ...
+    def info(self, algorithm: str) -> None: ...
 
     @abstractmethod
     def get_parameters(self, algorithm: str) -> Dict: ...
@@ -58,7 +58,7 @@ class AlgorithmRunner(ABC):
     def get_signature_params(self, algorithm: str) -> List[str]: ...
 
     @abstractmethod
-    def _stream(self, algorithm, params_res: Results): ...
+    def _stream(self, algorithm, params_res: Results) -> Generator[Results, None, None]: ...
 
     def run_generator(
         self,
@@ -191,13 +191,9 @@ class AlgorithmRunner(ABC):
         else:
             tiling_ctx = None
 
-        # TODO: Here - first-tile hook?
-         
         # Run the algorithm and assemble the results
         for tile_results in self.run_generator(algorithm, algo_params_res, tiling_ctx):
             results.merge(tile_results)
-
-        # TODO: Here - last-tile hook? 
         
         # Remove the progress bar
         results.delete(layer_name="Tile progress")

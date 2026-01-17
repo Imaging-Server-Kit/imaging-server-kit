@@ -107,11 +107,11 @@ class InstanceMask(Mask):
             self.tile_tracker.add_node(new_label)
 
         border_mask = mask_tile.tile_meta.overlap_border_mask
-
-        for src_lab in unique_positive(src_arr[border_mask]):
-            lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
-            lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
-            for dst_lab in unique_positive(lab_filt_dst_in_overlap):
-                n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
-                if n_intersecting_px > self.min_intersecting_px:
-                    self.tile_tracker.add_edge(dst_lab, src_lab)
+        if border_mask is not None:
+            for src_lab in unique_positive(src_arr[border_mask]):
+                lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
+                lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
+                for dst_lab in unique_positive(lab_filt_dst_in_overlap):
+                    n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
+                    if n_intersecting_px > self.min_intersecting_px:
+                        self.tile_tracker.add_edge(dst_lab, src_lab)

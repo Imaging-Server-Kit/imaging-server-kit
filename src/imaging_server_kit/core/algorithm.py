@@ -4,6 +4,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generator,
     Iterable,
     List,
     Optional,
@@ -230,7 +231,7 @@ class AlgoStream:
                 raise e
 
 
-def algo_stream_gen(algo_stream: AlgoStream):
+def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
     for x in algo_stream:
         yield x
     yield algo_stream.value
@@ -315,7 +316,7 @@ class Algorithm(AlgorithmRunner):
     def algorithms(self, algorithms: Iterable[str]):
         self._algorithms = algorithms
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Any:
         # Get a Results object
         results = self.run(*args, **kwargs)
 
@@ -340,17 +341,19 @@ class Algorithm(AlgorithmRunner):
         return getattr(self._run_algorithm_func, name)
 
     @validate_algorithm
-    def info(self, algorithm=None):
+    def info(self, algorithm: Optional[str] = None) -> None:
         """Create and open the algorithm info page in a web browser."""
         algo_params_schema = self.get_parameters(algorithm)
         etc.open_doc_link(algo_params_schema, algo_info=self.algo_info)
 
     @validate_algorithm
-    def get_parameters(self, algorithm=None) -> Dict[str, Any]:
+    def get_parameters(self, algorithm: Optional[str] = None) -> Dict[str, Any]:
         return self.parameters_model.model_json_schema()
 
     @validate_algorithm
-    def get_sample(self, algorithm=None, idx: int = 0) -> Optional[Results]:
+    def get_sample(
+        self, algorithm: Optional[str] = None, idx: int = 0
+    ) -> Optional[Results]:
         n_samples = self.get_n_samples(algorithm)
         if n_samples == 0:
             return
@@ -378,27 +381,27 @@ class Algorithm(AlgorithmRunner):
             sample_results.create(kind, param_value, param_name)
         return sample_results
 
-    def get_n_samples(self, algorithm=None):
+    def get_n_samples(self, algorithm: Optional[str] = None) -> int:
         return len(self.samples)
 
-    def is_tileable(self, algorithm=None):
+    def is_tileable(self, algorithm: Optional[str] = None) -> bool:
         return self.tileable
 
     @validate_algorithm
-    def get_signature_params(self, algorithm=None) -> List[str]:
+    def get_signature_params(self, algorithm: Optional[str] = None) -> List[str]:
         """List parameter names of the algo run function."""
         return list(signature(self._run_algorithm_func).parameters.keys())
 
-    def _stream(self, algorithm: str, params_res: Results):
+    def _stream(self, algorithm: str, params_res: Results) -> Generator[Results, None, None]:
         """Generator that runs an algorithm using given parameters."""
         algo_params = params_res.to_params_dict()
-        
+
         # Validate parameters `manually` with Pydantic:
         try:
             self.parameters_model(**algo_params)
         except ValidationError as e:
-            raise e       
-        
+            raise e
+
         # If user-defined run function has `yield` statements:
         if isgeneratorfunction(self._run_algorithm_func):
             gen = algo_stream_gen(AlgoStream(self._run_algorithm_func(**algo_params)))
@@ -443,7 +446,7 @@ def algorithm(
     An algorithm instance (sk.Algorithm).
     """
 
-    def _decorate(run_aglorithm_func: Callable):
+    def _decorate(run_aglorithm_func: Callable) -> Algorithm:
         return Algorithm(
             run_algorithm_func=run_aglorithm_func,
             parameters=parameters,

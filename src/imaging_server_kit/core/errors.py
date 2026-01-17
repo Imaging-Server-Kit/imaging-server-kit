@@ -4,7 +4,7 @@ from typing import Optional
 class AlgorithmNotFoundError(Exception):
     """Exception raised when a specified algorithm is not found."""
 
-    def __init__(self, algorithm: str, message="Algorithm not found"):
+    def __init__(self, algorithm: Optional[str], message="Algorithm not found"):
         self.algorithm_name = algorithm
         self.message = f"{message}: {algorithm}"
         super().__init__(self.message)
