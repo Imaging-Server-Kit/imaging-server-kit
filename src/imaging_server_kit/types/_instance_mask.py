@@ -84,6 +84,13 @@ class InstanceMask(Mask):
         self.tile_tracker = InstanceTileTracker()
         self.min_intersecting_px = min_intersecting_px
 
+    def first_tile_hook(self):
+        self.tile_tracker.initialize()
+
+    def last_tile_hook(self):
+        # Do the graph merging (Note: could be done tile-by-tile as well)
+        self.data = self.tile_tracker.resolve(self.data)
+
     def merge(self, mask_tile: Mask) -> None:
         if (self.data is None) or (mask_tile.tile_meta is None):
             raise RuntimeError("Invalid attempt to merge an instance mask tile.")
@@ -91,9 +98,6 @@ class InstanceMask(Mask):
         dst_tile = self.get_tile(mask_tile.tile_meta)
         if dst_tile is None:
             raise RuntimeError("Invalid attempt to merge an instance mask tile.")
-
-        if mask_tile.tile_meta.is_first_tile:
-            self.tile_tracker.initialize()
 
         src_arr = self.tile_tracker.add_N_to_tile(mask_tile.data)
 
@@ -111,20 +115,3 @@ class InstanceMask(Mask):
                 n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
                 if n_intersecting_px > self.min_intersecting_px:
                     self.tile_tracker.add_edge(dst_lab, src_lab)
-
-        # Do the graph merging at the last iteration
-        # => Progress might freeze at 100% for a while (OK for now..)
-        if mask_tile.tile_meta.is_last_tile:
-            self.data = self.tile_tracker.resolve(
-                self.data
-            )  # Implies processing the whole mask at once (OK for now..)
-
-            # TODO: check this
-            # # Alternatively: resolve tile-by-tile
-            # instance_mask = Mask(self._get_initial_data(self.pixel_domain))
-            # for tile_meta in generate_nd_tiles(self.pixel_domain, tile_size_px=512):  # 512?
-            #     mask_tile = self.get_tile(tile_meta)
-            #     resolved_mask_tile_data = self.tile_tracker.resolve(mask_tile.data)
-            #     rmtd = Mask(data=resolved_mask_tile_data, tile_meta=tile_meta)
-            #     instance_mask.merge_tile(rmtd)
-            # self.data = instance_mask.data

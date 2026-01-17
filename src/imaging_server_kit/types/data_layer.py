@@ -144,6 +144,12 @@ class DataLayer(ABC):
 
     def refresh(self):
         pass
+    
+    def first_tile_hook(self):
+        pass
+    
+    def last_tile_hook(self):
+        pass
 
     def merge(self, layer: DataLayer) -> None:
         self.data = layer.data

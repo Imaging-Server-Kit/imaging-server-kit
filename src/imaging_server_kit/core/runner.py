@@ -191,10 +191,14 @@ class AlgorithmRunner(ABC):
         else:
             tiling_ctx = None
 
+        # TODO: Here - first-tile hook?
+         
         # Run the algorithm and assemble the results
         for tile_results in self.run_generator(algorithm, algo_params_res, tiling_ctx):
             results.merge(tile_results)
 
+        # TODO: Here - last-tile hook? 
+        
         # Remove the progress bar
         results.delete(layer_name="Tile progress")
 

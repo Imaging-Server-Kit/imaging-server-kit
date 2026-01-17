@@ -80,8 +80,10 @@ class LayerStackBase(ABC):
             return
 
         for tile_layer in layer_stack:
-            # Create a destination layer with data initialized like pixel_domain, if it does not exist
             dst_layer = self.read(tile_layer.name)
+            first_tile = tile_layer.tile_meta.is_first_tile
+            last_tile = tile_layer.tile_meta.is_last_tile
+            
             if dst_layer is None:
                 dst_layer = self.create(
                     kind=tile_layer.kind,
@@ -90,9 +92,11 @@ class LayerStackBase(ABC):
                     meta=tile_layer.meta,
                     tile_meta=None,  # Important!
                 )
-
-            # On first tile, erase the layer data to re-initialize it
-            if tile_layer.tile_meta.is_first_tile:
+            
+            if first_tile:
+                dst_layer.first_tile_hook()
+                
+                # Erase the layer data to re-initialize it
                 self.update(
                     layer_name=dst_layer.name,
                     updated_data=tile_layer._get_initial_data(tile_layer.pixel_domain),
@@ -108,6 +112,10 @@ class LayerStackBase(ABC):
                 updated_data=dst_layer.data,
                 updated_meta=dst_layer.meta,
             )
+            
+            if last_tile:
+                dst_layer.last_tile_hook()
+            
 
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
