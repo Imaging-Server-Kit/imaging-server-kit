@@ -40,7 +40,6 @@ dependencies = [
     "python-multipart",
     # Used in app + client
     "msgpack",
-    "httpx",
     "networkx",
 ]
 
