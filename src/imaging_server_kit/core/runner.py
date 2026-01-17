@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
 
-from tqdm import tqdm
-
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
-    AlgorithmStreamError,
     AlgorithmRuntimeError,
     napari_available,
 )
@@ -37,31 +34,6 @@ def validate_algorithm(func):
     return wrapper
 
 
-class AlgoStream:
-    def __init__(self, gen):
-        self._it = iter(gen)
-        self.value = None
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            return next(self._it)
-        except (StopIteration, AlgorithmRuntimeError) as e:
-            if isinstance(e, StopIteration):
-                self.value = e.value
-                raise
-            elif isinstance(e, AlgorithmRuntimeError):
-                raise e
-
-
-def algo_stream_gen(algo_stream: AlgoStream):
-    for x in algo_stream:
-        yield x
-    yield algo_stream.value
-
-
 class AlgorithmRunner(ABC):
     @property  # type: ignore
     @abstractmethod
@@ -86,21 +58,53 @@ class AlgorithmRunner(ABC):
     def get_signature_params(self, algorithm: str) -> List[str]: ...
 
     @abstractmethod
-    def _is_stream(self, algorithm: str): ...
+    def _stream(self, algorithm, params_res: Results): ...
 
-    @abstractmethod
-    def _stream(self, algorithm, param_results: Results): ...
-
-    @abstractmethod
-    def _tile(
+    def run_generator(
         self,
-        algorithm: Optional[str],
-        tiling_ctx: TilingContext,
-        param_results: Results,
-    ): ...
+        algorithm: str,
+        params_res: Results,
+        tiling_ctx: Optional[TilingContext] = None,
+    ):
+        if tiling_ctx is None:
+            tiling_ctx = (
+                TilingContext(tile_size_px=params_res.pixel_domain)
+                if params_res.pixel_domain
+                else None
+            )
+        
+        for params_tile in params_res.generate_tiles(tiling_ctx):
+            for result_tile in self._stream(algorithm, params_tile):
+                # Construct the progress data
+                if len(params_tile) > 0:
+                    params_tile_meta = params_tile[0].tile_meta
+                    progress_data = params_tile_meta.tile_idx
+                    progress_max_val = params_tile_meta.n_tiles
+                else:
+                    params_tile_meta = None
+                    progress_data = 0
+                    progress_max_val = 1
 
-    @abstractmethod
-    def _run(self, algorithm, param_results: Results) -> Results: ...
+                # Create a progress layer at the current step
+                result_tile.create(
+                    kind="progress",
+                    name="Tile progress",
+                    data=progress_data,
+                    meta={"max_val": progress_max_val},
+                    tile_meta=params_tile_meta,
+                )
+
+                # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
+                if params_tile_meta is not None:
+                    # Set the tile index to be the current index for all result layers
+                    for l in result_tile:
+                        l.tile_meta.tile_idx = params_tile_meta.tile_idx
+                        l.tile_meta.n_tiles = params_tile_meta.n_tiles
+                        # TODO: for the tile position, should we not add the returned l.coords_min to offset them correctly?
+                        l.tile_meta.coords_min = params_tile_meta.coords_min
+                        l.tile_meta.overlap_px = params_tile_meta.overlap_px
+                
+                yield result_tile
 
     def run(
         self,
@@ -129,6 +133,13 @@ class AlgorithmRunner(ABC):
         """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 
+        # Raise if tileable is set to False and the algo is attempted to be run in tiles
+        if tiled and not self.is_tileable(algorithm):
+            raise AlgorithmRuntimeError(
+                algorithm,
+                message="Algorithm cannot be run in tiled mode.",
+            )
+
         # Parameters from the Pydantic model => gives defaults from the {parameters=} definition
         algo_param_defs = self.get_parameters(algorithm)["properties"]
 
@@ -145,19 +156,21 @@ class AlgorithmRunner(ABC):
         )
 
         # Convert the resolved parameters to a Results object
-        param_results = Results()
+        algo_params_res = Results()
+
+        # TODO: this is a special case for RGB... how else could we handle that?
         for param_name, param_value in resolved_params.items():
             kind = algo_param_defs[param_name].get("param_type")
             if kind == "image":
-                # TODO: this is a special case for RGB... how else could we handle that?
                 rgb = algo_param_defs[param_name].get("rgb")
-                param_results.create(kind, param_value, param_name, rgb=rgb)
+                algo_params_res.create(kind, param_value, param_name, rgb=rgb)
             else:
-                param_results.create(kind, param_value, param_name)
+                algo_params_res.create(kind, param_value, param_name)
 
         if results is None:
             results = Results()
 
+        # Handle the special napari case
         special_napari_case = False
         if NAPARI_INSTALLED:
             import napari
@@ -165,63 +178,27 @@ class AlgorithmRunner(ABC):
 
             if isinstance(results, napari.Viewer):
                 special_napari_case = True
-                results = NapariResults(viewer=results)
+                results = NapariResults(viewer=results) # type: ignore
 
-        stream = self._is_stream(algorithm)
-
+        # Construct the tiling context
         if tiled:
-            if self.is_tileable is False:
-                raise AlgorithmRuntimeError(
-                    algorithm,
-                    message="Algorithm cannot be run in tiled mode.",
-                )
-            if stream:
-                raise AlgorithmStreamError(
-                    algorithm,
-                    message="Algorithm is a stream. It cannot be run in tiled mode.",
-                )
             tiling_ctx = TilingContext(
                 tile_size_px=tile_size_px,
                 overlap_percent=overlap_percent,
                 randomize=randomize,
                 delay_sec=delay_sec,
             )
-            tqdm_pbar = tqdm()
-            # for tile_results, tile_idx, n_tiles in self._tile(
-            for tile_results in self._tile(
-                algorithm, tiling_ctx, param_results
-            ): # type: ignore
-                if tile_results is not None:
-                    results.merge_tile(tile_results)
-                    # TODO: replace this with at sk.Progress type => 
-                    # on refresh, its self.data (=tqdm_pbar) increments current value to its self.tile_meta
-                    tile_idx = results[0].tile_meta.tile_idx
-                    n_tiles = results[0].tile_meta.n_tiles
-                    if tile_idx is not None:
-                        tqdm_pbar.n = tile_idx + 1
-                        tqdm_pbar.total = n_tiles
-                        tqdm_pbar.refresh()
         else:
-            if stream:
-                tqdm_pbar = tqdm()
-                wrap = AlgoStream(self._stream(algorithm, param_results))
-                for frame_results in algo_stream_gen(wrap):
-                    if frame_results is not None:
-                        results.merge(frame_results)
-            else:
-                # # TODO: could we do _tile here, in fact?
-                # _tile_size_px = param_results.pixel_domain
-                # tiling_ctx = TilingContext(tile_size_px=_tile_size_px)
-                # for tile_results, tile_idx, n_tiles in self._tile(
-                #     algorithm, tiling_ctx, param_results
-                # ): # type: ignore
-                #     if tile_results is not None:
-                #         results.merge_tile(tile_results)
-                
-                run_results = self._run(algorithm, param_results)
-                if run_results is not None:
-                    results.merge(run_results)
+            tiling_ctx = None
 
+        # Run the algorithm and assemble the results
+        for tile_results in self.run_generator(algorithm, algo_params_res, tiling_ctx):
+            results.merge(tile_results)
+
+        # Remove the progress bar
+        results.delete(layer_name="Tile progress")
+
+        # Return the results
         if special_napari_case:
             return results.viewer  # type: ignore
         else:

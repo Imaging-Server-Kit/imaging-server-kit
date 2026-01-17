@@ -34,6 +34,7 @@ from .types import (
     Choice,
     Notification,
     Null,
+    Progress,
 )
 
 from .core.errors import napari_available

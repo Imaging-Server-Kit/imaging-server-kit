@@ -16,7 +16,7 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
 class InstanceTileTracker:
     def __init__(self) -> None:
         self.initialize()
-        
+
     def initialize(self):
         self.N = 0  # Current number of objects
         self.G = nx.Graph()
@@ -70,7 +70,7 @@ class InstanceMask(Mask):
         required: bool = True,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
-        min_intersecting_px: int=5,
+        min_intersecting_px: int = 5,
     ):
         super().__init__(
             data=data,
@@ -83,27 +83,27 @@ class InstanceMask(Mask):
         )
         self.tile_tracker = InstanceTileTracker()
         self.min_intersecting_px = min_intersecting_px
-    
-    def merge_tile(self, mask_tile: Mask) -> None:
+
+    def merge(self, mask_tile: Mask) -> None:
         if (self.data is None) or (mask_tile.tile_meta is None):
             raise RuntimeError("Invalid attempt to merge an instance mask tile.")
-        
+
         dst_tile = self.get_tile(mask_tile.tile_meta)
         if dst_tile is None:
             raise RuntimeError("Invalid attempt to merge an instance mask tile.")
-        
+
         if mask_tile.tile_meta.is_first_tile:
             self.tile_tracker.initialize()
-        
+
         src_arr = self.tile_tracker.add_N_to_tile(mask_tile.data)
-        
+
         self.data[mask_tile.tile_meta.slices] = src_arr
-        
+
         for new_label in unique_positive(src_arr):
             self.tile_tracker.add_node(new_label)
-        
+
         border_mask = mask_tile.tile_meta.overlap_border_mask
-        
+
         for src_lab in unique_positive(src_arr[border_mask]):
             lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
             lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
@@ -111,12 +111,14 @@ class InstanceMask(Mask):
                 n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
                 if n_intersecting_px > self.min_intersecting_px:
                     self.tile_tracker.add_edge(dst_lab, src_lab)
-        
+
         # Do the graph merging at the last iteration
         # => Progress might freeze at 100% for a while (OK for now..)
         if mask_tile.tile_meta.is_last_tile:
-            self.data = self.tile_tracker.resolve(self.data)  # Implies processing the whole mask at once (OK for now..)
-            
+            self.data = self.tile_tracker.resolve(
+                self.data
+            )  # Implies processing the whole mask at once (OK for now..)
+
             # TODO: check this
             # # Alternatively: resolve tile-by-tile
             # instance_mask = Mask(self._get_initial_data(self.pixel_domain))

@@ -3,7 +3,6 @@ from typing import Callable, Dict, List, Optional
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
-from imaging_server_kit.core.tiling import TilingContext
 
 
 class MultiAlgorithm(AlgorithmRunner):
@@ -53,33 +52,11 @@ class MultiAlgorithm(AlgorithmRunner):
     def __call__(self, algorithm: str, *args, **kwargs):
         return self.algorithms_dict[algorithm].__call__(*args, **kwargs)
 
-    def _is_stream(self, algorithm: str) -> bool:
-        return self.algorithms_dict[algorithm]._is_stream(algorithm)
-
-    def _stream(self, algorithm: str, param_results: Results):
+    def _stream(self, algorithm: str, params_res: Results):
         for results in self.algorithms_dict[algorithm]._stream(
-            algorithm, param_results
+            algorithm, params_res
         ):
             yield results
-
-    def _tile(
-        self,
-        algorithm: str,
-        tiling_ctx: TilingContext,
-        param_results: Results,
-    ):
-        """Breaks down the image into tiles before sequentially processing them."""
-        # for tile_results, tile_idx, n_tiles in self.algorithms_dict[algorithm]._tile(
-        for tile_results in self.algorithms_dict[algorithm]._tile(
-            algorithm,
-            tiling_ctx,
-            param_results,
-        ):
-            yield tile_results#, tile_idx, n_tiles
-
-    def _run(self, algorithm: str, param_results: Results) -> Results:
-        return self.algorithms_dict[algorithm]._run(algorithm, param_results)
-
 
 def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgorithm:
     """

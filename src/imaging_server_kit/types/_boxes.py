@@ -16,7 +16,9 @@ def _get_tile(boxes: Boxes, tile_meta: TileMeta):
     )
 
     # All coordinates must be in the tile bounds
-    tile_filter = boxes_coords_in_tile.reshape((len(boxes_coords_in_tile), -1)).all(axis=1)
+    tile_filter = boxes_coords_in_tile.reshape((len(boxes_coords_in_tile), -1)).all(
+        axis=1
+    )
 
     # Select boxes in the tile
     boxes_data_tile = boxes.data[tile_filter]
@@ -90,55 +92,51 @@ class Boxes(DataLayer):
 
     def get_tile(self, tile_meta: TileMeta) -> Boxes:
         if self.data is None:
-            return Boxes(
-                data=self.data,
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self.data
+            _meta = self.meta
         if self.n_objects == 0:
-            return Boxes(
-                data=self._get_initial_data(self.pixel_domain), # type: ignore
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self._get_initial_data(self.pixel_domain)
+            _meta = self.meta
         else:
             boxes_tile_data, boxes_tile_meta, _ = _get_tile(self, tile_meta)
             if boxes_tile_data is not None:
                 boxes_tile_data = boxes_tile_data - tile_meta.coords_min
-            return Boxes(
-                data=boxes_tile_data,
-                name=self.name,
-                meta=boxes_tile_meta,
-                tile_meta=tile_meta,
-            )
+            _data = boxes_tile_data
+            _meta = boxes_tile_meta
+        return Boxes(
+            data=_data,
+            name=self.name,
+            meta=_meta,
+            tile_meta=tile_meta,
+        )
 
-    def merge_tile(self, boxes_tile: Boxes) -> None:
-        if (boxes_tile.data is None) or (boxes_tile.tile_meta is None):
-            raise RuntimeError("Invalid attempt to merge a box tile.")
-
-        if self.n_objects > 0:
-            # Offset the tile data by the tile positions
-            boxes_tile.data = boxes_tile.data + boxes_tile.tile_meta.coords_min
-
-            # Remove the previous tile boxes from the data boxes
-            *_, tile_filter = _get_tile(self, boxes_tile.tile_meta)
-            boxes_clean = self.data[~tile_filter]
-
-            # Merge the new tile boxes with the data boxes
-            merged_boxes_data = np.vstack((boxes_clean, boxes_tile.data)) # type: ignore
-
-            # Do the same for boxes metadata
-            merged_boxes_meta = merge_meta_tile(
-                self.meta, boxes_tile.meta, self.n_objects, tile_filter
-            )
+    def merge(self, boxes_tile: Boxes) -> None:
+        if (self.data is None) and (boxes_tile.data is not None):
+            self.data = boxes_tile.data
+        elif (boxes_tile.data is None) or (boxes_tile.tile_meta is None):
+            return
         else:
-            merged_boxes_data = boxes_tile.data
-            merged_boxes_meta = boxes_tile.meta
+            if self.n_objects > 0:
+                # Offset the tile data by the tile positions
+                boxes_tile.data = boxes_tile.data + boxes_tile.tile_meta.coords_min
 
-        self.data = merged_boxes_data
-        self.meta = merged_boxes_meta
+                # Remove the previous tile boxes from the data boxes
+                *_, tile_filter = _get_tile(self, boxes_tile.tile_meta)
+                boxes_clean = self.data[~tile_filter]
+
+                # Merge the new tile boxes with the data boxes
+                merged_boxes_data = np.vstack((boxes_clean, boxes_tile.data))  # type: ignore
+
+                # Do the same for boxes metadata
+                merged_boxes_meta = merge_meta_tile(
+                    self.meta, boxes_tile.meta, self.n_objects, tile_filter
+                )
+            else:
+                merged_boxes_data = boxes_tile.data
+                merged_boxes_meta = boxes_tile.meta
+
+            self.data = merged_boxes_data
+            self.meta = merged_boxes_meta
 
     @classmethod
     def serialize(

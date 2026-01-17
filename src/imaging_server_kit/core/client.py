@@ -7,7 +7,6 @@ from typing import Dict, Iterable, List, Optional
 from urllib.parse import urljoin
 
 import requests
-import httpx
 import msgpack
 
 from imaging_server_kit.core.runner import AlgorithmRunner, validate_algorithm
@@ -17,13 +16,8 @@ from imaging_server_kit.core.errors import (
     InvalidAlgorithmParametersError,
     ServerRequestError,
 )
-import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.serialization import deserialize_results
-from imaging_server_kit.core.tiling import TilingContext
-
-
-TIMEOUT_SEC = 3600  # Timeout for the /process route (in seconds)
 
 
 class Client(AlgorithmRunner):
@@ -118,17 +112,13 @@ class Client(AlgorithmRunner):
         endpoint = f"{self.server_url}/{algorithm}/signature"
         return self._access_algo_get_endpoint(endpoint)
 
-    def _is_stream(self, algorithm=None) -> bool:
-        endpoint = f"{self.server_url}/{algorithm}/is_stream"
-        return self._access_algo_get_endpoint(endpoint)
-
-    def _stream(self, algorithm, param_results: Results):
+    def _stream(self, algorithm, params_res: Results):
         endpoint = f"{self.server_url}/{algorithm}/stream"
         with requests.Session() as client:
             try:
                 response = client.post(
                     endpoint,
-                    json=param_results.serialize("Python/Napari"),
+                    json=params_res.serialize("Python/Napari"),
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.token}",
@@ -146,71 +136,16 @@ class Client(AlgorithmRunner):
                     if not chunk:
                         continue
                     unpacker.feed(chunk)
-                    yield deserialize_results(unpacker, "Python/Napari")
+                    for serialized_results in unpacker:
+                        yield deserialize_results([serialized_results], "Python/Napari")
             else:
                 self._handle_response_errored(response)
 
-    def _tile(
-        self,
-        algorithm: str,
-        tiling_ctx: TilingContext,
-        param_results: Results,
-    ):
-        """Breaks down the 2D image parameter into tiles before sequentially postiong to /process."""
-        endpoint = f"{self.server_url}/{algorithm}/process"
-        with requests.Session() as client:
-            # for algo_params_tile, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
-            for algo_params_tile in param_results.generate_tiles(tiling_ctx):
-                try:
-                    response = client.post(
-                        endpoint,
-                        json=algo_params_tile.serialize("Python/Napari"),
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {self.token}",
-                            "accept": "application/msgpack",
-                            "User-Agent": "Python/Napari",
-                        },
-                    )
-                except requests.RequestException as e:
-                    raise ServerRequestError(endpoint, e)
-
-                if response.status_code == 201:
-                    results = deserialize_results(response.json(), "Python/Napari")
-                    for l in results:
-                        l.tile_meta = algo_params_tile[0].tile_meta
-                        # l._is_tile = True
-                    yield results#, tile_idx, n_tiles
-                else:
-                    self._handle_response_errored(response)
-
-    def _run(self, algorithm: str, param_results: Results) -> Results:
-        endpoint = f"{self.server_url}/{algorithm}/process"
-        with httpx.Client(base_url=self.server_url, timeout=TIMEOUT_SEC) as client:
-            try:
-                response = client.post(
-                    endpoint,
-                    json=param_results.serialize("Python/Napari"),
-                    headers={
-                        "Content-Type": "application/json",
-                        "accept": "application/json",
-                        "Authorization": f"Bearer {self.token}",
-                        "User-Agent": "Python/Napari",
-                    },
-                )
-            except httpx.RequestError as e:
-                raise ServerRequestError(endpoint, e)
-        if response.status_code == 201:
-            return deserialize_results(response.json(), "Python/Napari")
-        else:
-            self._handle_response_errored(response)
-
     def _access_algo_get_endpoint(self, endpoint: str):
-        """Used to get /parameters, /is_stream"""
-        with httpx.Client(base_url=self.server_url) as client:
+        with requests.Session() as client:
             try:
                 response = client.get(endpoint)
-            except httpx.RequestError as e:
+            except requests.RequestException as e:
                 raise ServerRequestError(endpoint, e)
         if response.status_code == 200:
             return response.json()

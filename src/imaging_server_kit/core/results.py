@@ -34,7 +34,12 @@ class LayerStackBase(ABC):
 
     @abstractmethod
     def create(
-        self, kind: str, data: Any, name: Optional[str], meta: Optional[Dict]
+        self,
+        kind: str,
+        data: Any,
+        name: Optional[str],
+        meta: Optional[Dict],
+        tile_meta: Optional[TileMeta],
     ) -> DataLayer: ...
 
     @abstractmethod
@@ -61,19 +66,7 @@ class LayerStackBase(ABC):
     def __getitem__(self, idx: int) -> DataLayer:
         return self.layers[idx]
 
-    def _create_if_not_exists(self, layer: DataLayer) -> DataLayer:
-        existing_layer = self.read(layer.name)
-        if existing_layer is None:
-            existing_layer = self.create(
-                layer.kind,
-                # layer.get_initial_data(),
-                layer._get_initial_data(layer.pixel_domain),
-                layer.name,
-                layer.meta,
-            )
-        return existing_layer
-
-    def merge(self, layer_stack: LayerStackBase):
+    def merge(self, layer_stack: Optional[LayerStackBase]) -> None:
         """Merge another layer stack, based on layer names.
 
         Parameters
@@ -83,22 +76,38 @@ class LayerStackBase(ABC):
             will update corresponding meta and data attributes.
             Other layers from layer_stack will be added via the create() method.
         """
-        for layer in layer_stack:
-            existing_layer = self._create_if_not_exists(layer)
-            existing_layer.update(updated_data=layer.data, updated_meta=layer.meta)
+        if layer_stack is None:
+            return
 
-    def merge_tile(self, tile_results: LayerStackBase) -> None:
-        for tile_layer in tile_results:
-            layer = self._create_if_not_exists(tile_layer)
+        for tile_layer in layer_stack:
+            # Create a destination layer with data initialized like pixel_domain, if it does not exist
+            dst_layer = self.read(tile_layer.name)
+            if dst_layer is None:
+                dst_layer = self.create(
+                    kind=tile_layer.kind,
+                    data=tile_layer._get_initial_data(tile_layer.pixel_domain),
+                    name=tile_layer.name,
+                    meta=tile_layer.meta,
+                    tile_meta=None,  # Important!
+                )
+
+            # On first tile, erase the layer data to re-initialize it
             if tile_layer.tile_meta.is_first_tile:
                 self.update(
-                    layer_name=layer.name,
-                    # updated_data=tile_layer.get_initial_data(),
+                    layer_name=dst_layer.name,
                     updated_data=tile_layer._get_initial_data(tile_layer.pixel_domain),
-                    updated_meta=tile_layer.meta,
+                    updated_meta=tile_layer.meta,  # TODO: Not `initial_meta`?
                 )
-            layer.merge_tile(tile_layer)
-            layer.refresh()
+            
+            # Merge the tile in the destination layer
+            dst_layer.merge(tile_layer)
+
+            # Trigger a layer update (will also do .refresh() and, for example, refresh the Napari viewer)
+            self.update(
+                layer_name=dst_layer.name,
+                updated_data=dst_layer.data,
+                updated_meta=dst_layer.meta,
+            )
 
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
@@ -107,7 +116,7 @@ class LayerStackBase(ABC):
             cls: Type[DataLayer] = DATA_TYPES[layer.kind]
             data = cls.serialize(layer.data, client_origin)
             meta = _serialize_meta(layer.meta)
-            tile_meta = _serialize_meta(layer.tile_meta)
+            tile_meta = layer.tile_meta.serialize()
             serialized_results.append(
                 {
                     "kind": layer.kind,
@@ -118,7 +127,7 @@ class LayerStackBase(ABC):
                 }
             )
         return serialized_results
-    
+
     def to_params_dict(self) -> Dict[str, Any]:
         """
         Convert a layer stack to a dictionary representation mapping layer.name to layer.data.
@@ -178,7 +187,7 @@ class Results(LayerStackBase):
         return self._layers
 
     @property
-    def pixel_domain(self) -> Optional[List]:
+    def pixel_domain(self) -> Optional[List[int]]:
         domains = []
         for data_layer in self.layers:
             if data_layer.pixel_domain is not None:
@@ -198,7 +207,7 @@ class Results(LayerStackBase):
             else:
                 _pixel_domain_arr_results = np.asarray(self.pixel_domain)
                 _pixel_domain_arr_layer = np.asarray(layer.pixel_domain)
-                _filt = _pixel_domain_arr_results > _pixel_domain_arr_layer
+                _filt = _pixel_domain_arr_results > _pixel_domain_arr_layer  # TODO: bug `operands could not be broadcast together with shapes (2,) (3,)`
                 if _filt.sum() > 0:
                     _pixel_domain_arr_layer[_filt] = _pixel_domain_arr_results[_filt]
                     layer.tile_meta.pixel_domain = _pixel_domain_arr_layer.tolist()
@@ -206,7 +215,7 @@ class Results(LayerStackBase):
                 if _filt.sum() > 0:
                     _pixel_domain_arr_results[_filt] = _pixel_domain_arr_layer[_filt]
                     for l in self.layers:
-                        l.tile_meta.pixel_domain = _pixel_domain_arr_results.tolist()   
+                        l.tile_meta.pixel_domain = _pixel_domain_arr_results.tolist()
 
     def create(
         self,
@@ -250,14 +259,14 @@ class Results(LayerStackBase):
         # Instantiate layer
         layer = cls(name=name, data=data, meta=meta, tile_meta=tile_meta, **kwargs)
 
-        # TODO: Match pixel domain between the layer and self
+        # Match pixel domains
         self._update_result_pixel_domain(layer)
-        
+
         # Add layer to the stack
         self._layers.append(layer)
 
         return layer
-        
+
     def read(self, layer_name: str) -> Optional[DataLayer]:
         """Read a layer by name."""
         for layer in self.layers:
@@ -271,7 +280,6 @@ class Results(LayerStackBase):
         layer = self.read(layer_name)
         if layer is not None:
             layer.update(updated_data, updated_meta)
-            # Recompute pixel domain
             self._update_result_pixel_domain(layer)
         return layer
 
@@ -280,35 +288,23 @@ class Results(LayerStackBase):
         for idx, layer in enumerate(self.layers):
             if layer.name == layer_name:
                 self._layers.pop(idx)
-        # Recompute pixel domain
+        # Recompute pixel domain for each layer
         for l in self.layers:
             l.tile_meta.pixel_domain = self.pixel_domain
 
-    def generate_tiles(self, ctx: TilingContext):
-        for tile_meta in generate_nd_tiles(
-            pixel_domain=self.pixel_domain,
-            tile_size_px=ctx.tile_size_px,
-            overlap_percent=ctx.overlap_percent,
-            delay_sec=ctx.delay_sec,
-            randomize=ctx.randomize,
-        ):
+    def generate_tiles(self, ctx: Optional[TilingContext]):
+        if ctx is None:
+            tile_meta = TileMeta()
             yield self.get_tile(tile_meta)
-            # tile_results = self.get_tile(tile_meta)
-            # tile_idx = tile_meta.tile_idx
-            # n_tiles = tile_meta.n_tiles
-            # yield tile_results#, tile_idx, n_tiles
+        else:
+            for tile_meta in generate_nd_tiles(
+                pixel_domain=self.pixel_domain,
+                tile_size_px=ctx.tile_size_px,
+                overlap_percent=ctx.overlap_percent,
+                delay_sec=ctx.delay_sec,
+                randomize=ctx.randomize,
+            ):
+                yield self.get_tile(tile_meta)
 
-    def get_tile(self, tile_meta: TileMeta) -> Optional[Results]:
-        tile_results = Results()
-        for layer in self.layers:
-            tile_layer = layer.get_tile(tile_meta)
-            if tile_layer is None:
-                return
-            tile_results.create(
-                name=tile_layer.name,
-                kind=tile_layer.kind,
-                data=tile_layer.data,
-                meta=tile_layer.meta,
-                tile_meta=tile_meta,
-            )
-        return tile_results
+    def get_tile(self, tile_meta: TileMeta) -> Results:
+        return Results(layers=[l.get_tile(tile_meta) for l in self.layers])

@@ -1,9 +1,7 @@
-import asyncio
 import importlib.resources
 import os
 import pathlib
-from functools import partial
-from typing import Callable, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import msgpack
 import uvicorn
@@ -16,27 +14,25 @@ from pydantic import ValidationError
 
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
-from imaging_server_kit.core.runner import AlgoStream, algo_stream_gen
 from imaging_server_kit.core.algorithm import Algorithm
-from imaging_server_kit.core.serialization import deserialize_results, serialize_results
+from imaging_server_kit.core.results import Results
+from imaging_server_kit.core.serialization import deserialize_results
 from imaging_server_kit.types.data_layer import DataLayer
 
 templates_dir = pathlib.Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("templates") # type: ignore
+    importlib.resources.files("imaging_server_kit.core").joinpath("templates")  # type: ignore
 )
 
 static_dir = pathlib.Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("static") # type: ignore
+    importlib.resources.files("imaging_server_kit.core").joinpath("static")  # type: ignore
 )
 
 templates = Jinja2Templates(directory=str(templates_dir))
 
-PROCESS_TIMEOUT_SEC = 3600  # Client timeout for the /process route
-
 ALGORITHM_HUB_URL = os.getenv("ALGORITHM_HUB_URL", "http://algorithm_hub:8000")
 
 
-def find_algorithm(algorithm_name, algorithms_dict):
+def find_algorithm(algorithm_name: str, algorithms_dict: Dict) -> Algorithm:
     if algorithm_name not in algorithms_dict:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -145,77 +141,6 @@ class AlgorithmApp:
             )
 
         @self.app.get(
-            "/{algorithm_name}/is_stream",
-            description="Whether to handle the algorithm as a stream.",
-            tags=["algorithm"],
-        )
-        def is_stream(algorithm_name: str):
-            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-            return algorithm._is_stream(algorithm_name)
-
-        @self.app.post(
-            "/{algorithm_name}/process",
-            status_code=status.HTTP_201_CREATED,
-            summary="Run algorithm",
-            description="Execute the algorithm with the provided parameters and return the serialized results.",
-            tags=["algorithm"],
-        )
-        async def run_algo(
-            algorithm_name: str = Path(...),
-            request: Request = ...,
-        ):
-            """Run the algorithm processing endpoint."""
-            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-            encoded_params = await request.json()
-            client_origin: str = request.headers["User-Agent"]
-            
-            validated_param_results = self._decode_and_validate(
-                algorithm, encoded_params, client_origin
-            )
-            
-            algo_run_funct = partial(
-                algorithm._run,
-                algorithm=algorithm_name,
-                param_results=validated_param_results,
-            )
-
-            return await self._run_algo_logic(algo_run_funct, client_origin)
-
-        @self.app.post(
-            "/{algorithm_name}/stream",
-            status_code=status.HTTP_200_OK,
-            summary="Stream algorithm",
-            description="Execute the algorithm as a stream with the provided parameters.",
-            tags=["algorithm"],
-        )
-        async def stream_algo(
-            algorithm_name: str = Path(...),
-            request: Request = ...,
-        ):
-            """Run the algorithm as a stream."""
-            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
-            encoded_params = await request.json()
-            client_origin = request.headers.get("User-Agent")
-            validated_params = self._decode_and_validate(
-                algorithm, encoded_params, client_origin
-            )
-
-            algo_stream_generator = algo_stream_gen(
-                AlgoStream(
-                    algorithm._stream(
-                        algorithm=algorithm_name, param_results=validated_params
-                    )
-                )
-            )
-
-            return StreamingResponse(
-                content=self._stream_algorithm_msgpack(
-                    algo_stream_generator, client_origin
-                ),
-                media_type="application/msgpack",
-            )
-
-        @self.app.get(
             "/{algorithm_name}/parameters",
             response_model=dict,
             summary="Get parameter schema",
@@ -238,7 +163,7 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             sample = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
             if sample is not None:
-                return serialize_results(sample, client_origin="Python/Napari")
+                return sample.serialize("Python/Napari")
 
         @self.app.get(
             "/{algorithm_name}/n_samples",
@@ -252,7 +177,7 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             n_samples = algorithm.get_n_samples(algorithm=algorithm_name)
             return {"n_samples": n_samples}
-        
+
         @self.app.get(
             "/{algorithm_name}/tileable",
             response_model=dict,
@@ -269,72 +194,65 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             return algorithm.get_signature_params(algorithm_name)
 
-    def _stream_algorithm_msgpack(
-        self, algo_stream_generator: Iterable, client_origin: str
-    ):
-        """Generator that yields the (serialized) results of run_algorithm with the provided parameters."""
-        for results in algo_stream_generator:
-            if results is not None:
-                serialized_results = serialize_results(results, client_origin)
-                for r in serialized_results:
-                    yield msgpack.packb(r)
-        if hasattr(algo_stream_generator, "value"):
-            for v in algo_stream_generator.value: # type: ignore
-                if v is not None:
-                    for r in serialize_results(v, client_origin):
-                        yield msgpack.packb(r)
-
-    async def _serialize_results(self, results, client_origin):
-        serialized_results = await asyncio.to_thread(
-            serialize_results, results, client_origin
+        @self.app.post(
+            "/{algorithm_name}/stream",
+            status_code=status.HTTP_200_OK,
+            summary="Stream algorithm",
+            description="Execute the algorithm as a stream with the provided parameters.",
+            tags=["algorithm"],
         )
-        return serialized_results
+        async def stream_algo(
+            algorithm_name: str = Path(...),
+            request: Request = ...,
+        ):
+            """Run the algorithm on the provided parameters."""
+            algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
+            encoded_params = await request.json()
 
-    async def _run_algorithm(self, algo_run_funct: Callable):
-        results = await asyncio.to_thread(algo_run_funct)
-        return results
+            # Python/Napari or Java/QuPath
+            client_origin = str(request.headers.get("User-Agent"))
 
-    async def _run_algo_logic(self, algo_run_funct: Callable, client_origin: str):
-        try:
-            results = await asyncio.wait_for(
-                self._run_algorithm(algo_run_funct=algo_run_funct),
-                timeout=PROCESS_TIMEOUT_SEC,
-            )
-        except asyncio.TimeoutError:  # Note: This doesn't kill the thread...
-            raise HTTPException(
-                status_code=504, detail="Request timeout during processing."
-            )
-        try:
-            serialized_results = await asyncio.wait_for(
-                self._serialize_results(results, client_origin),
-                timeout=PROCESS_TIMEOUT_SEC,
-            )
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=504, detail="Request timeout during serialization."
-            )
-        return serialized_results
+            # Reconstruct the algo parameters as a `Results` object
+            params_res = deserialize_results(encoded_params, client_origin)
 
-    def _decode_and_validate(self, algorithm, encoded_params, client_origin):
-        param_results = deserialize_results(encoded_params, client_origin)
-        
-        # Special case: when request is sent from QuPath, the image is named `qupath-image`
-        # and should be assigned to whichever parameter is an image in the algo (we assume)
-        # TODO: shouldn't this decision be handled by the QuPath extension?
-        if client_origin == "Java/QuPath":
-            qupath_image: Optional[DataLayer] = param_results.read("image-qupath")
-            if qupath_image is not None:
-                param_results.delete("image-qupath")
-                # Find the first image parameter in the schema and assume it's what the QuPath image is meant to be
-                for param_name, param_values in algorithm.get_parameters().get("properties").items():
-                    param_type = param_values.get("param_type")
-                    if param_type == "image":
-                        param_results.create("image", qupath_image.data, param_name)
-                        break
-        
-        # Validate and return parameters stack
-        try:
-            algorithm.parameters_model(**param_results.to_params_dict())
-            return param_results
-        except ValidationError as e:
-            raise HTTPException(status_code=422, detail=e.errors())
+            # Special case: when request is sent from QuPath, the image is named `qupath-image`
+            # and should be assigned to whichever parameter is an image in the algo (we assume)
+            # TODO: shouldn't this decision be handled by the QuPath extension?
+            if client_origin == "Java/QuPath":
+                qupath_image: Optional[DataLayer] = params_res.read("image-qupath")
+                if qupath_image is not None:
+                    params_res.delete("image-qupath")
+                    # Find the first image parameter in the schema and assume it's what the QuPath image is meant to be
+                    for param_name, param_values in algorithm.get_parameters()[
+                        "properties"
+                    ].items():
+                        param_type = param_values.get("param_type")
+                        if param_type == "image":
+                            params_res.create(
+                                "image", qupath_image.data, param_name
+                            )
+                            break
+
+            # Validate the parameters `manually` with Pydantic...
+            try:
+                algorithm.parameters_model(**params_res.to_params_dict())
+            except ValidationError as e:
+                raise HTTPException(status_code=422, detail=e.errors())
+
+            # Create the algorithm `run` generator
+            gen = algorithm.run_generator(
+                algorithm=algorithm_name,
+                params_res=params_res,
+            )
+
+            # Will do results.serialize() => msgpack.packrb() to stream the response
+            msgpack_stream = self._stream_msgpack(gen, client_origin)
+
+            # To check: `content` is a Python generator, where StreamingResponse expects a special ContentStream object..
+            # but it iseems to work anyway
+            return StreamingResponse(msgpack_stream, media_type="application/msgpack")
+
+    def _stream_msgpack(self, stream_generator: Iterable[Results], client_origin: str):
+        for results in stream_generator:
+            for r in results.serialize(client_origin):
+                yield msgpack.packb(r)

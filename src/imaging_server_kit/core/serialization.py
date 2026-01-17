@@ -5,6 +5,7 @@ Serialization module for the Imaging Server Kit.
 import base64
 from typing import Any, Dict, List, Type
 from imaging_server_kit.core.results import Results, DataLayer
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types import DATA_TYPES
 
 from imaging_server_kit.core.encoding import decode_contents
@@ -34,22 +35,17 @@ def _deserialize_value(obj: Any) -> Any:
         except:
             return obj
     return obj
-    
+
 
 def _deserialize_meta(serialized_meta: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively deserialize Numpy arrays in the meta dictionary."""
     return {k: _deserialize_value(v) for k, v in serialized_meta.items()}
 
 
-def serialize_results(results: Results, client_origin: str) -> List[Dict]:
-    """Serialize a Results object to JSON."""
-    return results.serialize(client_origin=client_origin)
-
-
 def deserialize_results(serialized_results: List[Dict], client_origin: str) -> Results:
     """Deserialize a JSON to a Results object."""
     results = Results()
-    
+
     for ser in serialized_results:
         kind = ser["kind"]
         name = ser["name"]
@@ -60,7 +56,7 @@ def deserialize_results(serialized_results: List[Dict], client_origin: str) -> R
         cls: Type[DataLayer] = DATA_TYPES[kind]
         decoded_data = cls.deserialize(data, client_origin)
         decoded_meta = _deserialize_meta(meta)
-        decoded_tile_meta = _deserialize_meta(tile_meta)
+        decoded_tile_meta = TileMeta(**tile_meta)
 
         results.create(
             kind=kind,

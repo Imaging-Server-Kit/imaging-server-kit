@@ -51,17 +51,28 @@ class Paths(DataLayer):
 
         # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
+    def __str__(self) -> str:
+        return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
+    
+    @property
+    def n_objects(self) -> int:
+        if self.data is None:
+            return 0
+        else:
+            return len(self.data)
+
     @property
     def _pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
-        path_domains = []
-        for path in self.data:
-            path_domain = np.max(path, axis=0)
-            path_domains.append(list(path_domain))
-        path_domains = np.asarray(path_domains)
-        pixel_domain = np.max(path_domains, axis=0)
-        return tuple(pixel_domain)
+        if self.n_objects > 0:
+            path_domains = []
+            for path in self.data:
+                path_domain = np.max(path, axis=0)
+                path_domains.append(list(path_domain))
+            path_domains = np.asarray(path_domains)
+            pixel_domain = np.max(path_domains, axis=0)
+            return tuple(pixel_domain)
 
     @classmethod
     def serialize(cls, data: Optional[List[np.ndarray]], client_origin:str):

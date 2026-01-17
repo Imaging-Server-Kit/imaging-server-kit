@@ -24,13 +24,10 @@ from pydantic import (
 )
 from imaging_server_kit.core.errors import AlgorithmRuntimeError
 import imaging_server_kit.core._etc as etc
-from imaging_server_kit.core.tiling import TilingContext
 import imaging_server_kit.types as skt
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.core.runner import (
     AlgorithmRunner,
-    AlgoStream,
-    algo_stream_gen,
     validate_algorithm,
 )
 from imaging_server_kit.types import DATA_TYPES, DataLayer
@@ -211,6 +208,37 @@ def _parse_user_func_output(payload: Any) -> Results:
     return Results(layers)
 
 
+### AlgoStream utility ###
+
+
+class AlgoStream:
+    def __init__(self, gen):
+        self._it = iter(gen)
+        self.value = None
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return next(self._it)
+        except (StopIteration, AlgorithmRuntimeError) as e:
+            if isinstance(e, StopIteration):
+                self.value = e.value
+                raise
+            elif isinstance(e, AlgorithmRuntimeError):
+                raise e
+
+
+def algo_stream_gen(algo_stream: AlgoStream):
+    for x in algo_stream:
+        yield x
+    yield algo_stream.value
+
+
+### Algorithm implementation ###
+
+
 class Algorithm(AlgorithmRunner):
     """An algorithm converted from a Python function.
 
@@ -361,49 +389,28 @@ class Algorithm(AlgorithmRunner):
         """List parameter names of the algo run function."""
         return list(signature(self._run_algorithm_func).parameters.keys())
 
-    def _is_stream(self, algorithm=None) -> bool:
-        return isgeneratorfunction(self._run_algorithm_func)
-
-    def _stream(self, algorithm, param_results: Results):
-        algo_params = param_results.to_params_dict()
+    def _stream(self, algorithm: str, params_res: Results):
+        """Generator that runs an algorithm using given parameters."""
+        algo_params = params_res.to_params_dict()
+        
+        # Validate parameters `manually` with Pydantic:
         try:
             self.parameters_model(**algo_params)
         except ValidationError as e:
-            raise e
-
-        for payload in algo_stream_gen(
-            AlgoStream(self._run_algorithm_func(**algo_params))
-        ):
+            raise e       
+        
+        # If user-defined run function has `yield` statements:
+        if isgeneratorfunction(self._run_algorithm_func):
+            gen = algo_stream_gen(AlgoStream(self._run_algorithm_func(**algo_params)))
+            for payload in gen:
+                yield _parse_user_func_output(payload)
+        # Otherwise:
+        else:
+            try:
+                payload = self._run_algorithm_func(**algo_params)
+            except Exception as e:
+                raise AlgorithmRuntimeError(algorithm, e)
             yield _parse_user_func_output(payload)
-
-    def _tile(
-        self,
-        algorithm: str,
-        tiling_ctx: TilingContext,
-        param_results: Results,
-    ):
-        """Process the image sequentially in tiles."""
-        # for tile_results, tile_idx, n_tiles in param_results.generate_tiles(tiling_ctx):
-        for tile_results in param_results.generate_tiles(tiling_ctx):
-            if tile_results is not None:
-                results = self._run(algorithm, tile_results)
-                # Copy the tile metadata from the inputs to the outputs (TODO: really weird..)
-                for l in results:
-                    l.tile_meta = tile_results[0].tile_meta
-                    # l._is_tile = True
-                yield results#, tile_idx, n_tiles
-
-    def _run(self, algorithm, param_results: Results) -> Results:
-        algo_params = param_results.to_params_dict()
-        try:
-            self.parameters_model(**algo_params)
-        except ValidationError as e:
-            raise e
-        try:
-            payload = self._run_algorithm_func(**algo_params)
-        except Exception as e:
-            raise AlgorithmRuntimeError(algorithm, e)
-        return _parse_user_func_output(payload)
 
 
 def algorithm(

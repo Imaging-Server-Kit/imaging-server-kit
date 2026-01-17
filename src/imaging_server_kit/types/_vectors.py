@@ -21,7 +21,7 @@ def _get_tile(vectors: Vectors, tile_meta: TileMeta):
 
     # Select vectors in the tile
     vectors_tile = vectors.data[tile_filter]
-    
+
     # Select meta of vectors in the tile
     vectors_meta_tile = extract_meta_tile(vectors.meta, vectors.n_objects, tile_filter)
 
@@ -93,58 +93,56 @@ class Vectors(DataLayer):
 
     def get_tile(self, tile_meta: TileMeta) -> Vectors:
         if self.data is None:
-            return Vectors(
-                data=self.data,
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self.data
+            _meta = self.meta
         if self.n_objects == 0:
-            return Vectors(
-                data=self._get_initial_data(self.pixel_domain),  # type: ignore
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self._get_initial_data(self.pixel_domain)
+            _meta = self.meta
         else:
             vectors_tile_data, vectors_tile_meta, _ = _get_tile(self, tile_meta)
             if vectors_tile_data is not None:
                 vectors_tile_data = vectors_tile_data - tile_meta.coords_min
-            return Vectors(
-                data=vectors_tile_data,
-                name=self.name,
-                meta=vectors_tile_meta,
-                tile_meta=tile_meta,
-            )
+            _data = vectors_tile_data
+            _meta = vectors_tile_meta
+        return Vectors(
+            data=_data,
+            name=self.name,
+            meta=_meta,
+            tile_meta=tile_meta,
+        )
 
-    def merge_tile(self, vectors_tile: Vectors) -> None:
+    def merge(self, vectors_tile: Vectors) -> None:
         """Merges vectors from a tile into a set of existing vectors.
         Existing vectors inside the tile domain (from tile overlap) are replaced by vectors in the tile.
         """
-        if (vectors_tile.data is None) or (vectors_tile.tile_meta is None):
-            raise RuntimeError("Invalid attempt to merge a vectors tile.")
-        
-        if self.n_objects > 0:
-            # Offset the tile data by the tile positions
-            vectors_tile.data = vectors_tile.data + vectors_tile.tile_meta.coords_min
-
-            # Remove the vectors from the vectors data that are in the tile
-            *_, tile_filter = _get_tile(self, vectors_tile.tile_meta)
-            vectors_clean = self.data[~tile_filter]
-
-            # Merge the tile data with the cleaned vectors data
-            merged_vectors_data = np.vstack((vectors_clean, vectors_tile.data))
-
-            # Do the same for the vectors metadata
-            merged_vectors_meta = merge_meta_tile(
-                self.meta, vectors_tile.meta, self.n_objects, tile_filter
-            )
+        if (self.data is None) and (vectors_tile.data is not None):
+            self.data = vectors_tile.data
+        elif (vectors_tile.data is None) or (vectors_tile.tile_meta is None):
+            return
         else:
-            merged_vectors_data = vectors_tile.data
-            merged_vectors_meta = vectors_tile.meta
+            if self.n_objects > 0:
+                # Offset the tile data by the tile positions
+                vectors_tile.data = (
+                    vectors_tile.data + vectors_tile.tile_meta.coords_min
+                )
 
-        self.data = merged_vectors_data
-        self.meta = merged_vectors_meta
+                # Remove the vectors from the vectors data that are in the tile
+                *_, tile_filter = _get_tile(self, vectors_tile.tile_meta)
+                vectors_clean = self.data[~tile_filter]
+
+                # Merge the tile data with the cleaned vectors data
+                merged_vectors_data = np.vstack((vectors_clean, vectors_tile.data))
+
+                # Do the same for the vectors metadata
+                merged_vectors_meta = merge_meta_tile(
+                    self.meta, vectors_tile.meta, self.n_objects, tile_filter
+                )
+            else:
+                merged_vectors_data = vectors_tile.data
+                merged_vectors_meta = vectors_tile.meta
+
+            self.data = merged_vectors_data
+            self.meta = merged_vectors_meta
 
     @classmethod
     def serialize(

@@ -15,6 +15,7 @@ from ._string import String
 from ._choice import Choice
 from ._notification import Notification
 from ._null import Null
+from ._progress import Progress
 
 DATA_TYPES: Dict[str, Type[DataLayer]] = {
     c.kind: c
@@ -34,6 +35,7 @@ DATA_TYPES: Dict[str, Type[DataLayer]] = {
         Choice,
         Notification,
         Null,
+        Progress,
     ]
 }
 
@@ -55,4 +57,5 @@ __all__ = [
     "Choice",
     "Notification",
     "Null",
+    "Progress",
 ]

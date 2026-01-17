@@ -6,6 +6,7 @@ import numpy as np
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.types.data_layer import DataLayer
 from imaging_server_kit.core.tiling import TileMeta
+from imaging_server_kit.types._null import Null
 
 
 class Image(DataLayer):
@@ -68,27 +69,36 @@ class Image(DataLayer):
         else:
             return self.data.shape
 
-    def get_tile(self, tile_meta: TileMeta) -> Optional[Image]:
-        if (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
-            print("Could not get an image tile from that tile meta.")
-            return
-        
-        tile_data = self.data[tile_meta.slices] if self.data is not None else None
+    def get_tile(self, tile_meta: TileMeta) -> Image:
+        if (
+            (self.data is None)
+            or (tile_meta.coords_max is None)
+            or (self.pixel_domain is None)
+        ):
+            _data = None
+        elif (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
+            _data = None
+        else:
+            _data = self.data[tile_meta.slices]
         return Image(
-            data=tile_data,
+            data=_data,
             name=self.name,
             meta=self.meta,
             tile_meta=tile_meta,
         )
 
-    def merge_tile(self, image_tile: Image) -> None:
-        if (self.data is not None) and (image_tile.tile_meta is not None):
-            self.data[image_tile.tile_meta.slices] = (
-                self.data[image_tile.tile_meta.slices]
-                + image_tile.data / image_tile.tile_meta.overlap_count_map
-            )
+    def merge(self, image_tile: Image) -> None:
+        if (self.data is None) and (image_tile.data is not None):
+            self.data = image_tile.data
+        elif (image_tile.data is None) or (image_tile.tile_meta is None):
+            return
         else:
-            raise RuntimeError("Invalid attempt to merge an image tile.")
+            _slices = image_tile.tile_meta.slices
+            _overlap_count_map = image_tile.tile_meta.overlap_count_map
+            if (_slices is not None) and (_overlap_count_map is not None):
+                self.data[_slices] = (
+                    self.data[_slices] + image_tile.data / _overlap_count_map
+                )
 
     @classmethod
     def serialize(cls, data: Optional[np.ndarray], client_origin: str):
@@ -116,7 +126,7 @@ class Image(DataLayer):
     @classmethod
     def initialize(cls, pixel_domain: Union[Tuple, List]) -> Image:
         return cls(data=cls._get_initial_data(pixel_domain))
-    
+
     @classmethod
     def validate_data(cls, data, meta, constraints):
         main, extra = constraints

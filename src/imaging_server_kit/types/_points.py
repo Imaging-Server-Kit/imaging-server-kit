@@ -115,55 +115,51 @@ class Points(DataLayer):
 
     def get_tile(self, tile_meta: TileMeta) -> Points:
         if self.data is None:
-            return Points(
-                data=self.data,
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self.data
+            _meta = self.meta
         if self.n_objects == 0:
-            return Points(
-                data=self._get_initial_data(self.pixel_domain),  # type: ignore
-                name=self.name,
-                meta=self.meta,
-                tile_meta=tile_meta,
-            )
+            _data = self._get_initial_data(self.pixel_domain)
+            _meta = self.meta
         else:
             points_tile_data, points_tile_meta, _ = _get_tile(self, tile_meta)
             if points_tile_data is not None:
                 points_tile_data = points_tile_data - tile_meta.coords_min
-            return Points(
-                data=points_tile_data,
-                name=self.name,
-                meta=points_tile_meta,
-                tile_meta=tile_meta,
-            )
+            _data = points_tile_data
+            _meta = points_tile_meta
+        return Points(
+            data=_data,
+            name=self.name,
+            meta=_meta,
+            tile_meta=tile_meta,
+        )
 
-    def merge_tile(self, points_tile: Points) -> None:
-        if (points_tile.data is None) or (points_tile.tile_meta is None):
-            raise RuntimeError("Invalid attempt to merge a points tile.")
-
-        if self.n_objects > 0:
-            # Offset the tile data by the tile positions
-            points_tile.data = points_tile.data + points_tile.tile_meta.coords_min
-
-            # Remove the points from the points data that are in the tile
-            *_, tile_filter = _get_tile(self, points_tile.tile_meta)
-            points_clean = self.data[~tile_filter]
-
-            # Merge the tile data with the cleaned points data
-            merged_points_data = np.vstack((points_clean, points_tile.data))
-
-            # Do the same for the points metadata
-            merged_points_meta = merge_meta_tile(
-                self.meta, points_tile.meta, self.n_objects, tile_filter
-            )
+    def merge(self, points_tile: Points) -> None:
+        if (self.data is None) and (points_tile.data is not None):
+            self.data = points_tile.data
+        elif (points_tile.data is None) or (points_tile.tile_meta is None):
+            return
         else:
-            merged_points_data = points_tile.data
-            merged_points_meta = points_tile.meta
+            if self.n_objects > 0:
+                # Offset the tile data by the tile positions
+                points_tile.data = points_tile.data + points_tile.tile_meta.coords_min
 
-        self.data = merged_points_data
-        self.meta = merged_points_meta
+                # Remove the points from the points data that are in the tile
+                *_, tile_filter = _get_tile(self, points_tile.tile_meta)
+                points_clean = self.data[~tile_filter]
+
+                # Merge the tile data with the cleaned points data
+                merged_points_data = np.vstack((points_clean, points_tile.data))
+
+                # Do the same for the points metadata
+                merged_points_meta = merge_meta_tile(
+                    self.meta, points_tile.meta, self.n_objects, tile_filter
+                )
+            else:
+                merged_points_data = points_tile.data
+                merged_points_meta = points_tile.meta
+
+            self.data = merged_points_data
+            self.meta = merged_points_meta
 
     @classmethod
     def serialize(

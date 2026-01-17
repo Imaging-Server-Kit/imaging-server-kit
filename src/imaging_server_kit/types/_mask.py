@@ -218,27 +218,32 @@ class Mask(DataLayer):
             return self.data.shape
 
     def get_tile(self, tile_meta: TileMeta) -> Optional[Mask]:
-        if (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
-            print("Could not get a mask tile from that tile meta.")
-            return
-        
-        if self.data is not None:
-            tile_data = self.data[tile_meta.slices]
+        if (
+            (self.data is None)
+            or (tile_meta.coords_max is None)
+            or (self.pixel_domain is None)
+        ):
+            _data = None
+        elif (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
+            _data = None
         else:
-            tile_data = None
+            _data = self.data[tile_meta.slices]
         return Mask(
-            data=tile_data,
+            data=_data,
             name=self.name,
             meta=self.meta,
             tile_meta=tile_meta,
         )
 
-    def merge_tile(self, mask_tile: Mask) -> None:
-        if (self.data is not None) and (mask_tile.tile_meta is not None):
-            # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
-            self.data[mask_tile.tile_meta.slices] = mask_tile.data
+    def merge(self, mask_tile: Mask) -> None:
+        if (self.data is None) and (mask_tile.data is not None):
+            self.data = mask_tile.data
+        elif (mask_tile.data is None) or (mask_tile.tile_meta is None):
+            return
         else:
-            raise RuntimeError("Invalid attempt to merge a mask tile.")
+            # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
+            _slices = mask_tile.tile_meta.slices
+            self.data[_slices] = mask_tile.data
 
     @classmethod
     def serialize(
@@ -272,7 +277,7 @@ class Mask(DataLayer):
         cls, pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is not None:
-            return np.zeros(pixel_domain, dtype=np.uint16)
+            return np.zeros(np.array(pixel_domain).astype(np.uint16), dtype=np.uint16)
 
     @classmethod
     def initialize(cls, pixel_domain: Union[Tuple, List]) -> Mask:
