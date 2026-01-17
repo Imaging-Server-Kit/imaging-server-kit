@@ -142,3 +142,18 @@ def test_sk_tiled_boxes():
     results = sk_tiled_boxes_input.run(image, boxes, tiled=True, tile_size_px=25)
     new_boxes = results.read("Boxes").data
     assert isinstance(new_boxes, np.ndarray)
+
+
+### Tiled streaming
+@sk.algorithm
+def sk_streamed_tiling(image):
+    for _ in range(3):
+        yield sk.Image(np.random.random(image.shape), name="Random")
+    return sk.String("Success", name="Success")
+
+def test_sk_tiled_streaming():
+    image = np.random.random((30, 30))
+    results = sk_streamed_tiling.run(image=image, tiled=True, tile_size_px=10)
+    assert results.read("Random").data.shape == image.shape
+    assert results.read("Success").data == "Success"
+    

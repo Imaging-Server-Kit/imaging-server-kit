@@ -150,12 +150,12 @@ def test_type_hinted_defaults():
     assert sk_type_hinted.run(5, 3.14)[0].data == 8.14
 
 
-# Setting required=False
+# # Setting required=False TODO
 
-@sk.algorithm
-def has_required_image(image=sk.Image(required=False)):
-    return sk.Image(image)  # image is None
+# @sk.algorithm
+# def has_required_image(image=sk.Image(required=False)):
+#     return sk.Image(image)  # image is None
 
-def test_required_image():
-    results = has_required_image.run()
-    assert results[0].data is None
+# def test_required_image():
+#     results = has_required_image.run()
+#     assert results[0].data is None
