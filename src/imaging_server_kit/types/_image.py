@@ -4,8 +4,51 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger
 from imaging_server_kit.core.tiling import TileMeta
+
+
+class ImageMerger(DefaultMerger):
+    
+    def merge(self, src_layer: Image, dst_layer: Image) -> None:
+        if (
+            (dst_layer.data is None)
+            or (dst_layer.tile_meta is None)
+            or (dst_layer.pixel_domain is None)
+        ):
+            return
+
+        if (
+            (src_layer.data is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.pixel_domain is None)
+        ):
+            # Will set src_layer.tile_meta and src_layer.pixel_domain
+            src_layer.data = src_layer._get_initial_data(tuple([1]*dst_layer.ndim))
+        
+        if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None):
+            return  # This should never happen (just there for type hints)
+
+        _s1 = dst_layer.tile_meta.slices
+        _o1 = dst_layer.tile_meta.overlap_count_map
+        if (_s1 is not None) and (_o1 is not None):
+            _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
+            _pixel_domain = np.max(_stack, axis=0).tolist()
+
+            # If the incoming tile extends the pixel domain, we create a new Image, write src_layer.data into it, then merge the tile
+            if _pixel_domain != src_layer.pixel_domain:
+                new = Image.initialize(_pixel_domain)
+                new_data = new.data
+                new_data[src_layer.tile_meta.slices] = src_layer.data
+            else:
+                new_data = src_layer.data
+            
+            new_data[_s1] = new_data[_s1] + dst_layer.data / _o1  # type: ignore
+            src_layer.data = new_data
+
+    def first_tile_hook(self, src_layer: Image, dst_layer: Image):
+        # Erase all of the data before tiling
+        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
 
 
 class Image(DataLayer):
@@ -58,15 +101,18 @@ class Image(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+        
+        # Merging strategy
+        self.merger = ImageMerger()
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
-        if self.data is None:
+    def data_pixel_domain(self) -> Optional[Tuple]:
+        if self._data is None:
             return
         if self.rgb:
-            return (self.data.shape[0], self.data.shape[1])
+            return (self._data.shape[0], self._data.shape[1])
         else:
-            return self.data.shape
+            return self._data.shape
 
     def get_tile(self, tile_meta: TileMeta) -> Image:
         if (
@@ -74,8 +120,6 @@ class Image(DataLayer):
             or (tile_meta.coords_max is None)
             or (self.pixel_domain is None)
         ):
-            _data = None
-        elif (tile_meta.coords_max > np.asarray(self.pixel_domain)).any():
             _data = None
         else:
             _data = self.data[tile_meta.slices]
@@ -86,19 +130,6 @@ class Image(DataLayer):
             tile_meta=tile_meta,
         )
 
-    def merge(self, image_tile: Image) -> None:
-        if (self.data is None) and (image_tile.data is not None):
-            self.data = image_tile.data
-        elif (image_tile.data is None) or (image_tile.tile_meta is None):
-            return
-        else:
-            _slices = image_tile.tile_meta.slices
-            _overlap_count_map = image_tile.tile_meta.overlap_count_map
-            if (_slices is not None) and (_overlap_count_map is not None):
-                self.data[_slices] = (
-                    self.data[_slices] + image_tile.data / _overlap_count_map
-                )
-
     @classmethod
     def serialize(cls, data: Optional[np.ndarray], client_origin: str):
         if data is not None:
@@ -107,7 +138,7 @@ class Image(DataLayer):
     @classmethod
     def deserialize(
         cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
-    ):
+    ) -> Optional[np.ndarray]:
         if serialized_data is None:
             return None
         if isinstance(serialized_data, str):

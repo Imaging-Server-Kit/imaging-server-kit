@@ -54,7 +54,7 @@ class Notification(DataLayer):
 
     def __str__(self) -> str:
         level = self.meta.get("level", "info")
-        return f"Notification ({level}): {self.data}"
+        return f"{self.name} ({level}): {self.data}"
 
     def refresh(self):
         print(self)

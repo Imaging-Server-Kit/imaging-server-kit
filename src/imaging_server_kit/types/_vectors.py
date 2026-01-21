@@ -5,9 +5,8 @@ import numpy as np
 from geojson import Feature, LineString
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer
-
-from imaging_server_kit.types.common import merge_meta_tile, extract_meta_tile
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
+from imaging_server_kit.types.common import extract_meta_tile
 
 
 def _get_tile(vectors: Vectors, tile_meta: TileMeta):
@@ -75,8 +74,17 @@ class Vectors(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+            
+        self.merger = ObjectMerger()
 
-        # TODO: Implement object-specific properties, like max_objects or max_vector_length (could be validated).
+    @property
+    def data_global_coords(self) -> Optional[np.ndarray]:
+        """Data in global coordinate reference instead of local to the tile."""
+        if (self.data is not None) and (self.tile_meta is not None):
+            if self.tile_meta.coords_min is not None:
+                data_global = self.data.copy()
+                data_global[:, 0] = data_global[:, 0] + self.tile_meta.coords_min
+                return data_global
 
     @property
     def n_objects(self) -> int:
@@ -86,7 +94,7 @@ class Vectors(DataLayer):
             return len(self.data)
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data[:, 0], axis=0))
@@ -110,39 +118,6 @@ class Vectors(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    def merge(self, vectors_tile: Vectors) -> None:
-        """Merges vectors from a tile into a set of existing vectors.
-        Existing vectors inside the tile domain (from tile overlap) are replaced by vectors in the tile.
-        """
-        if (self.data is None) and (vectors_tile.data is not None):
-            self.data = vectors_tile.data
-        elif (vectors_tile.data is None) or (vectors_tile.tile_meta is None):
-            return
-        else:
-            if self.n_objects > 0:
-                # Offset the tile data by the tile positions
-                vectors_tile.data = (
-                    vectors_tile.data + vectors_tile.tile_meta.coords_min
-                )
-
-                # Remove the vectors from the vectors data that are in the tile
-                *_, tile_filter = _get_tile(self, vectors_tile.tile_meta)
-                vectors_clean = self.data[~tile_filter]
-
-                # Merge the tile data with the cleaned vectors data
-                merged_vectors_data = np.vstack((vectors_clean, vectors_tile.data))
-
-                # Do the same for the vectors metadata
-                merged_vectors_meta = merge_meta_tile(
-                    self.meta, vectors_tile.meta, self.n_objects, tile_filter
-                )
-            else:
-                merged_vectors_data = vectors_tile.data
-                merged_vectors_meta = vectors_tile.meta
-
-            self.data = merged_vectors_data
-            self.meta = merged_vectors_meta
 
     @classmethod
     def serialize(

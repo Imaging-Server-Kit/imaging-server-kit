@@ -6,7 +6,7 @@ from geojson import Feature, Polygon
 
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
 
 
 def _get_tile(boxes: Boxes, tile_meta: TileMeta):
@@ -74,8 +74,15 @@ class Boxes(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+            
+        self.merger = ObjectMerger()
 
-        # TODO: Implement object-specific properties, like max_objects or min_box_area (could be validated).
+    @property
+    def data_global_coords(self) -> Optional[np.ndarray]:
+        """Data in global coordinate reference instead of local to the tile."""
+        if (self.data is not None) and (self.tile_meta is not None):
+            if self.tile_meta.coords_min is not None:
+                return self.data + self.tile_meta.coords_min
 
     @property
     def n_objects(self) -> int:
@@ -85,7 +92,7 @@ class Boxes(DataLayer):
             return len(self.data)
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(np.asarray(self.data), axis=(0, 1)))
@@ -109,34 +116,6 @@ class Boxes(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    def merge(self, boxes_tile: Boxes) -> None:
-        if (self.data is None) and (boxes_tile.data is not None):
-            self.data = boxes_tile.data
-        elif (boxes_tile.data is None) or (boxes_tile.tile_meta is None):
-            return
-        else:
-            if self.n_objects > 0:
-                # Offset the tile data by the tile positions
-                boxes_tile.data = boxes_tile.data + boxes_tile.tile_meta.coords_min
-
-                # Remove the previous tile boxes from the data boxes
-                *_, tile_filter = _get_tile(self, boxes_tile.tile_meta)
-                boxes_clean = self.data[~tile_filter]
-
-                # Merge the new tile boxes with the data boxes
-                merged_boxes_data = np.vstack((boxes_clean, boxes_tile.data))  # type: ignore
-
-                # Do the same for boxes metadata
-                merged_boxes_meta = merge_meta_tile(
-                    self.meta, boxes_tile.meta, self.n_objects, tile_filter
-                )
-            else:
-                merged_boxes_data = boxes_tile.data
-                merged_boxes_meta = boxes_tile.meta
-
-            self.data = merged_boxes_data
-            self.meta = merged_boxes_meta
 
     @classmethod
     def serialize(

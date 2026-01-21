@@ -57,7 +57,9 @@ class Tracks(DataLayer):
             return encode_contents(data.astype(np.float32))
 
     @classmethod
-    def deserialize(cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str) -> Optional[np.ndarray]:
+    def deserialize(
+        cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
+    ) -> Optional[np.ndarray]:
         if serialized_data is None:
             return None
         if isinstance(serialized_data, str):
@@ -65,10 +67,12 @@ class Tracks(DataLayer):
         return serialized_data.astype(float)
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[Union[Tuple, List]]) -> Optional[np.ndarray]:
+    def _get_initial_data(
+        cls, pixel_domain: Optional[Union[Tuple, List]]
+    ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
-        return np.zeros((1, len(pixel_domain)+2), dtype=np.float32)
+        return np.zeros((1, len(pixel_domain) + 2), dtype=np.float32)
 
     @property
     def n_objects(self) -> int:
@@ -78,7 +82,7 @@ class Tracks(DataLayer):
             return len(self.data)
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0)[2:])

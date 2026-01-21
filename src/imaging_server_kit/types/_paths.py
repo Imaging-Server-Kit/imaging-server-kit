@@ -53,7 +53,7 @@ class Paths(DataLayer):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
-    
+
     @property
     def n_objects(self) -> int:
         if self.data is None:
@@ -62,7 +62,7 @@ class Paths(DataLayer):
             return len(self.data)
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is None:
             return
         if self.n_objects > 0:
@@ -75,12 +75,14 @@ class Paths(DataLayer):
             return tuple(pixel_domain)
 
     @classmethod
-    def serialize(cls, data: Optional[List[np.ndarray]], client_origin:str):
+    def serialize(cls, data: Optional[List[np.ndarray]], client_origin: str):
         if data is not None:
             return [encode_contents(arr.astype(np.float32)) for arr in data]
 
     @classmethod
-    def deserialize(cls, serialized_data: Optional[str], client_origin: str) -> Optional[List[np.ndarray]]:
+    def deserialize(
+        cls, serialized_data: Optional[str], client_origin: str
+    ) -> Optional[List[np.ndarray]]:
         if serialized_data is None:
             return None
         data = []
@@ -91,7 +93,9 @@ class Paths(DataLayer):
         return data
 
     @classmethod
-    def _get_initial_data(cls, pixel_domain: Optional[Union[Tuple, List]]) -> Optional[np.ndarray]:
+    def _get_initial_data(
+        cls, pixel_domain: Optional[Union[Tuple, List]]
+    ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         return np.asarray([])

@@ -6,10 +6,12 @@ import imantics
 import numpy as np
 from geojson import Feature, Polygon
 from skimage.draw import polygon2mask
+import networkx as nx
+from skimage.util import map_array
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -165,6 +167,154 @@ def features2instance_mask_3d(features, image_shape):
     return segmentation_mask
 
 
+def unique_positive(labels: np.ndarray) -> np.ndarray:
+    return np.unique(labels[labels > 0])
+
+
+class MaskMerger(DefaultMerger):
+    
+    def merge(self, src_layer: Mask, dst_layer: Mask) -> None:
+        if (
+            (dst_layer.data is None)
+            or (dst_layer.tile_meta is None)
+            or (dst_layer.pixel_domain is None)
+        ):
+            return
+
+        if (
+            (src_layer.data is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.pixel_domain is None)
+        ):
+            src_layer.data = src_layer._get_initial_data(tuple([1]*dst_layer.ndim))  # Will set src_layer.tile_meta and src_layer.pixel_domain
+        
+        if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None) or (src_layer.data is None):
+            return  # This should never happen (just there for type hints)
+        
+        # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
+        _slices = dst_layer.tile_meta.slices
+        _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
+        _pixel_domain = np.max(_stack, axis=0).tolist()
+        
+        if _pixel_domain != src_layer.pixel_domain:
+            new = Mask.initialize(_pixel_domain)
+            new_data = new.data
+            new_data[src_layer.tile_meta.slices] = src_layer.data
+        else:
+            new_data = src_layer.data
+        
+        new_data[_slices] = dst_layer.data
+        src_layer.data = new_data
+
+    def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
+        # Erase all of the data before tiling
+        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
+
+
+class InstanceTileTracker:
+    def __init__(self) -> None:
+        self.initialize()
+
+    def initialize(self):
+        self.N = 0  # Current number of objects
+        self.G = nx.Graph()
+
+    def add_N_to_tile(self, labels: np.ndarray) -> np.ndarray:
+        if labels.sum() > 0:
+            labels[labels != 0] = labels[labels != 0] + self.N
+            self.N = labels.max()
+        return labels
+
+    def add_node(self, lab):
+        self.G.add_node(lab)
+
+    def add_edge(self, a, b):
+        self.G.add_edge(a, b)
+
+    def build_mapping(self):
+        self.G.add_nodes_from(range(1, self.N + 1))
+        mapping = {}
+        for comp_id, comp in enumerate(nx.connected_components(self.G), start=1):
+            for n in comp:
+                mapping[n] = comp_id
+        self._mapping = mapping
+
+    def resolve(self, arr):
+        if not hasattr(self, "_mapping"):
+            self.build_mapping()
+        input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
+        output_vals = np.array([self._mapping[k] for k in input_vals], dtype=np.int64)
+        return map_array(arr, input_vals=input_vals, output_vals=output_vals)
+
+
+class InstanceMaskMerger(DefaultMerger):
+    def __init__(self, min_intersecting_px: int = 5) -> None:
+        self.min_intersecting_px = min_intersecting_px
+        self.tile_tracker = InstanceTileTracker()
+    
+    def merge(self, src_layer: Mask, dst_layer: Mask) -> None:
+        if (
+            (dst_layer.data is None)
+            or (dst_layer.tile_meta is None)
+            or (dst_layer.pixel_domain is None)
+        ):
+            return
+
+        if (
+            (src_layer.data is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.pixel_domain is None)
+        ):
+            src_layer.data = src_layer._get_initial_data(tuple([1]*dst_layer.ndim))  # Will set src_layer.tile_meta and src_layer.pixel_domain
+        
+        if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None) or (src_layer.data is None):
+            return  # This should never happen (just there for type hints)
+
+        
+        _slices = dst_layer.tile_meta.slices
+        _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
+        _pixel_domain = np.max(_stack, axis=0).tolist()
+        
+        if _pixel_domain != src_layer.pixel_domain:
+            new = Mask.initialize(_pixel_domain)
+            new_data = new.data
+            new_data[src_layer.tile_meta.slices] = src_layer.data
+        else:
+            new_data = src_layer.data
+
+        dst_tile = src_layer.get_tile(dst_layer.tile_meta)
+        if dst_tile is None:
+            raise ValueError("Could not get a mask tile where it was requested.")
+        
+        
+        src_arr = self.tile_tracker.add_N_to_tile(dst_layer.data)
+        
+        new_data[_slices] = src_arr
+        
+        for new_label in unique_positive(src_arr):
+            self.tile_tracker.add_node(new_label)
+
+        border_mask = dst_layer.tile_meta.overlap_border_mask
+        if border_mask is not None:
+            for src_lab in unique_positive(src_arr[border_mask]):
+                lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
+                lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
+                for dst_lab in unique_positive(lab_filt_dst_in_overlap):
+                    n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
+                    if n_intersecting_px > self.min_intersecting_px:
+                        self.tile_tracker.add_edge(dst_lab, src_lab)
+        
+        src_layer.data = new_data
+        
+    def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
+        # Erase all of the data before tiling
+        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
+        self.tile_tracker.initialize()
+    
+    def last_tile_hook(self, src_layer: Mask, dst_layer: Mask):
+        src_layer.data = self.tile_tracker.resolve(src_layer.data)
+
+
 class Mask(DataLayer):
     """Data layer used to represent segmentation masks.
 
@@ -185,6 +335,7 @@ class Mask(DataLayer):
         required: bool = True,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        merger: Optional[str] = "default",
     ):
         super().__init__(
             name=name,
@@ -211,9 +362,17 @@ class Mask(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+        
+        # Merging strategy
+        if merger == "default":
+            self.merger = MaskMerger()
+        elif merger == "instances":
+            self.merger = InstanceMaskMerger(min_intersecting_px=5)
+        else:
+            raise ValueError("`merger` should be one of ['default', 'instances']")
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if isinstance(self.data, np.ndarray):
             return self.data.shape
 
@@ -234,16 +393,6 @@ class Mask(DataLayer):
             meta=self.meta,
             tile_meta=tile_meta,
         )
-
-    def merge(self, mask_tile: Mask) -> None:
-        if (self.data is None) and (mask_tile.data is not None):
-            self.data = mask_tile.data
-        elif (mask_tile.data is None) or (mask_tile.tile_meta is None):
-            return
-        else:
-            # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
-            _slices = mask_tile.tile_meta.slices
-            self.data[_slices] = mask_tile.data
 
     @classmethod
     def serialize(

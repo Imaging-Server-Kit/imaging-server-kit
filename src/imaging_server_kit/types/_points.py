@@ -6,8 +6,8 @@ from geojson import Feature, Point
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.common import extract_meta_tile
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
 
 
 def _get_tile(points: Points, tile_meta: TileMeta):
@@ -98,7 +98,14 @@ class Points(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
 
-        # TODO: Implement object-specific properties, like max_objects or min_point_distance (could be validated).
+        self.merger = ObjectMerger()
+
+    @property
+    def data_global_coords(self) -> Optional[np.ndarray]:
+        """Data in global coordinate reference instead of local to the tile."""
+        if (self.data is not None) and (self.tile_meta is not None):
+            if self.tile_meta.coords_min is not None:
+                return self.data + self.tile_meta.coords_min
 
     @property
     def n_objects(self) -> int:
@@ -108,7 +115,7 @@ class Points(DataLayer):
             return len(self.data)
 
     @property
-    def _pixel_domain(self) -> Optional[Tuple]:
+    def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0))
@@ -132,34 +139,6 @@ class Points(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    def merge(self, points_tile: Points) -> None:
-        if (self.data is None) and (points_tile.data is not None):
-            self.data = points_tile.data
-        elif (points_tile.data is None) or (points_tile.tile_meta is None):
-            return
-        else:
-            if self.n_objects > 0:
-                # Offset the tile data by the tile positions
-                points_tile.data = points_tile.data + points_tile.tile_meta.coords_min
-
-                # Remove the points from the points data that are in the tile
-                *_, tile_filter = _get_tile(self, points_tile.tile_meta)
-                points_clean = self.data[~tile_filter]
-
-                # Merge the tile data with the cleaned points data
-                merged_points_data = np.vstack((points_clean, points_tile.data))
-
-                # Do the same for the points metadata
-                merged_points_meta = merge_meta_tile(
-                    self.meta, points_tile.meta, self.n_objects, tile_filter
-                )
-            else:
-                merged_points_data = points_tile.data
-                merged_points_meta = points_tile.meta
-
-            self.data = merged_points_data
-            self.meta = merged_points_meta
 
     @classmethod
     def serialize(

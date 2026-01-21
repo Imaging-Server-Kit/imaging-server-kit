@@ -7,6 +7,13 @@ from imaging_server_kit.types.data_layer import DataLayer
 
 from tqdm import tqdm
 
+
+# We use a global progress bar instead of one attached to the instance
+# so that it doesnt re-print itself line-by-line in the terminal.
+# However, this means we can only control a single progress bar.
+PBAR = tqdm()
+
+
 class Progress(DataLayer):
     """Data layer used to represent a progress bar.
 
@@ -53,10 +60,6 @@ class Progress(DataLayer):
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
         
-        # TQDM progress bar
-        self.pbar = tqdm()
-        self.refresh()
-
     @classmethod
     def serialize(cls, data: Optional[int], client_origin: str) -> Optional[int]:
         if data is not None:
@@ -72,7 +75,9 @@ class Progress(DataLayer):
         return f"Progress (current: {self.data}/{max_val})"
 
     def refresh(self):
-        if self.data is not None:
-            self.pbar.total = self.meta["max_val"]
-            self.pbar.n = self.data
-            self.pbar.refresh()
+        max_val = self.meta["max_val"]
+        # Only print the progress bar if there is more than 1 step.
+        if (max_val > 1) & (self.data is not None):
+            PBAR.total = max_val
+            PBAR.n = self.data
+            PBAR.refresh()
