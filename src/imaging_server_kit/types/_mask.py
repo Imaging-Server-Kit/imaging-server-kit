@@ -11,7 +11,7 @@ from skimage.util import map_array
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger
+from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger, DataSerializer
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -269,7 +269,6 @@ class InstanceMaskMerger(DefaultMerger):
         
         if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None) or (src_layer.data is None):
             return  # This should never happen (just there for type hints)
-
         
         _slices = dst_layer.tile_meta.slices
         _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
@@ -285,7 +284,6 @@ class InstanceMaskMerger(DefaultMerger):
         dst_tile = src_layer.get_tile(dst_layer.tile_meta)
         if dst_tile is None:
             raise ValueError("Could not get a mask tile where it was requested.")
-        
         
         src_arr = self.tile_tracker.add_N_to_tile(dst_layer.data)
         
@@ -315,6 +313,29 @@ class InstanceMaskMerger(DefaultMerger):
         src_layer.data = self.tile_tracker.resolve(src_layer.data)
 
 
+class MaskDataSerializer(DataSerializer):
+    def serialize(self, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:
+        if mask is None:
+            return None
+        if client_origin == "Python/Napari":
+            features = encode_contents(mask.astype(np.uint16))
+        elif client_origin == "Java/QuPath":
+            features = mask2features(mask)
+        else:
+            raise ValueError(f"Unrecognized client origin: {client_origin}")
+        return features
+    
+    def deserialize(self, serialized_mask: Optional[Union[List[Feature], str]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_mask is None:
+            return None
+        if isinstance(serialized_mask, str):
+            if client_origin == "Python/Napari":
+                mask = decode_contents(serialized_mask).astype(int)
+            else:
+                raise ValueError(f"Unrecognized client origin: {client_origin}")
+        return mask
+
+
 class Mask(DataLayer):
     """Data layer used to represent segmentation masks.
 
@@ -330,12 +351,14 @@ class Mask(DataLayer):
         self,
         data: Optional[np.ndarray] = None,
         name: str = "Mask",
+        
         description: str = "Segmentation mask (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
+        merger: Optional[str] = "default",
+        
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
-        merger: Optional[str] = "default",
     ):
         super().__init__(
             name=name,
@@ -367,9 +390,11 @@ class Mask(DataLayer):
         if merger == "default":
             self.merger = MaskMerger()
         elif merger == "instances":
-            self.merger = InstanceMaskMerger(min_intersecting_px=5)
+            self.merger = InstanceMaskMerger(min_intersecting_px=1)  # 1 intersecting px?
         else:
             raise ValueError("`merger` should be one of ['default', 'instances']")
+        
+        self.data_serializer = MaskDataSerializer()
 
     @property
     def data_pixel_domain(self) -> Optional[Tuple]:
@@ -393,33 +418,6 @@ class Mask(DataLayer):
             meta=self.meta,
             tile_meta=tile_meta,
         )
-
-    @classmethod
-    def serialize(
-        cls, mask: Optional[np.ndarray], client_origin: str
-    ) -> Optional[Union[List[Feature], str]]:
-        if mask is None:
-            return None
-        if client_origin == "Python/Napari":
-            features = encode_contents(mask.astype(np.uint16))
-        elif client_origin == "Java/QuPath":
-            features = mask2features(mask)
-        else:
-            raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return features
-
-    @classmethod
-    def deserialize(
-        cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_data is None:
-            return None
-        if isinstance(serialized_data, str):
-            if client_origin == "Python/Napari":
-                data = decode_contents(serialized_data).astype(int)
-            else:
-                raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return data
 
     @classmethod
     def _get_initial_data(

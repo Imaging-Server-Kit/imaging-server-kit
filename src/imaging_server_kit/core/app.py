@@ -16,7 +16,6 @@ import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
 from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.results import Results
-from imaging_server_kit.core.serialization import deserialize_results
 from imaging_server_kit.types.data_layer import DataLayer
 
 templates_dir = pathlib.Path(
@@ -195,17 +194,17 @@ class AlgorithmApp:
             return algorithm.get_signature_params(algorithm_name)
 
         @self.app.post(
-            "/{algorithm_name}/stream",
+            "/{algorithm_name}/process",
             status_code=status.HTTP_200_OK,
-            summary="Stream algorithm",
-            description="Execute the algorithm as a stream with the provided parameters.",
+            summary="Run algorithm",
+            description="Execute the algorithm with the provided parameters.",
             tags=["algorithm"],
         )
         async def stream_algo(
             algorithm_name: str = Path(...),
             request: Request = ...,
         ):
-            """Run the algorithm on the provided parameters."""
+            """Run the algorithm with the provided parameters."""
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             encoded_params = await request.json()
 
@@ -213,7 +212,8 @@ class AlgorithmApp:
             client_origin = str(request.headers.get("User-Agent"))
 
             # Reconstruct the algo parameters as a `Results` object
-            params_res = deserialize_results(encoded_params, client_origin)
+            # params_res = deserialize_results(encoded_params, client_origin)
+            params_res = Results.deserialize(encoded_params, client_origin)
 
             # Special case: when request is sent from QuPath, the image is named `qupath-image`
             # and should be assigned to whichever parameter is an image in the algo (we assume)

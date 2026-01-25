@@ -7,7 +7,7 @@ from geojson import Feature, Point
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.common import extract_meta_tile
-from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger, DataSerializer
 
 
 def _get_tile(points: Points, tile_meta: TileMeta):
@@ -50,6 +50,29 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
         except:
             print("Invalid point geometry.")
     return point_features
+
+
+class PointsDataSerializer(DataSerializer):
+    def serialize(self, points: Optional[np.ndarray], client_origin: str) -> Optional[Union[str, List[Feature]]]:
+        if points is None:
+            return None
+        if client_origin == "Python/Napari":
+            point_features = encode_contents(points.astype(np.float32))
+        elif client_origin == "Java/QuPath":
+            point_features = encode_point_features(points)
+        else:
+            raise ValueError(f"Unrecognized client origin: {client_origin}")
+        return point_features
+    
+    def deserialize(self, serialized_points: Optional[Union[str, List[Feature]]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_points is None:
+            return None
+        if isinstance(serialized_points, str):
+            points = decode_contents(serialized_points).astype(float)
+        else:
+            # Points are a List[Features]
+            points = decode_point_features(serialized_points)
+        return points
 
 
 class Points(DataLayer):
@@ -99,6 +122,8 @@ class Points(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
 
         self.merger = ObjectMerger()
+        
+        self.data_serializer = PointsDataSerializer()
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
@@ -139,35 +164,6 @@ class Points(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    @classmethod
-    def serialize(
-        cls, points: Optional[np.ndarray], client_origin: str
-    ) -> Optional[Union[str, List[Feature]]]:
-        if points is None:
-            return None
-        if client_origin == "Python/Napari":
-            point_features = encode_contents(points.astype(np.float32))
-        elif client_origin == "Java/QuPath":
-            point_features = encode_point_features(points)
-        else:
-            raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return point_features
-
-    @classmethod
-    def deserialize(
-        cls, serialized_points: Optional[Union[np.ndarray, str]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_points is None:
-            return None
-        if isinstance(serialized_points, str):
-            if client_origin == "Python/Napari":
-                points = decode_contents(serialized_points).astype(float)
-            else:
-                raise ValueError(f"Unrecognized client origin: {client_origin}")
-        else:
-            points = serialized_points
-        return points
 
     @classmethod
     def _get_initial_data(

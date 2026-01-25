@@ -59,16 +59,6 @@ class Progress(DataLayer):
         
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
-        
-    @classmethod
-    def serialize(cls, data: Optional[int], client_origin: str) -> Optional[int]:
-        if data is not None:
-            return int(data)
-
-    @classmethod
-    def deserialize(cls, serialized_data: Optional[int], client_origin: str) -> Optional[int]:
-        if serialized_data is not None:
-            return int(serialized_data)
 
     def __str__(self) -> str:
         max_val = self.meta["max_val"]

@@ -50,13 +50,3 @@ class Float(DataLayer):
         
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
-
-    @classmethod
-    def serialize(cls, data: Optional[float], client_origin: str):
-        if data is not None:
-            return float(data)
-
-    @classmethod
-    def deserialize(cls, serialized_data: Optional[float], client_origin: str):
-        if serialized_data is not None:
-            return float(serialized_data)

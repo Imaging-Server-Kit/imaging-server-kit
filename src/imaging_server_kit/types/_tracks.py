@@ -3,8 +3,21 @@ import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_layer import DataLayer, DataSerializer
 
+
+class TracksDataSerializer(DataSerializer):
+    def serialize(self, tracks: Optional[np.ndarray], client_origin: str) -> Optional[str]:
+        if tracks is not None:
+            return encode_contents(tracks.astype(np.float32))
+    
+    def deserialize(self, serialized_tracks: Optional[str], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_tracks is None:
+            return None
+        if isinstance(serialized_tracks, str):
+            serialized_tracks = decode_contents(serialized_tracks)
+        return serialized_tracks.astype(float)
+    
 
 class Tracks(DataLayer):
     """Data layer used to represent tracking data.
@@ -48,23 +61,23 @@ class Tracks(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+        
+        self.data_serializer = TracksDataSerializer()
 
-        # TODO: Implement object-specific properties, like max_objects or min_track_length (could be validated).
+    # @classmethod
+    # def serialize(cls, data, client_origin: str) -> Optional[str]:
+    #     if data is not None:
+    #         return encode_contents(data.astype(np.float32))
 
-    @classmethod
-    def serialize(cls, data, client_origin: str) -> Optional[str]:
-        if data is not None:
-            return encode_contents(data.astype(np.float32))
-
-    @classmethod
-    def deserialize(
-        cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_data is None:
-            return None
-        if isinstance(serialized_data, str):
-            serialized_data = decode_contents(serialized_data)
-        return serialized_data.astype(float)
+    # @classmethod
+    # def deserialize(
+    #     cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
+    # ) -> Optional[np.ndarray]:
+    #     if serialized_data is None:
+    #         return None
+    #     if isinstance(serialized_data, str):
+    #         serialized_data = decode_contents(serialized_data)
+    #     return serialized_data.astype(float)
 
     @classmethod
     def _get_initial_data(

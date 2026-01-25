@@ -3,7 +3,23 @@ import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_layer import DataLayer, DataSerializer
+
+
+class PathDataSerializer(DataSerializer):
+    def serialize(self, paths: Optional[List[np.ndarray]], client_origin: str) -> Optional[List[str]]:
+        if paths is not None:
+            return [encode_contents(arr.astype(np.float32)) for arr in paths]
+    
+    def deserialize(self, serialized_paths: Optional[List[str]], client_origin: str) -> Optional[List[np.ndarray]]:
+        if serialized_paths is None:
+            return None
+        data = []
+        for f in serialized_paths:
+            if isinstance(f, str):
+                f = decode_contents(f)
+                data.append(f.astype(float))
+        return data
 
 
 class Paths(DataLayer):
@@ -48,8 +64,9 @@ class Paths(DataLayer):
 
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
+        
+        self.data_serializer = PathDataSerializer()
 
-        # TODO: Implement object-specific properties, like max_objects or max_path_length (could be validated).
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
@@ -73,24 +90,6 @@ class Paths(DataLayer):
             path_domains = np.asarray(path_domains)
             pixel_domain = np.max(path_domains, axis=0)
             return tuple(pixel_domain)
-
-    @classmethod
-    def serialize(cls, data: Optional[List[np.ndarray]], client_origin: str):
-        if data is not None:
-            return [encode_contents(arr.astype(np.float32)) for arr in data]
-
-    @classmethod
-    def deserialize(
-        cls, serialized_data: Optional[str], client_origin: str
-    ) -> Optional[List[np.ndarray]]:
-        if serialized_data is None:
-            return None
-        data = []
-        for f in serialized_data:
-            if isinstance(f, str):
-                f = decode_contents(f)
-                data.append(f.astype(float))
-        return data
 
     @classmethod
     def _get_initial_data(

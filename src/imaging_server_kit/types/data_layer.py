@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import base64
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
 from imaging_server_kit.types.common import merge_meta_tile
+from imaging_server_kit.core.encoding import encode_contents, decode_contents
 
 
 def multi_merge(layers: List[DataLayer]) -> DataLayer:
@@ -99,6 +101,68 @@ class ObjectMerger(DefaultMerger):
         src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
 
 
+def _serialize_value(obj: Any) -> Any:
+    if isinstance(obj, Dict):
+        return {k: _serialize_value(v) for k, v in obj.items()}
+    if isinstance(obj, np.ndarray):
+        return encode_contents(obj)
+    return obj
+
+
+def _serialize_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively serialize Numpy arrays in the meta dictionary."""
+    return {k: _serialize_value(v) for k, v in meta.items()}
+
+
+def _is_base64_encoded(data: str) -> bool:
+    """Check if a given string is Base64-encoded."""
+    if not isinstance(data, str) or len(data) % 4 != 0:
+        # Base64 strings must be divisible by 4
+        return False
+    try:
+        # Try decoding and check if it re-encodes to the same value
+        decoded_data = base64.b64decode(data, validate=True)
+        return base64.b64encode(decoded_data).decode("utf-8") == data
+    except Exception:
+        return False
+
+
+def _deserialize_value(obj: Any) -> Any:
+    if isinstance(obj, Dict):
+        return {k: _deserialize_value(v) for k, v in obj.items()}
+    if isinstance(obj, str) and _is_base64_encoded(obj):
+        # TODO: This is a bit sketchy - we use a try/except on the decoding to figure out
+        # if the values in meta correspond to numpy arrays (features, etc.)
+        try:
+            return decode_contents(obj)
+        except:
+            return obj
+    return obj
+
+
+def _deserialize_meta(serialized_meta: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively deserialize Numpy arrays in the meta dictionary."""
+    return {k: _deserialize_value(v) for k, v in serialized_meta.items()}
+
+
+class DataSerializer(ABC):
+    @abstractmethod
+    def serialize(self, data: Any, client_origin: str) -> Any:
+        ...
+    
+    @abstractmethod
+    def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
+        ...
+
+
+class DefaultDataSerializer(DataSerializer):
+    def serialize(self, data: Any, client_origin: str) -> Any:
+        return data
+    
+    def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
+        return serialized_data
+
+
 class DataLayer(ABC):
     """
     Data layer container for a particular data type.
@@ -152,6 +216,7 @@ class DataLayer(ABC):
         self.constraints = [{}, {}]
         
         self.merger = DefaultMerger()
+        self.data_serializer = DefaultDataSerializer()
     
     def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
         if self.data_pixel_domain is None:  # TODO: recursive issue with data_pixel_domain...
@@ -191,6 +256,10 @@ class DataLayer(ABC):
     @property
     def name(self) -> str:
         return self._name
+    
+    @name.setter
+    def name(self, value: str):
+        self._name = value
 
     @property
     def description(self) -> str:
@@ -271,18 +340,57 @@ class DataLayer(ABC):
                 randomize=ctx.randomize,
             ):
                 yield self.get_tile(tile_meta)
-
+   
+    def serialize(self, client_origin: str) -> Dict[str, Any]:
+        """Serialize a layer."""
+        serialized_data = self.data_serializer.serialize(self.data, client_origin)
+        
+        if self.meta:
+            serialized_meta = _serialize_meta(self.meta)
+        else:
+            serialized_meta = {}
+        
+        if self.tile_meta:
+            serialized_tile_meta = self.tile_meta.serialize()     
+        else:
+            serialized_tile_meta = None   
+        
+        return {
+            "kind": self.kind,
+            "data": serialized_data,
+            "name": self.name,
+            "meta": serialized_meta,
+            "tile_meta": serialized_tile_meta,
+        }       
+    
+    def deserialize(self, serialized_layer: Dict[str, Any], client_origin: str) -> DataLayer:
+        """Deserialize a layer."""
+        kind = serialized_layer["kind"]
+        if kind != self.kind:
+            raise ValueError("Serialized layer cannot be deserialized (wrong kind).")
+        
+        name = serialized_layer["name"]
+        data = serialized_layer["data"]
+        meta = serialized_layer["meta"]
+        tile_meta = serialized_layer["tile_meta"]
+        
+        decoded_data = self.data_serializer.deserialize(data, client_origin)
+        decoded_meta = _deserialize_meta(meta)
+        decoded_tile_meta = TileMeta(**tile_meta)
+        
+        cls = type(self)
+        
+        return cls(
+            data=decoded_data,
+            name=name,
+            # description= # TODO
+            meta=decoded_meta,
+            tile_meta=decoded_tile_meta,
+        )
+    
     @classmethod
     def validate_data(cls, data: Any, meta: Dict, constraints: List[Dict]):
         pass
-
-    @classmethod
-    @abstractmethod
-    def serialize(cls, data: Any, client_origin: str) -> Any: ...
-
-    @classmethod
-    @abstractmethod
-    def deserialize(cls, serialized_data: Any, client_origin: str) -> Any: ...
 
     @classmethod
     def _get_initial_data(

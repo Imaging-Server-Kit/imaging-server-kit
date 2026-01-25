@@ -1,10 +1,11 @@
 """
 nD-Tiling module for the Imaging Server Kit.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 import time
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 
 
@@ -32,46 +33,19 @@ class TileMeta:
         self,
         tile_idx: Optional[int] = None,
         n_tiles: Optional[int] = None,
-        ndim: Optional[int] = None,
-        tile_size: Optional[Union[Tuple, List]] = None,
-        tile_pos: Optional[Union[Tuple, List]] = None,
-        overlap_px: Optional[Union[Tuple, List]] = None,
-        pixel_domain: Optional[Union[Tuple, List]] = None,
         first_tile: Optional[Union[Tuple, List]] = None,
         last_tile: Optional[Union[Tuple, List]] = None,
+        overlap_px: Optional[Union[Tuple, List]] = None,
+        tile_size: Optional[Union[Tuple, List]] = None,
+        tile_pos: Optional[Union[Tuple, List]] = None,
     ):
         self.tile_idx = 0 if tile_idx is None else tile_idx
         self.n_tiles = 1 if n_tiles is None else n_tiles
-        self._ndim = ndim
-        self._tile_size = tile_size
-        self._tile_pos = tile_pos
+        self._first_tile = first_tile
+        self._last_tile = last_tile
         self._overlap_px = overlap_px
-        self._pixel_domain = pixel_domain
-        
-        if (first_tile is None) and (ndim is not None):
-            self._first_tile = [False] * ndim
-        else:
-            if first_tile is not None:
-                self._first_tile = first_tile
-            else:
-                self._first_tile = None
-
-        if (last_tile is None) and (ndim is not None):
-            self._last_tile = [False] * ndim
-        else:
-            if last_tile is not None:
-                self._last_tile = last_tile
-            else:
-                self._last_tile = None
-
-    @property
-    def ndim(self) -> Optional[int]:
-        if self._ndim is not None:
-            return self._ndim
-
-    @ndim.setter
-    def ndim(self, value: Optional[int]):
-        self._ndim = value
+        self._tile_size = tile_size
+        self._coords_min = tile_pos
 
     @property
     def tile_size(self) -> Optional[Tuple]:
@@ -84,12 +58,12 @@ class TileMeta:
 
     @property
     def coords_min(self) -> Optional[Tuple]:
-        if self._tile_pos is not None:
-            return tuple(self._tile_pos)
+        if self._coords_min is not None:
+            return tuple(self._coords_min)
 
     @coords_min.setter
     def coords_min(self, value: Optional[Tuple]):
-        self._tile_pos = value
+        self._coords_min = value
 
     @property
     def coords_max(self) -> Optional[Tuple]:
@@ -102,6 +76,15 @@ class TileMeta:
                 for (tile_pos, tile_size) in zip(self.coords_min, self.tile_size)
             ]
         )
+
+    @property
+    def pixel_domain(self) -> Optional[Tuple]:
+        return self.coords_max
+
+    @property
+    def ndim(self) -> Optional[int]:
+        if self.pixel_domain is not None:
+            return len(self.pixel_domain)
 
     @property
     def overlap_px(self) -> Optional[Tuple]:
@@ -176,12 +159,18 @@ class TileMeta:
 
     @property
     def first_tile(self) -> Optional[Tuple]:
-        if self._first_tile is not None:
+        if self._first_tile is None:
+            if self.ndim is not None:
+                return tuple([False] * self.ndim)
+        else:
             return tuple(self._first_tile)
 
     @property
     def last_tile(self) -> Optional[Tuple]:
-        if self._last_tile is not None:
+        if self._last_tile is None:
+            if self.ndim is not None:
+                return tuple([False] * self.ndim)
+        else:
             return tuple(self._last_tile)
 
     @property
@@ -196,27 +185,19 @@ class TileMeta:
             return self.tile_idx == self.n_tiles - 1
         return False
 
-    @property
-    def pixel_domain(self) -> Optional[Tuple]:
-        if self._pixel_domain is not None:
-            return tuple(self._pixel_domain)
-
-    @pixel_domain.setter
-    def pixel_domain(self, value: Optional[Tuple]):
-        self._pixel_domain = value
-
     def serialize(self) -> Dict:
         return {
             "tile_idx": self.tile_idx,
             "n_tiles": self.n_tiles,
-            "ndim": self.ndim,
-            "tile_size": self._tile_size,
-            "tile_pos": self._tile_pos,
-            "overlap_px": self.overlap_px,
-            "pixel_domain": self.pixel_domain,
             "first_tile": self.first_tile,
             "last_tile": self.last_tile,
+            "overlap_px": self.overlap_px,
+            "tile_size": self._tile_size,
+            "tile_pos": self._coords_min,
         }
+    
+    def copy(self) -> TileMeta:
+        return TileMeta(**self.serialize())
 
 
 def valid_tile_size(
@@ -257,7 +238,7 @@ def generate_nd_tiles(
     overlap_percent: Union[float, Tuple, List] = 0.0,
     randomize: bool = False,
     delay_sec: float = 0.0,
-):
+) -> Generator[TileMeta, None, None]:
     """Generate tile metadata for overlapping N-dimensional tiles over a pixel domain.
 
     Parameters
@@ -304,31 +285,9 @@ def generate_nd_tiles(
             delay_sec=delay_sec,
         )
 
-        tiles_info = _get_tiles_info(pixel_domain, tiling_ctx)
-        n_tiles = len(tiles_info)
-        if n_tiles == 0:
-            yield TileMeta()
-        else:
-            for tile_idx, tile_info in enumerate(tiles_info):
-                ndim = tile_info["ndim"]
-                tile_size = [tile_info[f"tile_size_{i}"] for i in range(ndim)]
-                tile_pos = [tile_info[f"tile_pos_{i}"] for i in range(ndim)]
-                overlap_px = [tile_info[f"overlap_px_{i}"] for i in range(ndim)]
-                pixel_domain = [tile_info[f"domain_size_{i}"] for i in range(ndim)]
-                first_tile = [tile_info[f"first_tile_{i}"] for i in range(ndim)]
-                last_tile = [tile_info[f"last_tile_{i}"] for i in range(ndim)]
-                yield TileMeta(
-                    tile_idx=tile_idx,
-                    n_tiles=n_tiles,
-                    ndim=ndim,
-                    tile_size=tile_size,
-                    tile_pos=tile_pos,
-                    overlap_px=overlap_px,
-                    pixel_domain=pixel_domain,
-                    first_tile=first_tile,
-                    last_tile=last_tile,
-                )
-                time.sleep(delay_sec)
+        for tile_meta in _generate_tile_meta(pixel_domain, tiling_ctx):
+            time.sleep(delay_sec)
+            yield tile_meta
 
 
 def _tiles_info_axis(size_i: int, tile_size_i: int, overlap_px_i: int):
@@ -374,7 +333,7 @@ def _get_tile_pos_and_size_i(
     return pos_i, tile_size_i, is_first_tile_i, is_last_tile_i
 
 
-def _get_tiles_info(pixel_domain: Union[Tuple, List], ctx: TilingContext) -> List[Dict]:
+def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) -> Generator[TileMeta, None, None]:
     """Tiling in N-dimensions."""
     ndim = len(pixel_domain)
 
@@ -414,32 +373,40 @@ def _get_tiles_info(pixel_domain: Union[Tuple, List], ctx: TilingContext) -> Lis
     if ctx.randomize:
         np.random.shuffle(tile_coords_idx)
 
-    tile_infos = []
-    for tile_coord_ax in tile_coords_idx:
-        tile_info = {"ndim": ndim} | {
-            f"domain_size_{axis}": int(n_pix) for (axis, n_pix) in enumerate(n_pix_ax)
-        }
-        for axis, (coord_i, n_pix_i, shift_i, half_pad_i) in enumerate(
-            zip(tile_coord_ax, n_pix_ax, shift_ax, half_pad_ax)
-        ):
-            tile_shape_i = tile_shape[axis]
-
-            pos_i, tile_size_i, first_tile_i, last_tile_i = _get_tile_pos_and_size_i(
-                coord_i,
-                n_pix_i,
-                shift_i,
-                half_pad_i,
-                tile_shape_i,
+    n_tiles = len(tile_coords_idx)
+    if n_tiles == 0:
+        yield TileMeta()
+    else:
+        for tile_idx, tile_coord_ax in enumerate(tile_coords_idx):
+            first_tile = []
+            last_tile = []
+            overlap_px = []
+            tile_size = []
+            tile_pos = []
+            for axis, (coord_i, n_pix_i, shift_i, half_pad_i) in enumerate(
+                zip(tile_coord_ax, n_pix_ax, shift_ax, half_pad_ax)
+            ):
+                tile_shape_i = tile_shape[axis]
+                pos_i, tile_size_i, first_tile_i, last_tile_i = _get_tile_pos_and_size_i(
+                    coord_i,
+                    n_pix_i,
+                    shift_i,
+                    half_pad_i,
+                    tile_shape_i,
+                )
+                first_tile.append(first_tile_i)
+                last_tile.append(last_tile_i)
+                overlap_px.append(int(tile_shape_i - shift_i))
+                tile_size.append(int(tile_size_i))
+                tile_pos.append(int(pos_i))
+            
+            tile_meta = TileMeta(
+                tile_idx=tile_idx,
+                n_tiles=len(tile_coords_idx),
+                first_tile=first_tile,
+                last_tile=last_tile,
+                overlap_px=overlap_px,
+                tile_size=tile_size,
+                tile_pos=tile_pos,                       
             )
-
-            tile_info = tile_info | {
-                f"tile_pos_{axis}": int(pos_i),
-                f"tile_size_{axis}": int(tile_size_i),
-                f"overlap_px_{axis}": int(tile_shape_i - shift_i),
-                f"first_tile_{axis}": first_tile_i,
-                f"last_tile_{axis}": last_tile_i,
-            }
-
-        tile_infos.append(tile_info)
-
-    return tile_infos
+            yield tile_meta

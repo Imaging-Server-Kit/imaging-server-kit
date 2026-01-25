@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from geojson import Feature, LineString
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger, DataSerializer
 from imaging_server_kit.types.common import extract_meta_tile
 
 
@@ -25,6 +25,40 @@ def _get_tile(vectors: Vectors, tile_meta: TileMeta):
     vectors_meta_tile = extract_meta_tile(vectors.meta, vectors.n_objects, tile_filter)
 
     return vectors_tile, vectors_meta_tile, tile_filter
+
+
+class VectorsDataSerializer(DataSerializer):
+    def serialize(self, vectors: Optional[np.ndarray], client_origin: str) -> Optional[List[Feature]]:
+        if vectors is None:
+            return None
+        serialized_vectors = []
+        vectors = vectors[:, :, ::-1]  # Invert XY
+        for i, vector in enumerate(vectors):
+            point_start = list(vector[0])
+            point_end = list(vector[0] + vector[1])
+            coords = [point_start, point_end]
+            try:
+                geom = LineString(coordinates=coords)
+                serialized_vectors.append(
+                    Feature(geometry=geom, properties={"Detection ID": i})
+                )
+            except ValueError:
+                print("Invalid line string geometry.")
+        return serialized_vectors
+    
+    def deserialize(self, serialized_vectors: Optional[List[Feature]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_vectors is None:
+            return None
+
+        vectors_arr = np.array(
+            [feature["geometry"]["coordinates"] for feature in serialized_vectors]
+        )
+        vector_coords = vectors_arr[:, 0]
+        displacements = vectors_arr[:, 1] - vector_coords
+        vectors = np.stack((vector_coords, displacements))
+        vectors = np.rollaxis(vectors, 1)
+        vectors = vectors[:, :, ::-1]  # Invert XY
+        return vectors
 
 
 class Vectors(DataLayer):
@@ -76,6 +110,8 @@ class Vectors(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
             
         self.merger = ObjectMerger()
+        
+        self.data_serializer = VectorsDataSerializer()
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
@@ -119,43 +155,43 @@ class Vectors(DataLayer):
             tile_meta=tile_meta,
         )
 
-    @classmethod
-    def serialize(
-        cls, vectors: Optional[np.ndarray], client_origin: str
-    ) -> Optional[List[Feature]]:
-        if vectors is None:
-            return None
-        serialized_vectors = []
-        vectors = vectors[:, :, ::-1]  # Invert XY
-        for i, vector in enumerate(vectors):
-            point_start = list(vector[0])
-            point_end = list(vector[0] + vector[1])
-            coords = [point_start, point_end]
-            try:
-                geom = LineString(coordinates=coords)
-                serialized_vectors.append(
-                    Feature(geometry=geom, properties={"Detection ID": i})
-                )
-            except ValueError:
-                print("Invalid line string geometry.")
-        return serialized_vectors
+    # @classmethod
+    # def serialize(
+    #     cls, vectors: Optional[np.ndarray], client_origin: str
+    # ) -> Optional[List[Feature]]:
+    #     if vectors is None:
+    #         return None
+    #     serialized_vectors = []
+    #     vectors = vectors[:, :, ::-1]  # Invert XY
+    #     for i, vector in enumerate(vectors):
+    #         point_start = list(vector[0])
+    #         point_end = list(vector[0] + vector[1])
+    #         coords = [point_start, point_end]
+    #         try:
+    #             geom = LineString(coordinates=coords)
+    #             serialized_vectors.append(
+    #                 Feature(geometry=geom, properties={"Detection ID": i})
+    #             )
+    #         except ValueError:
+    #             print("Invalid line string geometry.")
+    #     return serialized_vectors
 
-    @classmethod
-    def deserialize(
-        cls, serialized_vectors: Optional[List[Dict[str, Any]]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_vectors is None:
-            return None
+    # @classmethod
+    # def deserialize(
+    #     cls, serialized_vectors: Optional[List[Dict[str, Any]]], client_origin: str
+    # ) -> Optional[np.ndarray]:
+    #     if serialized_vectors is None:
+    #         return None
 
-        vectors_arr = np.array(
-            [feature["geometry"]["coordinates"] for feature in serialized_vectors]
-        )
-        vector_coords = vectors_arr[:, 0]
-        displacements = vectors_arr[:, 1] - vector_coords
-        vectors = np.stack((vector_coords, displacements))
-        vectors = np.rollaxis(vectors, 1)
-        vectors = vectors[:, :, ::-1]  # Invert XY
-        return vectors
+    #     vectors_arr = np.array(
+    #         [feature["geometry"]["coordinates"] for feature in serialized_vectors]
+    #     )
+    #     vector_coords = vectors_arr[:, 0]
+    #     displacements = vectors_arr[:, 1] - vector_coords
+    #     vectors = np.stack((vector_coords, displacements))
+    #     vectors = np.rollaxis(vectors, 1)
+    #     vectors = vectors[:, :, ::-1]  # Invert XY
+    #     return vectors
 
     @classmethod
     def _get_initial_data(

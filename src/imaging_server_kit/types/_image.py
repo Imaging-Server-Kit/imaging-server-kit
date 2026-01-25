@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
-from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger
+from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger, DataSerializer
 from imaging_server_kit.core.tiling import TileMeta
 
 
@@ -51,6 +51,18 @@ class ImageMerger(DefaultMerger):
         src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
 
 
+class ImageDataSerializer(DataSerializer):
+    def serialize(self, data: Optional[np.ndarray], client_origin: str) -> Optional[str]:
+        if data is not None:
+            return encode_contents(data.astype(np.float32))
+    
+    def deserialize(self, serialized_data: Optional[str], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_data is not None:
+            if isinstance(serialized_data, str):
+                serialized_data = decode_contents(serialized_data)
+                return serialized_data.astype(float)
+            
+
 class Image(DataLayer):
     """Data layer used to represent images and image-like data.
 
@@ -67,10 +79,12 @@ class Image(DataLayer):
         self,
         data: Optional[np.ndarray] = None,
         name="Image",
+        
         description="Input image (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,  # When set to True, triggers a parameter validation error if image is None
         rgb: bool = False,
+        
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
     ):
@@ -104,6 +118,9 @@ class Image(DataLayer):
         
         # Merging strategy
         self.merger = ImageMerger()
+        
+        # Serializer
+        self.data_serializer = ImageDataSerializer()
 
     @property
     def data_pixel_domain(self) -> Optional[Tuple]:
@@ -129,21 +146,6 @@ class Image(DataLayer):
             meta=self.meta,
             tile_meta=tile_meta,
         )
-
-    @classmethod
-    def serialize(cls, data: Optional[np.ndarray], client_origin: str):
-        if data is not None:
-            return encode_contents(data.astype(np.float32))
-
-    @classmethod
-    def deserialize(
-        cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_data is None:
-            return None
-        if isinstance(serialized_data, str):
-            serialized_data = decode_contents(serialized_data)
-        return serialized_data.astype(float)
 
     @classmethod
     def _get_initial_data(

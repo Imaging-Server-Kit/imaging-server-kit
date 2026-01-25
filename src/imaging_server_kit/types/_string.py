@@ -35,15 +35,3 @@ class String(DataLayer):
         
         if self.data is not None:
             self.validate_data(data, self.meta, self.constraints)
-
-        # TODO: implement string-specific properties, for example: max_length (could be validated).
-
-    @classmethod
-    def serialize(cls, data: Optional[str], client_origin: str) -> Optional[str]:
-        if data is not None:
-            return str(data)
-
-    @classmethod
-    def deserialize(cls, serialized_data: Optional[str], client_origin: str) -> Optional[str]:
-        if serialized_data is not None:
-            return str(serialized_data)

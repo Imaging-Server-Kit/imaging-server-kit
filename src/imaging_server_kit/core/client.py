@@ -17,7 +17,6 @@ from imaging_server_kit.core.errors import (
     ServerRequestError,
 )
 from imaging_server_kit.core.results import Results
-from imaging_server_kit.core.serialization import deserialize_results
 
 
 class Client(AlgorithmRunner):
@@ -87,9 +86,8 @@ class Client(AlgorithmRunner):
             )
         endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
         serialized_sample_results = self._access_algo_get_endpoint(endpoint)
-        sample_results = deserialize_results(
-            serialized_sample_results,
-            client_origin="Python/Napari",
+        sample_results = Results.deserialize(
+            serialized_sample_results, client_origin="Python/Napari"
         )
         return sample_results
 
@@ -113,7 +111,7 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     def _stream(self, algorithm, params_res: Results):
-        endpoint = f"{self.server_url}/{algorithm}/stream"
+        endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
             try:
                 response = client.post(
@@ -137,7 +135,7 @@ class Client(AlgorithmRunner):
                         continue
                     unpacker.feed(chunk)
                     for serialized_results in unpacker:
-                        yield deserialize_results([serialized_results], "Python/Napari")
+                        yield Results.deserialize([serialized_results], "Python/Napari")
             else:
                 self._handle_response_errored(response)
 

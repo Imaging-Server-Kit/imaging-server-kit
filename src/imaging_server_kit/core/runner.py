@@ -27,7 +27,7 @@ def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) 
 
 
 def validate_algorithm(func: Callable) -> Callable:
-    def wrapper(self, algorithm: Optional[str]=None, *args, **kwargs):
+    def wrapper(self, algorithm: Optional[str] = None, *args, **kwargs):
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
         return func(self, algorithm, *args, **kwargs)
 
@@ -58,7 +58,9 @@ class AlgorithmRunner(ABC):
     def get_signature_params(self, algorithm: str) -> List[str]: ...
 
     @abstractmethod
-    def _stream(self, algorithm, params_res: Results) -> Generator[Results, None, None]: ...
+    def _stream(
+        self, algorithm, params_res: Results
+    ) -> Generator[Results, None, None]: ...
 
     def run_generator(
         self,
@@ -72,38 +74,41 @@ class AlgorithmRunner(ABC):
                 if params_res.pixel_domain
                 else None
             )
-        
+
         for params_tile in params_res.generate_tiles(tiling_ctx):
             for result_tile in self._stream(algorithm, params_tile):
                 # Construct the progress data
+                params_tile_meta = None
+                progress_data = 0
+                progress_max_val = 1
                 if len(params_tile) > 0:
                     params_tile_meta = params_tile[0].tile_meta
-                    progress_data = params_tile_meta.tile_idx
-                    progress_max_val = params_tile_meta.n_tiles
-                else:
-                    params_tile_meta = None
-                    progress_data = 0
-                    progress_max_val = 1
-
+                    if params_tile_meta is not None:
+                        progress_data = params_tile_meta.tile_idx + 1
+                        progress_max_val = params_tile_meta.n_tiles
+                
                 # Create a progress layer at the current step
                 result_tile.create(
                     kind="progress",
                     name="Tile progress",
                     data=progress_data,
                     meta={"max_val": progress_max_val},
-                    tile_meta=params_tile_meta,
                 )
 
                 # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
-                if params_tile_meta is not None:
+                            
+                if params_tile_meta is not None:                        
                     # Set the tile index to be the current index for all result layers
                     for l in result_tile:
                         l.tile_meta.tile_idx = params_tile_meta.tile_idx
                         l.tile_meta.n_tiles = params_tile_meta.n_tiles
-                        # TODO: for the tile position, should we not add the returned l.coords_min to offset them correctly?
-                        l.tile_meta.coords_min = params_tile_meta.coords_min
+                        # TODO: This is wrong if the pixel_domain of result_tile is larger/smaller
+                        # than that of the params_tile... we should look at the ratios
+                        # of domain sizes between params_tile and result_tile to infer the new coords_min
+                        if params_tile_meta.coords_min is not None:
+                            l.tile_meta.coords_min = params_tile_meta.coords_min
                         l.tile_meta.overlap_px = params_tile_meta.overlap_px
-                
+                            
                 yield result_tile
 
     def run(
@@ -156,16 +161,16 @@ class AlgorithmRunner(ABC):
         )
 
         # Convert the resolved parameters to a Results object
-        algo_params_res = Results()
+        params_res = Results()
 
         # TODO: this is a special case for RGB... how else could we handle that?
         for param_name, param_value in resolved_params.items():
             kind = algo_param_defs[param_name].get("param_type")
             if kind == "image":
                 rgb = algo_param_defs[param_name].get("rgb")
-                algo_params_res.create(kind, param_value, param_name, rgb=rgb)
+                params_res.create(kind, param_value, param_name, rgb=rgb)
             else:
-                algo_params_res.create(kind, param_value, param_name)
+                params_res.create(kind, param_value, param_name)
 
         if results is None:
             results = Results()
@@ -178,7 +183,7 @@ class AlgorithmRunner(ABC):
 
             if isinstance(results, napari.Viewer):
                 special_napari_case = True
-                results = NapariResults(viewer=results) # type: ignore
+                results = NapariResults(viewer=results)  # type: ignore
 
         # Construct the tiling context
         if tiled:
@@ -192,9 +197,22 @@ class AlgorithmRunner(ABC):
             tiling_ctx = None
 
         # Run the algorithm and assemble the results
-        for tile_results in self.run_generator(algorithm, algo_params_res, tiling_ctx):
+        for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
             results.merge(tile_results)
         
+        # # TODO: Whether to update "results", and therefore UIs, after each tile or only at the end.
+        # if tile_updates:
+        #     ...
+        # else:
+        #     # Collect results in a list (no merging)
+        #     res_tiles = []
+        #     for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
+        #         res_tiles.append(tile_results)
+        #     # Merge everyone at once
+        #     res = Results.merge_all(res_tiles)
+        #     # would iterate over the layers and do Layer.merge_all(*lays)
+            
+
         # Remove the progress bar
         results.delete(layer_name="Tile progress")
 

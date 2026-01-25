@@ -287,7 +287,7 @@ def blob_detector_algo(
             num_sigma=num_sigma,
             threshold=threshold,
         )
-        points = results[:, :image.ndim]
+        points = results[:, : image.ndim]
         sigmas = results[:, image.ndim]
 
     points_params = {
@@ -501,17 +501,16 @@ def background_subtract(image, sigma, method):
         "method": sk.Choice(
             name="Method", items=["max", "min", "mean"], default="max", auto_call=True
         ),
-        "axis": sk.Choice(name="Axis", items=["0", "1", "2"], auto_call=True),
     },
     samples=[{"image": skimage.data.brain()}],
 )
-def project(image, method, axis: str):
+def project(image, method):
     proj_func = {
         "max": np.max,
         "min": np.min,
         "mean": np.mean,
     }
-    proj = proj_func[method](image, axis=int(axis))
+    proj = proj_func[method](image, axis=0, keepdims=True)
     return sk.Image(
         proj,
         name=f"Projection",
@@ -528,17 +527,25 @@ def project(image, method, axis: str):
 def conway_algo(max_iter=200, delay=0.1):
     min_val = 0
     max_val = 255
-    
-    N=100  # Size of the grid
+
+    N = 100  # Size of the grid
 
     def update(grid: np.ndarray, N: int) -> np.ndarray:
         newGrid = grid.copy()
         for i in range(N):
             for j in range(N):
-                total = int((grid[i, (j-1)%N] + grid[i, (j+1)%N] + 
-                            grid[(i-1)%N, j] + grid[(i+1)%N, j] + 
-                            grid[(i-1)%N, (j-1)%N] + grid[(i-1)%N, (j+1)%N] + 
-                            grid[(i+1)%N, (j-1)%N] + grid[(i+1)%N, (j+1)%N]))
+                total = int(
+                    (
+                        grid[i, (j - 1) % N]
+                        + grid[i, (j + 1) % N]
+                        + grid[(i - 1) % N, j]
+                        + grid[(i + 1) % N, j]
+                        + grid[(i - 1) % N, (j - 1) % N]
+                        + grid[(i - 1) % N, (j + 1) % N]
+                        + grid[(i + 1) % N, (j - 1) % N]
+                        + grid[(i + 1) % N, (j + 1) % N]
+                    )
+                )
                 total = total / max_val
                 if grid[i, j] == max_val:
                     if (total < 2) or (total > 3):
@@ -548,8 +555,20 @@ def conway_algo(max_iter=200, delay=0.1):
                         newGrid[i, j] = max_val
         return newGrid
 
-    grid = np.random.choice([min_val, max_val], N*N, p=[0.5, 0.5]).reshape(N, N)
+    grid = np.random.choice([min_val, max_val], N * N, p=[0.5, 0.5]).reshape(N, N)
     for k in range(max_iter):
         grid = update(grid, N)
         time.sleep(delay)
-        yield sk.Mask(grid), f"Iterations: {k} / {max_iter}"
+        yield sk.Mask(grid), sk.Progress(k, meta={"max_val": max_iter})
+
+
+from skimage.morphology import label
+
+@sk.algorithm(
+    samples=[
+        {"mask": np.random.random((50, 50)) > 0.7}
+    ]
+)
+def label_algo(mask):
+    labelled = label(mask)
+    return sk.Mask(labelled, merger="instances")

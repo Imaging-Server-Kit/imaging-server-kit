@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from geojson import Feature, Polygon
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.common import extract_meta_tile, merge_meta_tile
-from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger
+from imaging_server_kit.types.common import extract_meta_tile
+from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger, DataSerializer
 
 
 def _get_tile(boxes: Boxes, tile_meta: TileMeta):
@@ -27,6 +27,39 @@ def _get_tile(boxes: Boxes, tile_meta: TileMeta):
     boxes_meta_tile = extract_meta_tile(boxes.meta, boxes.n_objects, tile_filter)
 
     return boxes_data_tile, boxes_meta_tile, tile_filter
+
+
+class BoxesDataSerializer(DataSerializer):
+    def serialize(self, boxes: Optional[np.ndarray], client_origin: str) -> Optional[List[Feature]]:
+        if boxes is None:
+            return None
+        features = []
+        for i, box in enumerate(boxes):
+            coords = np.array(box)[:, ::-1]  # Invert XY
+            coords = coords.tolist()
+            coords.append(coords[0])  # Close the Polygon
+            try:
+                geom = Polygon(coordinates=[coords], validate=True)
+                features.append(Feature(geometry=geom, properties={"Detection ID": i}))
+            except ValueError:
+                print(
+                    "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box."
+                )
+        return features
+    
+    def deserialize(self, serialized_boxes: Optional[List[Feature]], client_origin: str) -> Optional[np.ndarray]:
+        if serialized_boxes is None:
+            return None
+        boxes = np.array(
+            [feature["geometry"]["coordinates"] for feature in serialized_boxes]
+        )
+        boxes = np.array(
+            [box[0] for box in boxes]
+        )  # We get back a shape of (N, 1, 5, 2) - so we remove dim. 1
+        if len(boxes) > 0:
+            boxes = boxes[:, :-1]  # Remove the last element
+            boxes = boxes[:, :, ::-1]  # Invert XY
+        return boxes
 
 
 class Boxes(DataLayer):
@@ -76,6 +109,8 @@ class Boxes(DataLayer):
             self.validate_data(data, self.meta, self.constraints)
             
         self.merger = ObjectMerger()
+        
+        self.data_serializer = BoxesDataSerializer()
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
@@ -116,44 +151,6 @@ class Boxes(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    @classmethod
-    def serialize(
-        cls, boxes: Optional[np.ndarray], client_origin: str
-    ) -> Optional[List[Feature]]:
-        if boxes is None:
-            return None
-
-        features = []
-        for i, box in enumerate(boxes):
-            coords = np.array(box)[:, ::-1]  # Invert XY
-            coords = coords.tolist()
-            coords.append(coords[0])  # Close the Polygon
-            try:
-                geom = Polygon(coordinates=[coords], validate=True)
-                features.append(Feature(geometry=geom, properties={"Detection ID": i}))
-            except ValueError:
-                print(
-                    "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box."
-                )
-        return features
-
-    @classmethod
-    def deserialize(
-        cls, serialized_data: Optional[List[Dict[str, Any]]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_data is None:
-            return None
-        boxes = np.array(
-            [feature["geometry"]["coordinates"] for feature in serialized_data]
-        )
-        boxes = np.array(
-            [box[0] for box in boxes]
-        )  # We get back a shape of (N, 1, 5, 2) - so we remove dim. 1
-        if len(boxes) > 0:
-            boxes = boxes[:, :-1]  # Remove the last element
-            boxes = boxes[:, :, ::-1]  # Invert XY
-        return boxes
 
     @classmethod
     def _get_initial_data(
