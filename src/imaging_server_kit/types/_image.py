@@ -204,9 +204,9 @@ class Image(DataLayer):
             tile_meta=tile_meta,
         )
 
-    @classmethod
+    @staticmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
@@ -216,8 +216,8 @@ class Image(DataLayer):
     def initialize(cls, pixel_domain: Union[Tuple, List]) -> Image:
         return cls(data=cls._get_initial_data(pixel_domain))
 
-    @classmethod
-    def validate_data(cls, data, meta):
+    @staticmethod
+    def validate_data(data, meta):
         if meta["required"] is False:
             return
 

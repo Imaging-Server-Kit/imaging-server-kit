@@ -54,9 +54,9 @@ class Tracks(DataLayer):
             **kwargs,
         )
 
-    @classmethod
+    @staticmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

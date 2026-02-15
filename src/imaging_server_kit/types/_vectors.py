@@ -155,17 +155,17 @@ class Vectors(DataLayer):
             tile_meta=tile_meta,
         )
 
-    @classmethod
+    @staticmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return
         ndim = len(pixel_domain)
         return np.zeros((0, 2, ndim), dtype=np.float32)
 
-    @classmethod
-    def validate_data(cls, data, meta):
+    @staticmethod
+    def validate_data(data, meta):
         if meta["required"] is False:
             return
 

@@ -81,9 +81,9 @@ class Paths(DataLayer):
             pixel_domain = np.max(path_domains, axis=0)
             return tuple(pixel_domain)
 
-    @classmethod
+    @staticmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]]
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

@@ -166,8 +166,8 @@ class Results(LayerStackBase):
             # Final domain is the max bound of all parameter domains
             return np.max(np.stack(domains), axis=0).tolist()
 
-    @classmethod
-    def deserialize(cls, serialized_results: List[Dict], client_origin: str) -> Results:
+    @staticmethod
+    def deserialize(serialized_results: List[Dict], client_origin: str) -> Results:
         layers = []
         for serialized_layer in serialized_results:
             kind = serialized_layer["kind"]

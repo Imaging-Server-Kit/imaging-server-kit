@@ -443,12 +443,12 @@ class DataLayer(ABC):
             data_serizlizer=data_serializer_type,
         )
 
-    @classmethod
-    def validate_data(cls, data: Any, meta: Dict):
+    @staticmethod
+    def validate_data(data: Any, meta: Dict):
         pass
 
-    @classmethod
+    @staticmethod
     def _get_initial_data(
-        cls, pixel_domain: Optional[Union[List[int], Tuple]]
+        pixel_domain: Optional[Union[List[int], Tuple]]
     ) -> Optional[np.ndarray]:
         pass
