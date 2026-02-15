@@ -27,45 +27,34 @@ class Progress(DataLayer):
     def __init__(
         self,
         data: Optional[int] = None,
+        max_val: Optional[int] = 1,
         name="Progress",
         description="Progress bar",
         default: Optional[int] = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
-    ):
-        # Initialize max_val
-        if meta is None:
-            meta = {"max_val": 1}
-        else:
-            if "max_val" not in meta:
-                meta["max_val"] = 1
-        
+        **kwargs,
+    ):        
         if data is None:
             data = 0
         
         super().__init__(
             name=name,
-            description=description,
-            meta=meta,
             data=data,
+            meta=meta,
             tile_meta=tile_meta,
+            description=description,
+            default=default,
+            max_val=max_val,
+            **kwargs,
         )
-        self.default = default
-        
-        # Schema contributions
-        main = {"default": self.default}
-        extra = {}
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
 
     def __str__(self) -> str:
-        max_val = self.meta["max_val"]
+        max_val = self.meta.get("max_val", 1)
         return f"Progress (current: {self.data}/{max_val})"
 
     def refresh(self):
-        max_val = self.meta["max_val"]
+        max_val = self.meta.get("max_val", 1)
         # Only print the progress bar if there is more than 1 step.
         if (max_val > 1) & (self.data is not None):
             PBAR.total = max_val

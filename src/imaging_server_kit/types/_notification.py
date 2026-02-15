@@ -7,10 +7,10 @@ from imaging_server_kit.types.data_layer import DataLayer
 class Notification(DataLayer):
     """Data layer used to represent a text notification.
 
-    Use the `level` meta field to define the notification level (`info`, `warning`, or `error`).
+    Use the `level` parameter to define the notification level (`info`, `warning`, or `error`).
 
     Example:
-        notif = sk.Notification("Warning!", meta={"level": "warning"})
+        notif = sk.Notification("Warning!", level="warning")
     """
 
     kind = "notification"
@@ -19,11 +19,13 @@ class Notification(DataLayer):
     def __init__(
         self,
         data: Optional[str] = None,
+        level: Optional[str] = "info",
         name="Notification",
         description="Text notification",
         default: Optional[str] = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -31,16 +33,10 @@ class Notification(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            default=default,
+            level=level,
+            **kwargs,
         )
-        self.default = default
-        
-        # Schema contributions
-        main = {"default": self.default}
-        extra = {}
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
 
     def __str__(self) -> str:
         level = self.meta.get("level", "info")

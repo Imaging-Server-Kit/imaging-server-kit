@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 from geojson import Feature, LineString
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger, DataSerializer
+from imaging_server_kit.types.data_layer import (
+    DataLayer,
+    ObjectTileMerger,
+    ObjectMerger,
+    DataSerializer,
+    Merger,
+)
 from imaging_server_kit.types.common import extract_meta_tile
 
 
@@ -28,7 +34,9 @@ def _get_tile(vectors: Vectors, tile_meta: TileMeta):
 
 
 class VectorsDataSerializer(DataSerializer):
-    def serialize(self, vectors: Optional[np.ndarray], client_origin: str) -> Optional[List[Feature]]:
+    def serialize(
+        self, vectors: Optional[np.ndarray], client_origin: str
+    ) -> Optional[List[Feature]]:
         if vectors is None:
             return None
         serialized_vectors = []
@@ -45,8 +53,10 @@ class VectorsDataSerializer(DataSerializer):
             except ValueError:
                 print("Invalid line string geometry.")
         return serialized_vectors
-    
-    def deserialize(self, serialized_vectors: Optional[List[Feature]], client_origin: str) -> Optional[np.ndarray]:
+
+    def deserialize(
+        self, serialized_vectors: Optional[List[Feature]], client_origin: str
+    ) -> Optional[np.ndarray]:
         if serialized_vectors is None:
             return None
 
@@ -72,6 +82,10 @@ class Vectors(DataLayer):
     """
 
     kind = "vectors"
+    mergers: Dict[str, Type[Merger]] = {"default": ObjectTileMerger, "override": ObjectMerger}
+    data_serializers: Dict[str, Type[DataSerializer]] = {
+        "default": VectorsDataSerializer
+    }
 
     def __init__(
         self,
@@ -80,38 +94,24 @@ class Vectors(DataLayer):
         description="Input vectors (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
+        merger: str = "default",
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
-            description=description,
-            meta=meta,
             data=data,
+            meta=meta,
             tile_meta=tile_meta,
+            description=description,
+            dimensionality=dimensionality,
+            required=required,
+            merger=merger,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.dimensionality = (
-            dimensionality if dimensionality is not None else np.arange(6).tolist()
-        )
-        self.required = required
-
-        # Schema contributions
-        main = {}
-        if not self.required:
-            self.default = None
-            main["default"] = self.default
-        extra = {
-            "dimensionality": self.dimensionality,
-            "required": self.required,
-        }
-        self.constraints = [main, extra]
-
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
-            
-        self.merger = ObjectMerger()
-        
-        self.data_serializer = VectorsDataSerializer()
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
@@ -145,7 +145,7 @@ class Vectors(DataLayer):
         else:
             vectors_tile_data, vectors_tile_meta, _ = _get_tile(self, tile_meta)
             if vectors_tile_data is not None:
-                vectors_tile_data = vectors_tile_data - tile_meta.coords_min
+                vectors_tile_data[:, 0] = vectors_tile_data[:, 0] - tile_meta.coords_min
             _data = vectors_tile_data
             _meta = vectors_tile_meta
         return Vectors(
@@ -154,44 +154,6 @@ class Vectors(DataLayer):
             meta=_meta,
             tile_meta=tile_meta,
         )
-
-    # @classmethod
-    # def serialize(
-    #     cls, vectors: Optional[np.ndarray], client_origin: str
-    # ) -> Optional[List[Feature]]:
-    #     if vectors is None:
-    #         return None
-    #     serialized_vectors = []
-    #     vectors = vectors[:, :, ::-1]  # Invert XY
-    #     for i, vector in enumerate(vectors):
-    #         point_start = list(vector[0])
-    #         point_end = list(vector[0] + vector[1])
-    #         coords = [point_start, point_end]
-    #         try:
-    #             geom = LineString(coordinates=coords)
-    #             serialized_vectors.append(
-    #                 Feature(geometry=geom, properties={"Detection ID": i})
-    #             )
-    #         except ValueError:
-    #             print("Invalid line string geometry.")
-    #     return serialized_vectors
-
-    # @classmethod
-    # def deserialize(
-    #     cls, serialized_vectors: Optional[List[Dict[str, Any]]], client_origin: str
-    # ) -> Optional[np.ndarray]:
-    #     if serialized_vectors is None:
-    #         return None
-
-    #     vectors_arr = np.array(
-    #         [feature["geometry"]["coordinates"] for feature in serialized_vectors]
-    #     )
-    #     vector_coords = vectors_arr[:, 0]
-    #     displacements = vectors_arr[:, 1] - vector_coords
-    #     vectors = np.stack((vector_coords, displacements))
-    #     vectors = np.rollaxis(vectors, 1)
-    #     vectors = vectors[:, :, ::-1]  # Invert XY
-    #     return vectors
 
     @classmethod
     def _get_initial_data(
@@ -203,9 +165,8 @@ class Vectors(DataLayer):
         return np.zeros((0, 2, ndim), dtype=np.float32)
 
     @classmethod
-    def validate_data(cls, data, meta, constraints):
-        main, extra = constraints
-        if extra["required"] is False:
+    def validate_data(cls, data, meta):
+        if meta["required"] is False:
             return
 
         assert isinstance(

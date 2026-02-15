@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 
 import imantics
 import numpy as np
@@ -11,7 +11,12 @@ from skimage.util import map_array
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger, DataSerializer
+from imaging_server_kit.types.data_layer import (
+    DataLayer,
+    Merger,
+    DefaultMerger,
+    DataSerializer,
+)
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -171,8 +176,8 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
     return np.unique(labels[labels > 0])
 
 
-class MaskMerger(DefaultMerger):
-    
+class MaskOverrideMerger(DefaultMerger):
+    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""  
     def merge(self, src_layer: Mask, dst_layer: Mask) -> None:
         if (
             (dst_layer.data is None)
@@ -186,29 +191,43 @@ class MaskMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            src_layer.data = src_layer._get_initial_data(tuple([1]*dst_layer.ndim))  # Will set src_layer.tile_meta and src_layer.pixel_domain
-        
-        if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None) or (src_layer.data is None):
+            src_layer.data = src_layer._get_initial_data(tuple([1] * dst_layer.ndim))
+            src_layer.meta = dst_layer.meta
+
+        if (
+            (src_layer.pixel_domain is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.data is None)
+        ):
             return  # This should never happen (just there for type hints)
-        
+
         # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
         _slices = dst_layer.tile_meta.slices
         _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
         _pixel_domain = np.max(_stack, axis=0).tolist()
-        
+
         if _pixel_domain != src_layer.pixel_domain:
             new = Mask.initialize(_pixel_domain)
             new_data = new.data
             new_data[src_layer.tile_meta.slices] = src_layer.data
         else:
             new_data = src_layer.data
-        
-        new_data[_slices] = dst_layer.data
-        src_layer.data = new_data
 
+        # `Override` strategy:
+        new_data[_slices] = dst_layer.data
+
+        src_layer.data = new_data
+        src_layer.meta = dst_layer.meta
+    
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
-        # Erase all of the data before tiling
-        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
+        src_layer.meta = dst_layer.meta
+
+
+class MaskTileOverrideMerger(MaskOverrideMerger):
+    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""    
+    def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
+        src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
+        src_layer.meta = dst_layer.meta
 
 
 class InstanceTileTracker:
@@ -236,22 +255,22 @@ class InstanceTileTracker:
         mapping = {}
         for comp_id, comp in enumerate(nx.connected_components(self.G), start=1):
             for n in comp:
-                mapping[n] = comp_id
+                mapping[n.tolist()] = comp_id
         self._mapping = mapping
 
     def resolve(self, arr):
         if not hasattr(self, "_mapping"):
             self.build_mapping()
         input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
-        output_vals = np.array([self._mapping[k] for k in input_vals], dtype=np.int64)
-        return map_array(arr, input_vals=input_vals, output_vals=output_vals)
+        output_vals = np.array(list(self._mapping.values()), dtype=np.int64)        
+        return map_array(arr, out=arr, input_vals=input_vals, output_vals=output_vals)
 
 
-class InstanceMaskMerger(DefaultMerger):
-    def __init__(self, min_intersecting_px: int = 5) -> None:
+class InstanceMaskTileMerger(DefaultMerger):
+    def __init__(self, min_intersecting_px: int = 1) -> None:
         self.min_intersecting_px = min_intersecting_px
         self.tile_tracker = InstanceTileTracker()
-    
+
     def merge(self, src_layer: Mask, dst_layer: Mask) -> None:
         if (
             (dst_layer.data is None)
@@ -265,15 +284,20 @@ class InstanceMaskMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            src_layer.data = src_layer._get_initial_data(tuple([1]*dst_layer.ndim))  # Will set src_layer.tile_meta and src_layer.pixel_domain
-        
-        if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None) or (src_layer.data is None):
+            src_layer.data = src_layer._get_initial_data(tuple([1] * dst_layer.ndim))
+            src_layer.meta = dst_layer.meta
+
+        if (
+            (src_layer.pixel_domain is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.data is None)
+        ):
             return  # This should never happen (just there for type hints)
-        
+
         _slices = dst_layer.tile_meta.slices
         _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
         _pixel_domain = np.max(_stack, axis=0).tolist()
-        
+
         if _pixel_domain != src_layer.pixel_domain:
             new = Mask.initialize(_pixel_domain)
             new_data = new.data
@@ -281,40 +305,44 @@ class InstanceMaskMerger(DefaultMerger):
         else:
             new_data = src_layer.data
 
-        dst_tile = src_layer.get_tile(dst_layer.tile_meta)
-        if dst_tile is None:
-            raise ValueError("Could not get a mask tile where it was requested.")
-        
-        src_arr = self.tile_tracker.add_N_to_tile(dst_layer.data)
-        
-        new_data[_slices] = src_arr
-        
-        for new_label in unique_positive(src_arr):
+        src_layer.data = new_data  # Extend the source layer data
+
+        src_tile = src_layer.get_tile(dst_layer.tile_meta)
+        if src_tile.data is None:
+            raise ValueError(f"Could not get a mask tile where it was requested.")
+
+        dst_arr = self.tile_tracker.add_N_to_tile(dst_layer.data)
+
+        for new_label in unique_positive(dst_arr):
             self.tile_tracker.add_node(new_label)
 
         border_mask = dst_layer.tile_meta.overlap_border_mask
         if border_mask is not None:
-            for src_lab in unique_positive(src_arr[border_mask]):
-                lab_filt_src_in_overlap = np.logical_and(border_mask, src_arr == src_lab)
-                lab_filt_dst_in_overlap = dst_tile.data[lab_filt_src_in_overlap]
-                for dst_lab in unique_positive(lab_filt_dst_in_overlap):
-                    n_intersecting_px = (lab_filt_dst_in_overlap == dst_lab).sum()
+            for dst_lab in unique_positive(dst_arr[border_mask]):
+                filt = np.logical_and(border_mask, dst_arr == dst_lab)
+                src_tile_filt = src_tile.data[filt]
+                for src_lab in unique_positive(src_tile_filt):
+                    n_intersecting_px = (src_tile_filt == src_lab).sum()
                     if n_intersecting_px > self.min_intersecting_px:
-                        self.tile_tracker.add_edge(dst_lab, src_lab)
-        
+                        self.tile_tracker.add_edge(src_lab, dst_lab)
+
+        new_data[_slices] = dst_arr
         src_layer.data = new_data
-        
+        src_layer.meta = dst_layer.meta
+
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
-        # Erase all of the data before tiling
-        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
-        self.tile_tracker.initialize()
-    
+        src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
+        self.tile_tracker = InstanceTileTracker() # Important: just calling .initialize() would not work
+
     def last_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = self.tile_tracker.resolve(src_layer.data)
+        self.tile_tracker = InstanceTileTracker()
 
 
 class MaskDataSerializer(DataSerializer):
-    def serialize(self, mask: Optional[np.ndarray], client_origin: str) -> Optional[Union[List[Feature], str]]:
+    def serialize(
+        self, mask: Optional[np.ndarray], client_origin: str
+    ) -> Optional[Union[List[Feature], str]]:
         if mask is None:
             return None
         if client_origin == "Python/Napari":
@@ -324,8 +352,10 @@ class MaskDataSerializer(DataSerializer):
         else:
             raise ValueError(f"Unrecognized client origin: {client_origin}")
         return features
-    
-    def deserialize(self, serialized_mask: Optional[Union[List[Feature], str]], client_origin: str) -> Optional[np.ndarray]:
+
+    def deserialize(
+        self, serialized_mask: Optional[Union[List[Feature], str]], client_origin: str
+    ) -> Optional[np.ndarray]:
         if serialized_mask is None:
             return None
         if isinstance(serialized_mask, str):
@@ -346,19 +376,25 @@ class Mask(DataLayer):
     """
 
     kind = "mask"
+    mergers: Dict[str, Type[Merger]] = {
+        "default": MaskTileOverrideMerger,
+        "instances": InstanceMaskTileMerger,
+        "override": MaskOverrideMerger,
+    }
+    data_serializers: Dict[str, Type[DataSerializer]] = {"default": MaskDataSerializer}
 
     def __init__(
         self,
         data: Optional[np.ndarray] = None,
         name: str = "Mask",
-        
         description: str = "Segmentation mask (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
-        merger: Optional[str] = "default",
-        
+        merger: str = "default",
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -366,42 +402,19 @@ class Mask(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            dimensionality=dimensionality,
+            required=required,
+            merger=merger,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.dimensionality = (
-            dimensionality if dimensionality is not None else np.arange(6).tolist()
-        )
-        self.required = required
-
-        # Schema contributions
-        main = {}
-        if not self.required:
-            self.default = None
-            main["default"] = self.default
-        extra = {
-            "dimensionality": self.dimensionality,
-            "required": self.required,
-        }
-        self.constraints = [main, extra]
-
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
-        
-        # Merging strategy
-        if merger == "default":
-            self.merger = MaskMerger()
-        elif merger == "instances":
-            self.merger = InstanceMaskMerger(min_intersecting_px=1)  # 1 intersecting px?
-        else:
-            raise ValueError("`merger` should be one of ['default', 'instances']")
-        
-        self.data_serializer = MaskDataSerializer()
 
     @property
     def data_pixel_domain(self) -> Optional[Tuple]:
         if isinstance(self.data, np.ndarray):
             return self.data.shape
 
-    def get_tile(self, tile_meta: TileMeta) -> Optional[Mask]:
+    def get_tile(self, tile_meta: TileMeta) -> Mask:
         if (
             (self.data is None)
             or (tile_meta.coords_max is None)
@@ -431,9 +444,8 @@ class Mask(DataLayer):
         return cls(data=cls._get_initial_data(pixel_domain))
 
     @classmethod
-    def validate_data(cls, data, meta, constraints):
-        main, extra = constraints
-        if extra["required"] is False:
+    def validate_data(cls, data, meta):
+        if meta["required"] is False:
             return
 
         assert isinstance(
@@ -443,5 +455,5 @@ class Mask(DataLayer):
         if not all(data.shape):
             raise ValueError("Image array has an invalid shape: ", data.shape)
 
-        if len(data.shape) not in extra["dimensionality"]:
+        if len(data.shape) not in meta["dimensionality"]:
             raise ValueError("Image array has the wrong dimensionality.")

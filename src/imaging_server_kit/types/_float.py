@@ -23,6 +23,7 @@ class Float(DataLayer):
         auto_call: bool = False,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -30,23 +31,10 @@ class Float(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            default=default,
+            auto_call=auto_call,
+            min=min,
+            max=max,
+            step=step,
+            **kwargs,
         )
-        self.min = min
-        self.max = max
-        self.step = step
-        self.default = default
-        self.auto_call = auto_call
-        
-        main = {
-            "default": self.default,
-            "ge": self.min,
-            "le": self.max,
-        }
-        extra = {
-            "auto_call": self.auto_call,
-            "step": self.step,
-        }
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)

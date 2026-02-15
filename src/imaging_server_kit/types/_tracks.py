@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -28,6 +28,7 @@ class Tracks(DataLayer):
     """
 
     kind = "tracks"
+    data_serializers: Dict[str, Type[DataSerializer]] = {"default": TracksDataSerializer}
 
     def __init__(
         self,
@@ -36,48 +37,22 @@ class Tracks(DataLayer):
         description="Input tracks (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
-            description=description,
-            meta=meta,
             data=data,
+            meta=meta,
             tile_meta=tile_meta,
+            description=description,
+            dimensionality=dimensionality,
+            required=required,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.dimensionality = (
-            dimensionality if dimensionality is not None else np.arange(6).tolist()
-        )
-        self.required = required
-
-        # Schema contributions
-        main = {}
-        if not self.required:
-            self.default = None
-            main["default"] = self.default
-        extra = {"dimensionality": self.dimensionality}
-        self.constraints = [main, extra]
-
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
-        
-        self.data_serializer = TracksDataSerializer()
-
-    # @classmethod
-    # def serialize(cls, data, client_origin: str) -> Optional[str]:
-    #     if data is not None:
-    #         return encode_contents(data.astype(np.float32))
-
-    # @classmethod
-    # def deserialize(
-    #     cls, serialized_data: Optional[Union[np.ndarray, str]], client_origin: str
-    # ) -> Optional[np.ndarray]:
-    #     if serialized_data is None:
-    #         return None
-    #     if isinstance(serialized_data, str):
-    #         serialized_data = decode_contents(serialized_data)
-    #     return serialized_data.astype(float)
 
     @classmethod
     def _get_initial_data(

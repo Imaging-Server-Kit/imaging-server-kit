@@ -18,20 +18,14 @@ class String(DataLayer):
         default: str = "",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
-            description=description,
-            meta=meta,
             data=data,
+            meta=meta,
             tile_meta=tile_meta,
+            description=description,
+            default=default,
+            **kwargs,
         )
-        self.default = default
-        
-        # Schema contributions
-        main = {"default": self.default}
-        extra = {}
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)

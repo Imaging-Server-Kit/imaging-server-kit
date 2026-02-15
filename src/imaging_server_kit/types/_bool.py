@@ -19,6 +19,7 @@ class Bool(DataLayer):
         auto_call: bool = False,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -26,14 +27,7 @@ class Bool(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            default=default,
+            auto_call=auto_call,
+            **kwargs,
         )
-        self.default = default
-        self.auto_call = auto_call
-
-        # Schema contributions
-        main = {"default": self.default}
-        extra = {"auto_call": self.auto_call}
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)

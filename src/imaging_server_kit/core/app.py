@@ -229,7 +229,7 @@ class AlgorithmApp:
                         param_type = param_values.get("param_type")
                         if param_type == "image":
                             params_res.create(
-                                "image", qupath_image.data, param_name
+                                kind="image", data=qupath_image.data, name=param_name
                             )
                             break
 

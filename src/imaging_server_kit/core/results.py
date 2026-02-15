@@ -19,20 +19,13 @@ class LayerStackBase(ABC):
         return []
 
     @abstractmethod
-    def create(
-        self,
-        kind: str,
-        data: Any,
-        name: Optional[str],
-        meta: Optional[Dict],
-        tile_meta: Optional[TileMeta],
-    ) -> DataLayer: ...
+    def create(self, kind: str, name: Optional[str], **kwargs) -> DataLayer: ...
 
     @abstractmethod
-    def read(self, layer_name: str) -> Optional[DataLayer]: ...
+    def read(self, name: str) -> Optional[DataLayer]: ...
 
     @abstractmethod
-    def delete(self, layer_name: str) -> None: ...
+    def delete(self, name: str) -> None: ...
 
     @property
     @abstractmethod
@@ -59,25 +52,23 @@ class LayerStackBase(ABC):
         """
         if layer_stack is None:
             return
-                
+
         dst_layers = []
         for src_layer in layer_stack:
             dst_layer = self.read(src_layer.name)
             if dst_layer is None:
-                # TODO: what if we want to create an InstanceMask?
-                # Or image with rgb=True? CF runner line 170
                 dst_layer = self.create(
                     kind=src_layer.kind,
-                    data = None,
                     name=src_layer.name,
                     meta=src_layer.meta,
-                    tile_meta=None,  # Important!
+                    merger=src_layer.merger_type,
+                    data_serializer=src_layer.data_serializer_type,
                 )
             dst_layers.append(dst_layer)
 
         for src_layer, dst_layer in zip(layer_stack, dst_layers):
             dst_layer.merge(src_layer)
-        
+
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
         serialized_results = []
@@ -103,7 +94,7 @@ class LayerStackBase(ABC):
             algo_params[layer.name] = layer.data
         return algo_params
 
-    def resolve_layer_name(self, kind: str, name: Optional[str]=None) -> str:
+    def resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:
         # Make sure layer has a name
         if name is None:
             name = kind.capitalize()
@@ -115,7 +106,7 @@ class LayerStackBase(ABC):
         while name in layer_names:
             name = f"{original_name}-{name_idx:02d}"
             name_idx += 1
-        
+
         return name
 
 
@@ -138,11 +129,18 @@ class Results(LayerStackBase):
     """
 
     def __init__(self, layers: Optional[List[DataLayer]] = None):
-        super().__init__()
         self._layers: List[DataLayer] = []
         if layers is not None:
             for l in layers:
-                self.create(l.kind, l.data, l.name, l.meta, l.tile_meta)
+                self.create(
+                    kind=l.kind,
+                    data=l.data,
+                    name=l.name,
+                    meta=l.meta,
+                    tile_meta=l.tile_meta,
+                    merger=l.merger_type,
+                    data_serializer=l.data_serializer_type,
+                )
 
     def __str__(self):
         message = f"Results (Layers: {len(self.layers)})"
@@ -177,57 +175,44 @@ class Results(LayerStackBase):
             layer = layer_cls().deserialize(serialized_layer, client_origin)
             layers.append(layer)
         return Results(layers=layers)
-    
-    def create(
-        self,
-        kind: str,
-        data: Any,
-        name: Optional[str] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
-        **kwargs,
-    ) -> DataLayer:
+
+    def create(self, kind: str, name: Optional[str] = None, **kwargs) -> DataLayer:
         """Create a new layer in the results stack.
 
         Parameters
         ----------
         name: Name of the layer. If it already exists, a suffix will be added (e.g. Image-01).
-        data: Data in the layer (must be compatible with the kind of layer).
         kind: The kind of layer: ["image", "mask", "points", "vectors", "tracks", "boxes", "paths", "float", "int", "bool", "str", "choice", "notification", "null"]
-        meta: An optional dictionary of metadata about the layer.
-        """       
-        name = self.resolve_layer_name(kind, name)
-
-        # # Initialize meta if not provided
-        # if meta is None:
-        #     meta = {}
-
+        """
         # Get layer class to instanciate
         cls: Optional[Type[DataLayer]] = DATA_TYPES.get(kind)
         if cls is None:
             raise ValueError(f"{kind} layers cannot be handled.")
 
         # Instantiate layer
-        layer = cls(name=name, data=data, meta=meta, tile_meta=tile_meta, **kwargs)
+        name = self.resolve_layer_name(kind, name)
+        layer = cls(name=name, **kwargs)
 
         # Add layer to the stack
         self._layers.append(layer)
 
         return layer
 
-    def read(self, layer_name: str) -> Optional[DataLayer]:
+    def read(self, name: str) -> Optional[DataLayer]:
         """Read a layer by name."""
         for layer in self.layers:
-            if layer.name == layer_name:
+            if layer.name == name:
                 return layer
 
-    def delete(self, layer_name: str) -> None:
+    def delete(self, name: str) -> None:
         """Delete a layer by name."""
         for idx, layer in enumerate(self.layers):
-            if layer.name == layer_name:
+            if layer.name == name:
                 self._layers.pop(idx)
 
-    def generate_tiles(self, ctx: Optional[TilingContext]) -> Generator[Results, None, None]:
+    def generate_tiles(
+        self, ctx: Optional[TilingContext]
+    ) -> Generator[Results, None, None]:
         if ctx is None:
             tile_meta = TileMeta()
             yield self.get_tile(tile_meta)

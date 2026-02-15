@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import base64
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
@@ -32,18 +32,16 @@ def multi_merge(layers: List[DataLayer]) -> DataLayer:
         meta=first_layer.meta,
         tile_meta=first_layer.tile_meta,  # Correct?
     )
-    
+
     for l in layers[1:]:
         merged_layer.merge(l)
-    
+
     return merged_layer
 
 
 class Merger(ABC):
-
     @abstractmethod
-    def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None:
-        ...
+    def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None: ...
 
     @abstractmethod
     def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer): ...
@@ -53,11 +51,10 @@ class Merger(ABC):
 
 
 class DefaultMerger(Merger):
-    
     def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None:
         src_layer.data = dst_layer.data
         src_layer.meta = dst_layer.meta
-    
+
     def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
         pass
 
@@ -66,7 +63,6 @@ class DefaultMerger(Merger):
 
 
 class ObjectMerger(DefaultMerger):
-
     def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None:
         if (
             (dst_layer.data is None)
@@ -84,21 +80,26 @@ class ObjectMerger(DefaultMerger):
             src_layer.meta = dst_layer.meta
         else:
             if src_layer.n_objects > 0:
-                merged_points_data = np.vstack((src_layer.data_global_coords, dst_layer.data_global_coords))
-                merged_points_data = merged_points_data - src_layer.tile_meta.coords_min
-                merged_points_meta = merge_meta_tile(
+                merged_data = np.vstack(
+                    (src_layer.data_global_coords, dst_layer.data_global_coords)
+                )
+                merged_data = merged_data - src_layer.tile_meta.coords_min
+                merged_meta = merge_meta_tile(
                     src_layer.meta, dst_layer.meta, src_layer.n_objects
                 )
             else:
-                merged_points_data = dst_layer.data
-                merged_points_meta = dst_layer.meta
+                merged_data = dst_layer.data
+                merged_meta = dst_layer.meta
 
-            src_layer.data = merged_points_data
-            src_layer.meta = merged_points_meta
-    
+            src_layer.data = merged_data
+            src_layer.meta = merged_meta
+
+
+class ObjectTileMerger(ObjectMerger):
     def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
         # Erase all of the data before tiling
         src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
+        # src_layer.meta = dst_layer.meta  # TODO: Needed?
 
 
 def _serialize_value(obj: Any) -> Any:
@@ -147,18 +148,16 @@ def _deserialize_meta(serialized_meta: Dict[str, Any]) -> Dict[str, Any]:
 
 class DataSerializer(ABC):
     @abstractmethod
-    def serialize(self, data: Any, client_origin: str) -> Any:
-        ...
-    
+    def serialize(self, data: Any, client_origin: str) -> Any: ...
+
     @abstractmethod
-    def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
-        ...
+    def deserialize(self, serialized_data: Any, client_origin: str) -> Any: ...
 
 
 class DefaultDataSerializer(DataSerializer):
     def serialize(self, data: Any, client_origin: str) -> Any:
         return data
-    
+
     def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
         return serialized_data
 
@@ -194,38 +193,85 @@ class DataLayer(ABC):
 
     kind: str = ""
     type = Union[str, np.ndarray, type(None)]
+    mergers: Dict[str, Type[Merger]] = {"default": DefaultMerger}
+    data_serializers: Dict[str, Type[DataSerializer]] = {
+        "default": DefaultDataSerializer
+    }
 
     def __init__(
         self,
-        data: Any = None,
         name: str = "",
-        description: str = "",
+        data: Any = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        translate: Optional[Tuple] = None,
+        description: str = "",
+        merger: Union[str, Merger] = "default",
+        data_serializer: str = "default",
+        **meta_kwargs,
     ):
         self._data = data
         self._name = name
-        self._description = description
-        self._meta = meta if meta is not None else {}
-        
-        self._tile_meta = tile_meta if tile_meta is None else tile_meta.copy()
-        
-        self._sync_tile_meta(self.tile_meta)
 
-        # Schema contributions
-        self.constraints = [{}, {}]
-        
-        self.merger = DefaultMerger()
-        self.data_serializer = DefaultDataSerializer()
-    
+        # Prepare the meta attribute
+        if meta is None:
+            meta = {}
+        else:
+            meta["description"] = meta.get("description", description)
+
+        # Convert dimensionality=None to the default 6-dims
+        if "dimensionality" in meta_kwargs:
+            if meta_kwargs.get("dimensionality") is None:
+                meta_kwargs["dimensionality"] = np.arange(6).tolist()
+
+        # Add the meta kwargs
+        # NOTE: this is important - only parameters passed to meta here get serialized
+        for k, v in meta_kwargs.items():
+            if not k in meta:
+                meta[k] = v
+
+        self._meta = meta
+
+        # Prepare the tile meta
+        tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+        if isinstance(translate, Tuple):
+            tile_meta.coords_min = translate
+        self._tile_meta = tile_meta
+        self._sync_tile_meta(self._tile_meta)
+
+        # Run data validation
+        if data is not None:
+            self.validate_data(data, self._meta)
+
+        # Merger
+        if isinstance(merger, Merger):
+            self.merger = merger
+        else:
+            # `merger` is a string; instanciate a Merger() from the available ones.
+            if merger not in self.mergers:
+                raise ValueError(
+                    f"Merger `{merger}` is not supported. Available: {list(self.mergers.keys())}"
+                )
+            self.merger_type = merger
+            merger_cls = self.mergers[merger]
+            self.merger = merger_cls()
+
+        # Data serializer
+        if data_serializer not in self.data_serializers:
+            raise ValueError(
+                f"Data serializer `{data_serializer}` is not supported. Available: {list(self.data_serializers.keys())}"
+            )
+        self.data_serializer_type = data_serializer
+        data_serializer_cls = self.data_serializers[data_serializer]
+        self.data_serializer = data_serializer_cls()
+
     def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
-        if self.data_pixel_domain is None:  # TODO: recursive issue with data_pixel_domain...
-            new_tile_meta = tile_meta if tile_meta is not None else TileMeta()
+        new_tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+
+        if self.data_pixel_domain is None:
             new_tile_meta.tile_size = None
             new_tile_meta.coords_min = None
-            self._tile_meta = new_tile_meta
         else:
-            _tile_size = self.data_pixel_domain
             if tile_meta is None:
                 _tile_pos = tuple([0] * len(self.data_pixel_domain))
                 _overlap_px = tuple([0] * len(self.data_pixel_domain))
@@ -236,12 +282,12 @@ class DataLayer(ABC):
                 _overlap_px = tile_meta.overlap_px
                 if _overlap_px is None:
                     _overlap_px = tuple([0] * len(self.data_pixel_domain))
-            
-            new_tile_meta = tile_meta if tile_meta is not None else TileMeta()
+
+            new_tile_meta.tile_size = self.data_pixel_domain
             new_tile_meta.coords_min = _tile_pos
-            new_tile_meta.tile_size = _tile_size
             new_tile_meta.overlap_px = _overlap_px
-            self._tile_meta = new_tile_meta
+
+        self._tile_meta = new_tile_meta
 
     @property
     def data(self) -> Any:
@@ -250,20 +296,17 @@ class DataLayer(ABC):
     @data.setter
     def data(self, value: Any):
         self._data = value
+        # When the data changes, we synchronize the tile meta
         self._sync_tile_meta(self.tile_meta)
         self.refresh()
 
     @property
     def name(self) -> str:
         return self._name
-    
+
     @name.setter
     def name(self, value: str):
         self._name = value
-
-    @property
-    def description(self) -> str:
-        return self._description
 
     @property
     def meta(self) -> Optional[Dict]:
@@ -309,14 +352,17 @@ class DataLayer(ABC):
     def __repr__(self):
         return self.__str__()
 
-    def _validate(self, cls, v, meta, constraints):
-        self.validate_data(v, meta, constraints)
+    def _validate(self, cls, v, meta):
+        if v is not None:
+            self.validate_data(v, meta)
         return v
 
     def refresh(self):
         pass
 
     def merge(self, layer: DataLayer) -> None:
+        if not isinstance(layer.tile_meta, TileMeta):
+            raise RuntimeError("Layer to merge has no tile meta.")
         if layer.tile_meta.is_first_tile:
             self.merger.first_tile_hook(self, layer)
         self.merger.merge(self, layer)
@@ -327,7 +373,9 @@ class DataLayer(ABC):
         cls = type(self)
         return cls(data=self.data, name=self.name, meta=self.meta, tile_meta=tile_meta)
 
-    def generate_tiles(self, ctx: Optional[TilingContext]) -> Generator[DataLayer, None, None]:
+    def generate_tiles(
+        self, ctx: Optional[TilingContext]
+    ) -> Generator[DataLayer, None, None]:
         if ctx is None:
             tile_meta = TileMeta()
             yield self.get_tile(tile_meta)
@@ -340,56 +388,63 @@ class DataLayer(ABC):
                 randomize=ctx.randomize,
             ):
                 yield self.get_tile(tile_meta)
-   
+
     def serialize(self, client_origin: str) -> Dict[str, Any]:
         """Serialize a layer."""
         serialized_data = self.data_serializer.serialize(self.data, client_origin)
-        
+
         if self.meta:
             serialized_meta = _serialize_meta(self.meta)
         else:
             serialized_meta = {}
-        
+
         if self.tile_meta:
-            serialized_tile_meta = self.tile_meta.serialize()     
+            serialized_tile_meta = self.tile_meta.serialize()
         else:
-            serialized_tile_meta = None   
-        
+            serialized_tile_meta = None
+
         return {
             "kind": self.kind,
             "data": serialized_data,
             "name": self.name,
             "meta": serialized_meta,
             "tile_meta": serialized_tile_meta,
-        }       
-    
-    def deserialize(self, serialized_layer: Dict[str, Any], client_origin: str) -> DataLayer:
+            "merger": self.merger_type,
+            "data_serializer": self.data_serializer_type,
+        }
+
+    def deserialize(
+        self, serialized_layer: Dict[str, Any], client_origin: str
+    ) -> DataLayer:
         """Deserialize a layer."""
-        kind = serialized_layer["kind"]
-        if kind != self.kind:
-            raise ValueError("Serialized layer cannot be deserialized (wrong kind).")
-        
         name = serialized_layer["name"]
         data = serialized_layer["data"]
         meta = serialized_layer["meta"]
         tile_meta = serialized_layer["tile_meta"]
-        
-        decoded_data = self.data_serializer.deserialize(data, client_origin)
+        merger_type = serialized_layer["merger"]
+        data_serializer_type = serialized_layer["data_serializer"]
+
+        data_serializer_cls: Type[DataSerializer] = self.data_serializers[
+            data_serializer_type
+        ]
+        decoded_data = data_serializer_cls().deserialize(data, client_origin)
+
         decoded_meta = _deserialize_meta(meta)
         decoded_tile_meta = TileMeta(**tile_meta)
-        
+
         cls = type(self)
-        
+
         return cls(
             data=decoded_data,
             name=name,
-            # description= # TODO
             meta=decoded_meta,
             tile_meta=decoded_tile_meta,
+            merger=merger_type,
+            data_serizlizer=data_serializer_type,
         )
-    
+
     @classmethod
-    def validate_data(cls, data: Any, meta: Dict, constraints: List[Dict]):
+    def validate_data(cls, data: Any, meta: Dict):
         pass
 
     @classmethod

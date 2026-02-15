@@ -86,29 +86,29 @@ class AlgorithmRunner(ABC):
                     if params_tile_meta is not None:
                         progress_data = params_tile_meta.tile_idx + 1
                         progress_max_val = params_tile_meta.n_tiles
-                
+
                 # Create a progress layer at the current step
                 result_tile.create(
                     kind="progress",
                     name="Tile progress",
                     data=progress_data,
-                    meta={"max_val": progress_max_val},
+                    max_val=progress_max_val,
                 )
-
                 # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
-                            
-                if params_tile_meta is not None:                        
+                if params_tile_meta is not None:
                     # Set the tile index to be the current index for all result layers
                     for l in result_tile:
                         l.tile_meta.tile_idx = params_tile_meta.tile_idx
                         l.tile_meta.n_tiles = params_tile_meta.n_tiles
-                        # TODO: This is wrong if the pixel_domain of result_tile is larger/smaller
-                        # than that of the params_tile... we should look at the ratios
-                        # of domain sizes between params_tile and result_tile to infer the new coords_min
+                        # TODO: This will be wrong if the pixel_domain of result_tile is different
+                        # from that of the params_tile... could we look at the ratios
+                        # of domain sizes between params_tile and result_tile to infer the new coords_min instead?
                         if params_tile_meta.coords_min is not None:
                             l.tile_meta.coords_min = params_tile_meta.coords_min
                         l.tile_meta.overlap_px = params_tile_meta.overlap_px
-                            
+                        l.tile_meta.first_tile = params_tile_meta.first_tile
+                        l.tile_meta.last_tile = params_tile_meta.last_tile
+                        
                 yield result_tile
 
     def run(
@@ -162,15 +162,12 @@ class AlgorithmRunner(ABC):
 
         # Convert the resolved parameters to a Results object
         params_res = Results()
-
-        # TODO: this is a special case for RGB... how else could we handle that?
-        for param_name, param_value in resolved_params.items():
-            kind = algo_param_defs[param_name].get("param_type")
-            if kind == "image":
-                rgb = algo_param_defs[param_name].get("rgb")
-                params_res.create(kind, param_value, param_name, rgb=rgb)
-            else:
-                params_res.create(kind, param_value, param_name)
+        for name, data in resolved_params.items():
+            kw = algo_param_defs[name]
+            kind = kw.pop('param_type')
+            if 'anyOf' in kw:
+                kw.pop('anyOf')  # added by Pydantic - we don't need it.
+            params_res.create(kind=kind, data=data, name=name, **kw)
 
         if results is None:
             results = Results()
@@ -199,22 +196,13 @@ class AlgorithmRunner(ABC):
         # Run the algorithm and assemble the results
         for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
             results.merge(tile_results)
-        
-        # # TODO: Whether to update "results", and therefore UIs, after each tile or only at the end.
-        # if tile_updates:
-        #     ...
-        # else:
-        #     # Collect results in a list (no merging)
-        #     res_tiles = []
-        #     for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
-        #         res_tiles.append(tile_results)
-        #     # Merge everyone at once
-        #     res = Results.merge_all(res_tiles)
-        #     # would iterate over the layers and do Layer.merge_all(*lays)
-            
+
+        # TODO: Instead of calling merge many times, each time increasing the domain, 
+        # we could do a single merge at the end (with no intermediate updates of the container).
+        # Or, we could call results.merge at a given update frequency (every N tiles).
 
         # Remove the progress bar
-        results.delete(layer_name="Tile progress")
+        results.delete("Tile progress")
 
         # Return the results
         if special_napari_case:

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 from geojson import Feature, Point
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.common import extract_meta_tile
-from imaging_server_kit.types.data_layer import DataLayer, ObjectMerger, DataSerializer
+from imaging_server_kit.types.data_layer import (
+    DataLayer,
+    ObjectTileMerger,
+    ObjectMerger,
+    DataSerializer,
+    Merger,
+)
 
 
 def _get_tile(points: Points, tile_meta: TileMeta):
@@ -53,7 +59,9 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
 
 
 class PointsDataSerializer(DataSerializer):
-    def serialize(self, points: Optional[np.ndarray], client_origin: str) -> Optional[Union[str, List[Feature]]]:
+    def serialize(
+        self, points: Optional[np.ndarray], client_origin: str
+    ) -> Optional[Union[str, List[Feature]]]:
         if points is None:
             return None
         if client_origin == "Python/Napari":
@@ -63,8 +71,10 @@ class PointsDataSerializer(DataSerializer):
         else:
             raise ValueError(f"Unrecognized client origin: {client_origin}")
         return point_features
-    
-    def deserialize(self, serialized_points: Optional[Union[str, List[Feature]]], client_origin: str) -> Optional[np.ndarray]:
+
+    def deserialize(
+        self, serialized_points: Optional[Union[str, List[Feature]]], client_origin: str
+    ) -> Optional[np.ndarray]:
         if serialized_points is None:
             return None
         if isinstance(serialized_points, str):
@@ -84,6 +94,10 @@ class Points(DataLayer):
     """
 
     kind = "points"
+    mergers: Dict[str, Type[Merger]] = {"default": ObjectTileMerger, "override": ObjectMerger}
+    data_serializers: Dict[str, Type[DataSerializer]] = {
+        "default": PointsDataSerializer
+    }
 
     def __init__(
         self,
@@ -92,8 +106,11 @@ class Points(DataLayer):
         description="Input points (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
+        merger: str = "default",
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -101,29 +118,12 @@ class Points(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            dimensionality=dimensionality,
+            required=required,
+            merger=merger,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.dimensionality = (
-            dimensionality if dimensionality is not None else np.arange(6).tolist()
-        )
-        self.required = required
-
-        # Schema contributions
-        main = {}
-        if not self.required:
-            self.default = None
-            main["default"] = self.default
-        extra = {
-            "dimensionality": self.dimensionality,
-            "required": self.required,
-        }
-        self.constraints = [main, extra]
-
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
-
-        self.merger = ObjectMerger()
-        
-        self.data_serializer = PointsDataSerializer()
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
@@ -174,9 +174,8 @@ class Points(DataLayer):
         return np.zeros((0, len(pixel_domain)), dtype=np.float32)
 
     @classmethod
-    def validate_data(cls, data, meta, constraints):
-        main, extra = constraints
-        if extra["required"] is False:
+    def validate_data(cls, data, meta):
+        if meta["required"] is False:
             return
 
         assert isinstance(

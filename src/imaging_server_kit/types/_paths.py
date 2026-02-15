@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
@@ -32,6 +32,7 @@ class Paths(DataLayer):
     """
 
     kind = "paths"
+    data_serializers: Dict[str, Type[DataSerializer]] = {"default": PathDataSerializer}
 
     def __init__(
         self,
@@ -40,8 +41,10 @@ class Paths(DataLayer):
         description="Input paths shapes (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         required: bool = True,
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -49,25 +52,12 @@ class Paths(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            dimensionality=dimensionality,
+            required=required,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.dimensionality = (
-            dimensionality if dimensionality is not None else np.arange(6).tolist()
-        )
-        self.required = required
-
-        # Schema contributions
-        main = {}
-        if not self.required:
-            main["default"] = None
-        extra = {"dimensionality": self.dimensionality}
-        self.constraints = [main, extra]
-
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
         
-        self.data_serializer = PathDataSerializer()
-
-
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer, DataSerializer
 
@@ -20,6 +20,7 @@ class Null(DataLayer):
 
     kind = "null"
     type = type(None)
+    data_serializers: Dict[str, Type[DataSerializer]] = {"default": NullDataSerializer}
 
     def __init__(
         self,
@@ -27,8 +28,10 @@ class Null(DataLayer):
         name="None",
         description="Null (None) type",
         default=None,
+        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -36,15 +39,7 @@ class Null(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            default=default,
+            data_serializer=data_serializer,
+            **kwargs,
         )
-        self.default = default
-        
-        # Schema contributions
-        main = {"default": self.default}
-        extra = {}
-        self.constraints = [main, extra]
-        
-        if self.data is not None:
-            self.validate_data(data, self.meta, self.constraints)
-
-        self.data_serializer = NullDataSerializer()

@@ -107,11 +107,6 @@ def auto_threshold(image, method):
             auto_call=True,
             default="nearest",
         ),
-        "preserve_range": sk.Bool(
-            name="Preserve range",
-            description="Whether to keep the original range of values.",
-            default=False,
-        ),
     },
     samples=[
         {
@@ -120,12 +115,12 @@ def auto_threshold(image, method):
         },
     ],
 )
-def gaussian_algo(image, sigma, mode, preserve_range):
-    filtered = gaussian(image, sigma=sigma, mode=mode, preserve_range=preserve_range)
+def gaussian_algo(image, sigma, mode):
+    filtered = gaussian(image, sigma=sigma, mode=mode)
     return sk.Image(
         filtered,
         name=f"Filtered image (Gaussian)",
-        meta={"contrast_limits": [filtered.min(), filtered.max()]},
+        contrast_limits=[0, 1],
     )
 
 
@@ -135,19 +130,11 @@ def gaussian_algo(image, sigma, mode, preserve_range):
     description="Apply a Sobel filter to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.sobel",
     tags=["Filtering", "Scikit-image", "Demo"],
-    samples=[
-        {
-            "image": skimage.data.camera(),
-        },
-    ],
+    samples=[{"image": skimage.data.camera()}],
 )
 def sobel_algo(image):
     filtered = sobel(image)
-    return sk.Image(
-        filtered,
-        name=f"Edges (Sobel)",
-        meta={"contrast_limits": [filtered.min(), filtered.max()]},
-    )
+    return sk.Image(filtered, name=f"Edges (Sobel)", contrast_limits=[0, 1])
 
 
 ## Fibonacci sphere
@@ -181,7 +168,9 @@ def fibonacci_sphere(N, r, color, size):
 
     return sk.Points(
         points,
-        meta={"size": size, "border_color": "transparent", "face_color": color},
+        size=size,
+        border_color="transparent",
+        face_color=color,
     )
 
 
@@ -353,17 +342,8 @@ def blob_detector_algo(
             min=0.0,
             max=10.0,
         ),
-        "preserve_range": sk.Bool(
-            name="Preserve range",
-            description="Whether to keep the original range of values.",
-            default=True,
-        ),
     },
-    samples=[
-        {
-            "image": skimage.data.coins(),
-        }
-    ],
+    samples=[{"image": skimage.data.coins()}],
 )
 def nl_means_denoise(
     image,
@@ -372,7 +352,6 @@ def nl_means_denoise(
     h,
     fast_mode,
     sigma,
-    preserve_range,
 ):
     image_range = image.max() - image.min()
     h = h * image_range
@@ -384,14 +363,10 @@ def nl_means_denoise(
         h=h,
         fast_mode=fast_mode,
         sigma=sigma,
-        preserve_range=preserve_range,
+        preserve_range=True,
     )
 
-    return sk.Image(
-        denoised,
-        name="Denoised image",
-        meta={"contrast_limits": [denoised.min(), denoised.max()]},
-    )
+    return sk.Image(denoised, name="Denoised image")
 
 
 ## SLIC
@@ -454,7 +429,7 @@ def slic_algo(
 def notif_stream(time_delay, n_times, level):
     for k in range(n_times):
         time.sleep(time_delay)
-        yield sk.Notification(f"Step: {k}", meta={"level": level})
+        yield sk.Notification(f"Step: {k}", level=level)
 
 
 ## Background subtraction
@@ -470,12 +445,8 @@ def notif_stream(time_delay, n_times, level):
             auto_call=True,
         ),
     },
-    samples=[
-        {
-            "image": skimage.data.coins(),
-            "sigma": 10,
-        },
-    ],
+    samples=[{"image": skimage.data.coins(), "sigma": 10}],
+    tileable=False,
 )
 def background_subtract(image, sigma, method):
     blurred = gaussian(image, sigma=sigma, preserve_range=True)
@@ -487,13 +458,11 @@ def background_subtract(image, sigma, method):
     return sk.Image(
         corrected,
         name="Background corrected",
-        meta={"contrast_limits": [corrected.min(), corrected.max()]},
+        contrast_limits=[corrected.min(), corrected.max()],
     )
 
 
 ## Projections (max, min, etc.)
-# TODO: this is not going to be compatible with 3D tiling when the Z range exceeds the tile size along Z
-# But that's OK for now (a tiled Z projection along Z isn't meaningful...)
 @sk.algorithm(
     name="Projections (3D -> 2D)",
     parameters={
@@ -505,17 +474,9 @@ def background_subtract(image, sigma, method):
     samples=[{"image": skimage.data.brain()}],
 )
 def project(image, method):
-    proj_func = {
-        "max": np.max,
-        "min": np.min,
-        "mean": np.mean,
-    }
+    proj_func = {"max": np.max, "min": np.min, "mean": np.mean}
     proj = proj_func[method](image, axis=0, keepdims=True)
-    return sk.Image(
-        proj,
-        name=f"Projection",
-        meta={"contrast_limits": [proj.min(), proj.max()], "colormap": "viridis"},
-    )
+    return sk.Image(proj, name="Projection", colormap="viridis")
 
 
 ## Conway's game of life (inspired by: https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/)
@@ -559,16 +520,12 @@ def conway_algo(max_iter=200, delay=0.1):
     for k in range(max_iter):
         grid = update(grid, N)
         time.sleep(delay)
-        yield sk.Mask(grid), sk.Progress(k, meta={"max_val": max_iter})
+        yield sk.Mask(grid), sk.Progress(k, max_val=max_iter)
 
 
-from skimage.morphology import label
+# from skimage.morphology import label
 
-@sk.algorithm(
-    samples=[
-        {"mask": np.random.random((50, 50)) > 0.7}
-    ]
-)
-def label_algo(mask):
-    labelled = label(mask)
-    return sk.Mask(labelled, merger="instances")
+# @sk.algorithm(samples=[{"mask": np.random.random((50, 50)) > 0.7}])
+# def label_algo(mask):
+#     labelled = label(mask)
+#     return sk.Mask(labelled, merger="instances")

@@ -78,9 +78,8 @@ def _parse_run_func_signature(
         else:
             return cls(name=param_name, default=default)  # type: ignore
 
-    resolved = dict(
-        parameters
-    )  # Copy of the original parameters to avoid mutating them
+    # Copy of the original parameters to avoid mutating them
+    resolved = dict(parameters)  
 
     sig = signature(func)
 
@@ -140,7 +139,7 @@ def _parse_pydantic_params_schema(
     run_algorithm_func: Callable,
     params_from_decorator: Dict,
 ):
-    """Convert the parameters dictionary provided by @algorithm_server to a Pydantic model."""
+    """Convert the parameters dictionary provided by @algorithm to a Pydantic model."""
     # Parse the provided parameters dictionary + run function signature to a dict(str: DataLayer)
     parsed_params: Dict[str, DataLayer] = _parse_run_func_signature(
         run_algorithm_func, params_from_decorator
@@ -151,18 +150,28 @@ def _parse_pydantic_params_schema(
     validators = {}
     for param_name, data_layer in parsed_params.items():
         
-        constraints = data_layer.constraints
-        main, extra = constraints
+        meta = data_layer.meta
+        if meta is None:
+            meta = {}
+        
+        layer_field_constraints = {}
+        if ("default" in meta) and ("required" in meta):
+            if meta["required"] is False:
+                layer_field_constraints["default"] = meta["default"]
+        if "min" in meta:
+            layer_field_constraints["ge"] = meta["min"]
+        if "max" in meta:
+            layer_field_constraints["le"] = meta["max"]
+        
         field_constraints = {
             "title": data_layer.name,
-            "description": data_layer.description,
-            "json_schema_extra": {"param_type": data_layer.kind} | extra,
-        } | main
+            "description": meta.get("description"),
+            "json_schema_extra": {"param_type": data_layer.kind} | meta,
+        } | layer_field_constraints
 
         # Resolve the validator function
-        val_func = partial(
-            data_layer._validate, meta=data_layer.meta, constraints=constraints
-        )
+        val_func = partial(data_layer._validate, meta=meta)
+        
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"
         )(val_func)
@@ -207,7 +216,7 @@ def _parse_user_func_output(payload: Any) -> Results:
         layers = [layers]
 
     # List[DataLayer] => Results
-    return Results(layers)
+    return Results(layers=layers)
 
 
 ### AlgoStream utility ###
@@ -379,7 +388,13 @@ class Algorithm(AlgorithmRunner):
             kind = algo_params_defs.get(param_name).get("param_type")
             if (kind in ["image", "mask"]) & (not isinstance(param_value, np.ndarray)):
                 param_value = skimage.io.imread(param_value)
-            sample_results.create(kind, param_value, param_name)
+            
+            # Set Min/Max contrast limits for images, by default
+            kw = {}
+            if kind == "image":
+                kw["contrast_limits"] = [param_value.min(), param_value.max()]
+            
+            sample_results.create(kind=kind, data=param_value, name=param_name, **kw)
         return sample_results
 
     def get_n_samples(self, algorithm: Optional[str] = None) -> int:

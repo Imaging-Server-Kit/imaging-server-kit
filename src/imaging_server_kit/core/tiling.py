@@ -46,6 +46,17 @@ class TileMeta:
         self._overlap_px = overlap_px
         self._tile_size = tile_size
         self._coords_min = tile_pos
+    
+    def __str__(self):
+        message = "TileMeta"
+        message += "\n"
+        message += f"coords_min: {self.coords_min}"
+        message += "\n"
+        message += f"tile_size: {self.tile_size}"
+        return message
+
+    def __repr__(self):
+        return self.__str__()
 
     @property
     def tile_size(self) -> Optional[Tuple]:
@@ -164,6 +175,10 @@ class TileMeta:
                 return tuple([False] * self.ndim)
         else:
             return tuple(self._first_tile)
+        
+    @first_tile.setter
+    def first_tile(self, value: Optional[Tuple]):
+        self._first_tile = value
 
     @property
     def last_tile(self) -> Optional[Tuple]:
@@ -172,6 +187,10 @@ class TileMeta:
                 return tuple([False] * self.ndim)
         else:
             return tuple(self._last_tile)
+    
+    @last_tile.setter
+    def last_tile(self, value: Optional[Tuple]):
+        self._last_tile = value
 
     @property
     def is_first_tile(self) -> bool:
