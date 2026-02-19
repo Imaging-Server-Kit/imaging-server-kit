@@ -26,7 +26,7 @@ import imaging_server_kit as sk
             default=0.5,
             min=0,
             max=1,
-            step=0.1,
+            step=0.01,
             auto_call=True,
         ),
         "dark_background": sk.Bool(
@@ -521,11 +521,3 @@ def conway_algo(max_iter=200, delay=0.1):
         grid = update(grid, N)
         time.sleep(delay)
         yield sk.Mask(grid), sk.Progress(k, max_val=max_iter)
-
-
-# from skimage.morphology import label
-
-# @sk.algorithm(samples=[{"mask": np.random.random((50, 50)) > 0.7}])
-# def label_algo(mask):
-#     labelled = label(mask)
-#     return sk.Mask(labelled, merger="instances")
