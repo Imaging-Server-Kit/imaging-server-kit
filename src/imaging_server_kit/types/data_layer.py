@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-import base64
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
-from imaging_server_kit.types.common import merge_meta_tile
-from imaging_server_kit.core.encoding import encode_contents, decode_contents
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_serializer import DefaultDataSerializer
+from imaging_server_kit.types.meta_serializer import DefalutMetaSerializer
 
 
-def multi_merge(layers: List[DataLayer]) -> DataLayer:
+def merge_layers(layers: List[DataLayer]) -> DataLayer:
+    """Merge a list of data layers of the same kind."""
     if len(layers) == 0:
-        raise ValueError("There should be at least one layers to merge.")
+        raise ValueError("There should be at least one layer to merge.")
     elif len(layers) == 1:
         return layers[0]
 
@@ -24,16 +25,21 @@ def multi_merge(layers: List[DataLayer]) -> DataLayer:
         if not isinstance(l, cls):
             raise ValueError("Layers to merge must be of the same type.")
 
-    # Create a new instance of that type (TODO: or modify the first layer in-place?)
-    # Could this be first_layer.copy()?
+    # Find the layers domain (note: same as Results.pixel_domain)
+    domains = []
+    for l in layers:
+        if l.pixel_domain is not None:
+            domains.append(l.pixel_domain)
+    if len(domains):
+        _domain = np.max(np.stack(domains), axis=0).tolist()
+    
+    # Create a new instance
     merged_layer = cls(
-        data=first_layer.data,
-        name=first_layer.name,
-        meta=first_layer.meta,
-        tile_meta=first_layer.tile_meta,  # Correct?
+        data=cls._get_initial_data(_domain),
+        name=first_layer.name,  # Use first layer name by convention
     )
 
-    for l in layers[1:]:
+    for l in layers:
         merged_layer.merge(l)
 
     return merged_layer
@@ -60,106 +66,6 @@ class DefaultMerger(Merger):
 
     def last_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
         pass
-
-
-class ObjectMerger(DefaultMerger):
-    def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None:
-        if (
-            (dst_layer.data is None)
-            or (dst_layer.tile_meta is None)
-            or (dst_layer.pixel_domain is None)
-        ):
-            return
-
-        if (
-            (src_layer.data is None)
-            or (src_layer.tile_meta is None)
-            or (src_layer.pixel_domain is None)
-        ):
-            src_layer.data = dst_layer.data_global_coords
-            src_layer.meta = dst_layer.meta
-        else:
-            if src_layer.n_objects > 0:
-                merged_data = np.vstack(
-                    (src_layer.data_global_coords, dst_layer.data_global_coords)
-                )
-                merged_data = merged_data - src_layer.tile_meta.coords_min
-                merged_meta = merge_meta_tile(
-                    src_layer.meta, dst_layer.meta, src_layer.n_objects
-                )
-            else:
-                merged_data = dst_layer.data
-                merged_meta = dst_layer.meta
-
-            src_layer.data = merged_data
-            src_layer.meta = merged_meta
-
-
-class ObjectTileMerger(ObjectMerger):
-    def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
-        # Erase all of the data before tiling
-        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
-        # src_layer.meta = dst_layer.meta  # TODO: Needed?
-
-
-def _serialize_value(obj: Any) -> Any:
-    if isinstance(obj, Dict):
-        return {k: _serialize_value(v) for k, v in obj.items()}
-    if isinstance(obj, np.ndarray):
-        return encode_contents(obj)
-    return obj
-
-
-def _serialize_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively serialize Numpy arrays in the meta dictionary."""
-    return {k: _serialize_value(v) for k, v in meta.items()}
-
-
-def _is_base64_encoded(data: str) -> bool:
-    """Check if a given string is Base64-encoded."""
-    if not isinstance(data, str) or len(data) % 4 != 0:
-        # Base64 strings must be divisible by 4
-        return False
-    try:
-        # Try decoding and check if it re-encodes to the same value
-        decoded_data = base64.b64decode(data, validate=True)
-        return base64.b64encode(decoded_data).decode("utf-8") == data
-    except Exception:
-        return False
-
-
-def _deserialize_value(obj: Any) -> Any:
-    if isinstance(obj, Dict):
-        return {k: _deserialize_value(v) for k, v in obj.items()}
-    if isinstance(obj, str) and _is_base64_encoded(obj):
-        # TODO: This is a bit sketchy - we use a try/except on the decoding to figure out
-        # if the values in meta correspond to numpy arrays (features, etc.)
-        try:
-            return decode_contents(obj)
-        except:
-            return obj
-    return obj
-
-
-def _deserialize_meta(serialized_meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively deserialize Numpy arrays in the meta dictionary."""
-    return {k: _deserialize_value(v) for k, v in serialized_meta.items()}
-
-
-class DataSerializer(ABC):
-    @abstractmethod
-    def serialize(self, data: Any, client_origin: str) -> Any: ...
-
-    @abstractmethod
-    def deserialize(self, serialized_data: Any, client_origin: str) -> Any: ...
-
-
-class DefaultDataSerializer(DataSerializer):
-    def serialize(self, data: Any, client_origin: str) -> Any:
-        return data
-
-    def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
-        return serialized_data
 
 
 class DataLayer(ABC):
@@ -207,7 +113,7 @@ class DataLayer(ABC):
         translate: Optional[Tuple] = None,
         description: str = "",
         merger: Union[str, Merger] = "default",
-        data_serializer: str = "default",
+        data_serializer: Union[str, DataSerializer] = "default",
         **meta_kwargs,
     ):
         self._data = data
@@ -257,13 +163,16 @@ class DataLayer(ABC):
             self.merger = merger_cls()
 
         # Data serializer
-        if data_serializer not in self.data_serializers:
-            raise ValueError(
-                f"Data serializer `{data_serializer}` is not supported. Available: {list(self.data_serializers.keys())}"
-            )
-        self.data_serializer_type = data_serializer
-        data_serializer_cls = self.data_serializers[data_serializer]
-        self.data_serializer = data_serializer_cls()
+        if isinstance(data_serializer, DataSerializer):
+            self.data_serializer = data_serializer
+        else:
+            if data_serializer not in self.data_serializers:
+                raise ValueError(
+                    f"Data serializer `{data_serializer}` is not supported. Available: {list(self.data_serializers.keys())}"
+                )
+            self.data_serializer_type = data_serializer
+            data_serializer_cls = self.data_serializers[data_serializer]
+            self.data_serializer = data_serializer_cls()
 
     def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
         new_tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
@@ -339,7 +248,7 @@ class DataLayer(ABC):
     @property
     def pixel_domain(self) -> Optional[Tuple]:
         if self.tile_meta is not None:
-            return self.tile_meta.pixel_domain
+            return self.tile_meta.coords_max
 
     @property
     def data_pixel_domain(self) -> Optional[Tuple]:
@@ -392,17 +301,8 @@ class DataLayer(ABC):
     def serialize(self, client_origin: str) -> Dict[str, Any]:
         """Serialize a layer."""
         serialized_data = self.data_serializer.serialize(self.data, client_origin)
-
-        if self.meta:
-            serialized_meta = _serialize_meta(self.meta)
-        else:
-            serialized_meta = {}
-
-        if self.tile_meta:
-            serialized_tile_meta = self.tile_meta.serialize()
-        else:
-            serialized_tile_meta = None
-
+        serialized_meta = DefalutMetaSerializer().serialize(self.meta)
+        serialized_tile_meta = self.tile_meta.serialize() if self.tile_meta else None
         return {
             "kind": self.kind,
             "data": serialized_data,
@@ -423,17 +323,13 @@ class DataLayer(ABC):
         tile_meta = serialized_layer["tile_meta"]
         merger_type = serialized_layer["merger"]
         data_serializer_type = serialized_layer["data_serializer"]
-
         data_serializer_cls: Type[DataSerializer] = self.data_serializers[
             data_serializer_type
         ]
         decoded_data = data_serializer_cls().deserialize(data, client_origin)
-
-        decoded_meta = _deserialize_meta(meta)
+        decoded_meta = DefalutMetaSerializer().deserialize(meta)
         decoded_tile_meta = TileMeta(**tile_meta)
-
         cls = type(self)
-
         return cls(
             data=decoded_data,
             name=name,

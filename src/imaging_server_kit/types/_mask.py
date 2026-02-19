@@ -11,12 +11,8 @@ from skimage.util import map_array
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import (
-    DataLayer,
-    Merger,
-    DefaultMerger,
-    DataSerializer,
-)
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer, Merger, DefaultMerger
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -177,7 +173,8 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
 
 
 class MaskOverrideMerger(DefaultMerger):
-    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""  
+    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""
+
     def merge(self, src_layer: Mask, dst_layer: Mask) -> None:
         if (
             (dst_layer.data is None)
@@ -218,13 +215,14 @@ class MaskOverrideMerger(DefaultMerger):
 
         src_layer.data = new_data
         src_layer.meta = dst_layer.meta
-    
+
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.meta = dst_layer.meta
 
 
 class MaskTileOverrideMerger(MaskOverrideMerger):
-    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""    
+    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""
+
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
         src_layer.meta = dst_layer.meta
@@ -262,7 +260,7 @@ class InstanceTileTracker:
         if not hasattr(self, "_mapping"):
             self.build_mapping()
         input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
-        output_vals = np.array(list(self._mapping.values()), dtype=np.int64)        
+        output_vals = np.array(list(self._mapping.values()), dtype=np.int64)
         return map_array(arr, out=arr, input_vals=input_vals, output_vals=output_vals)
 
 
@@ -332,7 +330,9 @@ class InstanceMaskTileMerger(DefaultMerger):
 
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
-        self.tile_tracker = InstanceTileTracker() # Important: just calling .initialize() would not work
+        self.tile_tracker = (
+            InstanceTileTracker()
+        )  # Important: just calling .initialize() would not work
 
     def last_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = self.tile_tracker.resolve(src_layer.data)
@@ -434,7 +434,7 @@ class Mask(DataLayer):
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
         if pixel_domain is not None:
             return np.zeros(np.array(pixel_domain).astype(np.uint16), dtype=np.uint16)

@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Type
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_serializer import DataSerializer
 
 
 class NullDataSerializer(DataSerializer):

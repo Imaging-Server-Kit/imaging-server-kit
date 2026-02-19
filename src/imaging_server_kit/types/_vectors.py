@@ -5,14 +5,13 @@ import numpy as np
 from geojson import Feature, LineString
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import (
-    DataLayer,
-    ObjectTileMerger,
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer, Merger
+from imaging_server_kit.types.common import (
+    extract_meta_tile,
     ObjectMerger,
-    DataSerializer,
-    Merger,
+    ObjectTileMerger,
 )
-from imaging_server_kit.types.common import extract_meta_tile
 
 
 def _get_tile(vectors: Vectors, tile_meta: TileMeta):
@@ -82,7 +81,10 @@ class Vectors(DataLayer):
     """
 
     kind = "vectors"
-    mergers: Dict[str, Type[Merger]] = {"default": ObjectTileMerger, "override": ObjectMerger}
+    mergers: Dict[str, Type[Merger]] = {
+        "default": ObjectTileMerger,
+        "override": ObjectMerger,
+    }
     data_serializers: Dict[str, Type[DataSerializer]] = {
         "default": VectorsDataSerializer
     }
@@ -157,7 +159,7 @@ class Vectors(DataLayer):
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

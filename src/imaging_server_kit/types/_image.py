@@ -4,17 +4,14 @@ from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
-from imaging_server_kit.types.data_layer import (
-    DataLayer,
-    DefaultMerger,
-    DataSerializer,
-    Merger,
-)
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger, Merger
 from imaging_server_kit.core.tiling import TileMeta
 
 
 class ImageOverrideMerger(DefaultMerger):
     """Merge images using and `override` strategy: last tile overrides existing data in overlapping regions."""
+
     def merge(self, src_layer: Image, dst_layer: Image) -> None:
         if (
             (dst_layer.data is None)
@@ -40,11 +37,11 @@ class ImageOverrideMerger(DefaultMerger):
             return  # This should never happen (just there for type hints)
 
         _slices = dst_layer.tile_meta.slices
-        if (_slices is not None):
+        if _slices is not None:
             _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
             _pixel_domain = np.max(_stack, axis=0).tolist()
 
-            # If the incoming tile extends the pixel domain, we create a new Image, 
+            # If the incoming tile extends the pixel domain, we create a new Image,
             # write src_layer.data into it, then merge the tile
             if _pixel_domain != src_layer.pixel_domain:
                 if dst_layer.meta["rgb"] is True:
@@ -56,14 +53,15 @@ class ImageOverrideMerger(DefaultMerger):
                 new_data = src_layer.data
 
             # New tile overrides existing data
-            new_data[_slices] = dst_layer.data # type: ignore
-            
+            new_data[_slices] = dst_layer.data  # type: ignore
+
             src_layer.data = new_data
             src_layer.meta = dst_layer.meta
 
 
 class ImageTileOverlapMerger(DefaultMerger):
     """Merge images while averaging image intensities in overlapping regions."""
+
     def merge(self, src_layer: Image, dst_layer: Image) -> None:
         if (
             (dst_layer.data is None)
@@ -89,13 +87,13 @@ class ImageTileOverlapMerger(DefaultMerger):
             return  # This should never happen (just there for type hints)
 
         _overlap_count_map = dst_layer.tile_meta.overlap_count_map
-        
+
         _slices = dst_layer.tile_meta.slices
         if (_slices is not None) and (_overlap_count_map is not None):
             _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
             _pixel_domain = np.max(_stack, axis=0).tolist()
 
-            # If the incoming tile extends the pixel domain, we create a new Image, 
+            # If the incoming tile extends the pixel domain, we create a new Image,
             # write src_layer.data into it, then merge the tile
             if _pixel_domain != src_layer.pixel_domain:
                 if dst_layer.meta["rgb"] is True:
@@ -108,10 +106,10 @@ class ImageTileOverlapMerger(DefaultMerger):
 
             # We `add` the incoming image data to merge it cleanly
             new_data[_slices] = new_data[_slices] + dst_layer.data / _overlap_count_map  # type: ignore
-            
+
             src_layer.data = new_data
             src_layer.meta = dst_layer.meta
-    
+
     def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
         # Re-initialize image data on first tile to avoid accumulating data indefinitely on multiple runs
         src_layer.data = Image._get_initial_data(src_layer.pixel_domain)
@@ -145,7 +143,10 @@ class Image(DataLayer):
     """
 
     kind = "image"
-    mergers: Dict[str, Type[Merger]] = {"default": ImageTileOverlapMerger, "override": ImageOverrideMerger}
+    mergers: Dict[str, Type[Merger]] = {
+        "default": ImageTileOverlapMerger,
+        "override": ImageOverrideMerger,
+    }
     data_serializers: Dict[str, Type[DataSerializer]] = {"default": ImageDataSerializer}
 
     def __init__(
@@ -196,7 +197,7 @@ class Image(DataLayer):
             _data = None
         else:
             _data = self.data[tile_meta.slices]
-        
+
         return Image(
             data=_data,
             name=self.name,
@@ -206,7 +207,7 @@ class Image(DataLayer):
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

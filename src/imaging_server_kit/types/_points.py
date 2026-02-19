@@ -6,14 +6,13 @@ from geojson import Feature, Point
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.common import extract_meta_tile
-from imaging_server_kit.types.data_layer import (
-    DataLayer,
+from imaging_server_kit.types.common import (
+    extract_meta_tile,
     ObjectTileMerger,
     ObjectMerger,
-    DataSerializer,
-    Merger,
 )
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer, Merger
 
 
 def _get_tile(points: Points, tile_meta: TileMeta):
@@ -94,7 +93,10 @@ class Points(DataLayer):
     """
 
     kind = "points"
-    mergers: Dict[str, Type[Merger]] = {"default": ObjectTileMerger, "override": ObjectMerger}
+    mergers: Dict[str, Type[Merger]] = {
+        "default": ObjectTileMerger,
+        "override": ObjectMerger,
+    }
     data_serializers: Dict[str, Type[DataSerializer]] = {
         "default": PointsDataSerializer
     }
@@ -167,7 +169,7 @@ class Points(DataLayer):
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

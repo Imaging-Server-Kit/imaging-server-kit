@@ -1,5 +1,5 @@
 from typing import Dict, Type
-from .data_layer import DataLayer
+from .data_layer import DataLayer, merge_layers
 from ._image import Image
 from ._mask import Mask
 from ._points import Points

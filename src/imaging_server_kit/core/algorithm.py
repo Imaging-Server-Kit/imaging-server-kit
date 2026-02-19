@@ -79,7 +79,7 @@ def _parse_run_func_signature(
             return cls(name=param_name, default=default)  # type: ignore
 
     # Copy of the original parameters to avoid mutating them
-    resolved = dict(parameters)  
+    resolved = dict(parameters)
 
     sig = signature(func)
 
@@ -149,11 +149,11 @@ def _parse_pydantic_params_schema(
     fields = {}
     validators = {}
     for param_name, data_layer in parsed_params.items():
-        
+
         meta = data_layer.meta
         if meta is None:
             meta = {}
-        
+
         layer_field_constraints = {}
         if ("default" in meta) and ("required" in meta):
             if meta["required"] is False:
@@ -162,7 +162,7 @@ def _parse_pydantic_params_schema(
             layer_field_constraints["ge"] = meta["min"]
         if "max" in meta:
             layer_field_constraints["le"] = meta["max"]
-        
+
         field_constraints = {
             "title": data_layer.name,
             "description": meta.get("description"),
@@ -171,7 +171,7 @@ def _parse_pydantic_params_schema(
 
         # Resolve the validator function
         val_func = partial(data_layer._validate, meta=meta)
-        
+
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"
         )(val_func)
@@ -381,20 +381,23 @@ class Algorithm(AlgorithmRunner):
             args=(),
             algo_params=self.samples[idx],
         )
-
         # Convert the sample to a Results object
         sample_results = Results()
         for param_name, param_value in resolved_params.items():
             kind = algo_params_defs.get(param_name).get("param_type")
             if (kind in ["image", "mask"]) & (not isinstance(param_value, np.ndarray)):
                 param_value = skimage.io.imread(param_value)
-            
+
             # Set Min/Max contrast limits for images, by default
             kw = {}
             if kind == "image":
-                kw["contrast_limits"] = [param_value.min(), param_value.max()]
-            
+                kw["contrast_limits"] = [
+                    float(param_value.min()),
+                    float(param_value.max()),
+                ]
+
             sample_results.create(kind=kind, data=param_value, name=param_name, **kw)
+
         return sample_results
 
     def get_n_samples(self, algorithm: Optional[str] = None) -> int:
@@ -408,7 +411,9 @@ class Algorithm(AlgorithmRunner):
         """List parameter names of the algo run function."""
         return list(signature(self._run_algorithm_func).parameters.keys())
 
-    def _stream(self, algorithm: str, params_res: Results) -> Generator[Results, None, None]:
+    def _stream(
+        self, algorithm: str, params_res: Results
+    ) -> Generator[Results, None, None]:
         """Generator that runs an algorithm using given parameters."""
         algo_params = params_res.to_params_dict()
 

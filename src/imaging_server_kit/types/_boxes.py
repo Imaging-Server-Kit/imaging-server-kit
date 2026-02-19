@@ -5,14 +5,13 @@ import numpy as np
 from geojson import Feature, Polygon
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.common import extract_meta_tile
-from imaging_server_kit.types.data_layer import (
-    DataLayer,
-    ObjectTileMerger,
+from imaging_server_kit.types.common import (
+    extract_meta_tile,
     ObjectMerger,
-    DataSerializer,
-    Merger,
+    ObjectTileMerger,
 )
+from imaging_server_kit.types.data_serializer import DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer, Merger
 
 
 def _get_tile(boxes: Boxes, tile_meta: TileMeta):

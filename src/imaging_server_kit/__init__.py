@@ -34,6 +34,7 @@ from .types import (
     Notification,
     Null,
     Progress,
+    merge_layers,
 )
 
 from .core.errors import napari_available

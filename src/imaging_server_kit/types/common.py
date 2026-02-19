@@ -3,6 +3,8 @@
 from typing import Dict, Optional
 import numpy as np
 
+from imaging_server_kit.types.data_layer import DefaultMerger, DataLayer
+
 
 def _extract_meta(obj, n_objects, tile_filter):
     if isinstance(obj, Dict):
@@ -55,3 +57,43 @@ def merge_meta_tile(
         k: _merge_meta(v, meta_tile.get(k), n_objects, tile_filter)
         for k, v in meta.items()
     }
+
+
+class ObjectMerger(DefaultMerger):
+    def merge(self, src_layer: DataLayer, dst_layer: DataLayer) -> None:
+        if (
+            (dst_layer.data is None)
+            or (dst_layer.tile_meta is None)
+            or (dst_layer.pixel_domain is None)
+        ):
+            return
+
+        if (
+            (src_layer.data is None)
+            or (src_layer.tile_meta is None)
+            or (src_layer.pixel_domain is None)
+        ):
+            src_layer.data = dst_layer.data_global_coords
+            src_layer.meta = dst_layer.meta
+        else:
+            if src_layer.n_objects > 0:
+                merged_data = np.vstack(
+                    (src_layer.data_global_coords, dst_layer.data_global_coords)
+                )
+                merged_data = merged_data - src_layer.tile_meta.coords_min
+                merged_meta = merge_meta_tile(
+                    src_layer.meta, dst_layer.meta, src_layer.n_objects
+                )
+            else:
+                merged_data = dst_layer.data
+                merged_meta = dst_layer.meta
+
+            src_layer.data = merged_data
+            src_layer.meta = merged_meta
+
+
+class ObjectTileMerger(ObjectMerger):
+    def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
+        # Erase all of the data before tiling
+        src_layer.data = src_layer._get_initial_data(src_layer.data_pixel_domain)
+        # src_layer.meta = dst_layer.meta  # TODO: Needed?

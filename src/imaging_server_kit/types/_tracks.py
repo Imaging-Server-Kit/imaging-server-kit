@@ -3,7 +3,8 @@ import numpy as np
 
 from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_layer import DataLayer, DataSerializer
+from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.data_serializer import DataSerializer
 
 
 class TracksDataSerializer(DataSerializer):

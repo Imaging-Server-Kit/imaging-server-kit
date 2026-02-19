@@ -89,13 +89,9 @@ class TileMeta:
         )
 
     @property
-    def pixel_domain(self) -> Optional[Tuple]:
-        return self.coords_max
-
-    @property
     def ndim(self) -> Optional[int]:
-        if self.pixel_domain is not None:
-            return len(self.pixel_domain)
+        if self.coords_max is not None:
+            return len(self.coords_max)
 
     @property
     def overlap_px(self) -> Optional[Tuple]:
