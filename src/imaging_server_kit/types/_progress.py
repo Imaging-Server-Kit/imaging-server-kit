@@ -17,8 +17,11 @@ PBAR = tqdm()
 class Progress(DataLayer):
     """Data layer used to represent a progress bar.
 
-    Example:
-        notif = sk.Progress()
+    Usage example:
+    
+    max_val = 10
+    for k in range(max_val):
+        yield sk.Progress(k, max_val=max_val)
     """
 
     kind = "progress"

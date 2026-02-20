@@ -68,6 +68,8 @@ class AlgorithmRunner(ABC):
         params_res: Results,
         tiling_ctx: Optional[TilingContext] = None,
     ):
+        tile_progress_needed = tiling_ctx is not None
+        
         if tiling_ctx is None:
             tiling_ctx = (
                 TilingContext(tile_size_px=params_res.pixel_domain)
@@ -77,6 +79,7 @@ class AlgorithmRunner(ABC):
 
         for params_tile in params_res.generate_tiles(tiling_ctx):
             for result_tile in self._stream(algorithm, params_tile):
+                
                 # Construct the progress data
                 params_tile_meta = None
                 progress_data = 0
@@ -87,13 +90,15 @@ class AlgorithmRunner(ABC):
                         progress_data = params_tile_meta.tile_idx + 1
                         progress_max_val = params_tile_meta.n_tiles
 
-                # Create a progress layer at the current step
-                result_tile.create(
-                    kind="progress",
-                    name="Tile progress",
-                    data=progress_data,
-                    max_val=progress_max_val,
-                )
+                if tile_progress_needed:
+                    # Create a progress layer at the current step
+                    result_tile.create(
+                        kind="progress",
+                        name="Tile progress",
+                        data=progress_data,
+                        max_val=progress_max_val,
+                    )
+                
                 # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
                 if params_tile_meta is not None:
                     # Set the tile index to be the current index for all result layers

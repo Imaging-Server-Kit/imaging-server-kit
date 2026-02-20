@@ -11,7 +11,10 @@ from imaging_server_kit.types.meta_serializer import DefalutMetaSerializer
 
 
 def merge_layers(layers: List[DataLayer]) -> DataLayer:
-    """Merge a list of data layers of the same kind."""
+    """Merge a list of data layers of the same kind.
+    Note: This method differs from layer.merge(other_layer) which is an in-place merge.
+    Here, a new layer is created and the data from all `layers` are merged into it.
+    """
     if len(layers) == 0:
         raise ValueError("There should be at least one layer to merge.")
     elif len(layers) == 1:

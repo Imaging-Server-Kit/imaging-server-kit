@@ -117,7 +117,10 @@ class Boxes(DataLayer):
         """Data in global coordinate reference instead of local to the tile."""
         if (self.data is not None) and (self.tile_meta is not None):
             if self.tile_meta.coords_min is not None:
-                return self.data + self.tile_meta.coords_min
+                data_global_coords = self.data.copy()
+                for dim in range(self.ndim):
+                    data_global_coords[:, :, dim] = data_global_coords[:, :, dim] + self.tile_meta.coords_min[dim]
+                return data_global_coords
 
     @property
     def n_objects(self) -> int:
@@ -130,7 +133,7 @@ class Boxes(DataLayer):
     def data_pixel_domain(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
-                return tuple(np.max(np.asarray(self.data), axis=(0, 1)))
+                return tuple(np.max(np.asarray(self.data).tolist(), axis=(0, 1)))
 
     def get_tile(self, tile_meta: TileMeta) -> Boxes:
         if self.data is None:

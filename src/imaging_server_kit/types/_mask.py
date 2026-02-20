@@ -253,7 +253,7 @@ class InstanceTileTracker:
         mapping = {}
         for comp_id, comp in enumerate(nx.connected_components(self.G), start=1):
             for n in comp:
-                mapping[n.tolist()] = comp_id
+                mapping[int(n)] = comp_id
         self._mapping = mapping
 
     def resolve(self, arr):
