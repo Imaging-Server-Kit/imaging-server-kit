@@ -63,11 +63,17 @@ class LayerStackBase(ABC):
                     meta=src_layer.meta,
                     merger=src_layer.merger_type,
                     data_serializer=src_layer.data_serializer_type,
+                    data=None,
                 )
             dst_layers.append(dst_layer)
 
         for src_layer, dst_layer in zip(layer_stack, dst_layers):
             dst_layer.merge(src_layer)
+        
+        self.post_merge(dst_layers)
+    
+    def post_merge(self, dst_layers: List[DataLayer]):
+        pass
 
     def serialize(self, client_origin: str) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
@@ -195,8 +201,13 @@ class Results(LayerStackBase):
 
         # Add layer to the stack
         self._layers.append(layer)
+        
+        self.post_create(layer)
 
         return layer
+
+    def post_create(self, layer: DataLayer):
+        pass
 
     def read(self, name: str) -> Optional[DataLayer]:
         """Read a layer by name."""
@@ -209,6 +220,11 @@ class Results(LayerStackBase):
         for idx, layer in enumerate(self.layers):
             if layer.name == name:
                 self._layers.pop(idx)
+        
+        self.post_delete(name)
+    
+    def post_delete(self, name: str) -> None:
+        pass
 
     def generate_tiles(
         self, ctx: Optional[TilingContext]
