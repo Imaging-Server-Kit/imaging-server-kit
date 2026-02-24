@@ -41,7 +41,6 @@ class Paths(DataLayer):
         name="Paths",
         description="Input paths shapes (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        required: bool = True,
         data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
@@ -54,7 +53,6 @@ class Paths(DataLayer):
             data=data,
             tile_meta=tile_meta,
             dimensionality=dimensionality,
-            required=required,
             data_serializer=data_serializer,
             **kwargs,
         )

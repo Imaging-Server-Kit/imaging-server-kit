@@ -155,7 +155,6 @@ class Image(DataLayer):
         name="Image",
         description="Input image (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        required: bool = True,  # When set to True, triggers a parameter validation error if image is None
         merger: str = "default",
         data_serializer: str = "default",
         meta: Optional[Dict] = None,
@@ -170,7 +169,6 @@ class Image(DataLayer):
             tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
-            required=required,
             merger=merger,
             data_serializer=data_serializer,
             rgb=rgb,
@@ -219,9 +217,6 @@ class Image(DataLayer):
 
     @staticmethod
     def validate_data(data, meta):
-        if meta["required"] is False:
-            return
-
         assert isinstance(
             data, np.ndarray
         ), f"Image data ({type(data)}) is not a Numpy array"

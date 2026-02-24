@@ -37,7 +37,6 @@ class Tracks(DataLayer):
         name="Tracks",
         description="Input tracks (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        required: bool = True,
         data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
@@ -50,7 +49,6 @@ class Tracks(DataLayer):
             tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
-            required=required,
             data_serializer=data_serializer,
             **kwargs,
         )

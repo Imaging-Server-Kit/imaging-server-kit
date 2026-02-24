@@ -45,6 +45,9 @@ import imaging_server_kit as sk
     ],
 )
 def threshold_algo(image, threshold, dark_background):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     thresh_rel = threshold * (image.max() - image.min())
     if dark_background:
         mask = image > thresh_rel
@@ -74,10 +77,14 @@ def threshold_algo(image, threshold, dark_background):
         },
         {
             "image": skimage.data.camera(),
+            "method": "Li",
         },
     ],
 )
 def auto_threshold(image, method):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     if method == "Otsu":
         mask = image > threshold_otsu(image)
     elif method == "Li":
@@ -116,6 +123,9 @@ def auto_threshold(image, method):
     ],
 )
 def gaussian_algo(image, sigma, mode):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     filtered = gaussian(image, sigma=sigma, mode=mode)
     return sk.Image(
         filtered,
@@ -243,6 +253,9 @@ def blob_detector_algo(
     time_dim: bool,
     min_sigma: int,
 ):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     if invert_image:
         image = -image
 
@@ -353,6 +366,9 @@ def nl_means_denoise(
     fast_mode,
     sigma,
 ):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     image_range = image.max() - image.min()
     h = h * image_range
 
@@ -405,6 +421,9 @@ def slic_algo(
     n_segments,
     compactness,
 ):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     partitioned = slic(
         image,
         n_segments=n_segments,
@@ -449,6 +468,9 @@ def notif_stream(time_delay, n_times, level):
     tileable=False,
 )
 def background_subtract(image, sigma, method):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     blurred = gaussian(image, sigma=sigma, preserve_range=True)
     if method == "subtract":
         corrected = image - blurred
@@ -466,7 +488,7 @@ def background_subtract(image, sigma, method):
 @sk.algorithm(
     name="Projections (3D -> 2D)",
     parameters={
-        "image": sk.Image(name="3D image", dimensionality=[3], required=True),
+        "image": sk.Image(name="3D image", dimensionality=[3]),
         "method": sk.Choice(
             name="Method", items=["max", "min", "mean"], default="max", auto_call=True
         ),
@@ -474,6 +496,9 @@ def background_subtract(image, sigma, method):
     samples=[{"image": skimage.data.brain()}],
 )
 def project(image, method):
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+    
     proj_func = {"max": np.max, "min": np.min, "mean": np.mean}
     proj = proj_func[method](image, axis=0, keepdims=True)
     return sk.Image(proj, name="Projection", colormap="viridis")

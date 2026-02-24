@@ -16,6 +16,7 @@ class Bool(DataLayer):
         name="Bool",
         description="Boolean parameter",
         default: bool = False,
+        required: bool = True,
         auto_call: bool = False,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
@@ -28,6 +29,7 @@ class Bool(DataLayer):
             data=data,
             tile_meta=tile_meta,
             default=default,
+            required=required,
             auto_call=auto_call,
             **kwargs,
         )

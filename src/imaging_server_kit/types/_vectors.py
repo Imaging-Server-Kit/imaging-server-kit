@@ -95,7 +95,6 @@ class Vectors(DataLayer):
         name="Vectors",
         description="Input vectors (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        required: bool = True,
         merger: str = "default",
         data_serializer: str = "default",
         meta: Optional[Dict] = None,
@@ -109,7 +108,6 @@ class Vectors(DataLayer):
             tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
-            required=required,
             merger=merger,
             data_serializer=data_serializer,
             **kwargs,
@@ -168,9 +166,6 @@ class Vectors(DataLayer):
 
     @staticmethod
     def validate_data(data, meta):
-        if meta["required"] is False:
-            return
-
         assert isinstance(
             data, np.ndarray
         ), f"Vectors data ({type(data)}) is not a Numpy array"

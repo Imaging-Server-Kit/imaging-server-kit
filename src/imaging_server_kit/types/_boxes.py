@@ -92,7 +92,6 @@ class Boxes(DataLayer):
         name="Boxes",
         description="Bounding boxes.",
         dimensionality: Optional[List[int]] = None,
-        required: bool = True,
         merger: str = "default",
         data_serializer: str = "default",
         meta: Optional[Dict] = None,
@@ -106,7 +105,6 @@ class Boxes(DataLayer):
             data=data,
             tile_meta=tile_meta,
             dimensionality=dimensionality,
-            required=required,
             merger=merger,
             data_serializer=data_serializer,
             **kwargs,
@@ -165,9 +163,6 @@ class Boxes(DataLayer):
 
     @staticmethod
     def validate_data(data, meta):
-        if meta["required"] is False:
-            return
-
         assert isinstance(
             data, np.ndarray
         ), f"Boxes data ({type(data)}) is not a Numpy array"

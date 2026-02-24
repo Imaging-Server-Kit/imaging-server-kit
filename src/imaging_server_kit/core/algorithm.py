@@ -155,9 +155,9 @@ def _parse_pydantic_params_schema(
             meta = {}
 
         layer_field_constraints = {}
-        if ("default" in meta) and ("required" in meta):
-            if meta["required"] is False:
-                layer_field_constraints["default"] = meta["default"]
+        
+        if "default" in meta:
+            layer_field_constraints["default"] = meta["default"]
         if "min" in meta:
             layer_field_constraints["ge"] = meta["min"]
         if "max" in meta:
@@ -395,9 +395,9 @@ class Algorithm(AlgorithmRunner):
                     float(param_value.min()),
                     float(param_value.max()),
                 ]
-
+            
             sample_results.create(kind=kind, data=param_value, name=param_name, **kw)
-
+            
         return sample_results
 
     def get_n_samples(self, algorithm: Optional[str] = None) -> int:

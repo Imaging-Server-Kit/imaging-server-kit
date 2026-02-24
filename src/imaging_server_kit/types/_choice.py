@@ -19,6 +19,7 @@ class Choice(DataLayer):
     """
 
     kind = "choice"
+    type = str
 
     def __init__(
         self,
@@ -26,7 +27,8 @@ class Choice(DataLayer):
         name="Choice",
         description="Dropdown selection",
         items: Optional[List] = None,
-        default: Optional[str] = None,
+        required: bool = True,
+        default: str = "",
         auto_call: bool = False,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
@@ -38,6 +40,7 @@ class Choice(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
+            required=required,
             default=default,
             auto_call=auto_call,
             **kwargs,

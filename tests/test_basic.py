@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import imaging_server_kit as sk
 
 
@@ -149,11 +150,21 @@ def test_type_hinted_defaults():
     assert sk_type_hinted.run(5, 3.14)[0].data == 8.14
 
 
-# Setting required=False
+# Setting required=False and passing no data allows these data to be None
 @sk.algorithm
-def has_required_image(image=sk.Image(required=False)):
-    return sk.Image(image)  # image is None
+def int_required_false(val=sk.Integer(required=False)):
+    return sk.Bool(val is None)
 
-def test_required_image():
-    results = has_required_image.run()
+def test_required_int_false():
+    results = int_required_false.run()
     assert results[0].data is None
+
+
+# Setting required=True and passing no data sets the data to 0 (default integer)
+@sk.algorithm
+def int_required_true(val=sk.Integer(required=True)):
+    return sk.Bool(val is None)
+
+def test_required_int_false():
+    results = int_required_true.run()
+    assert results[0].data == 0

@@ -22,9 +22,10 @@ class Notification(DataLayer):
         level: Optional[str] = "info",
         name="Notification",
         description="Text notification",
-        default: Optional[str] = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        required: bool = True,
+        default: str = "",
         **kwargs,
     ):
         super().__init__(
@@ -33,8 +34,9 @@ class Notification(DataLayer):
             meta=meta,
             data=data,
             tile_meta=tile_meta,
-            default=default,
             level=level,
+            required=required,
+            default=default,
             **kwargs,
         )
 

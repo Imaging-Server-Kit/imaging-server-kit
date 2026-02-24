@@ -119,7 +119,7 @@ class DataLayer(ABC):
         data_serializer: Union[str, DataSerializer] = "default",
         **meta_kwargs,
     ):
-        self._data = data
+        # self._data = data
         self._name = name
 
         # Prepare the meta attribute
@@ -132,7 +132,10 @@ class DataLayer(ABC):
         if "dimensionality" in meta_kwargs:
             if meta_kwargs.get("dimensionality") is None:
                 meta_kwargs["dimensionality"] = np.arange(6).tolist()
-
+        
+        if "required" not in meta_kwargs:
+            meta_kwargs["required"] = False
+            
         # Add the meta kwargs
         # NOTE: this is important - only parameters passed to meta here get serialized
         for k, v in meta_kwargs.items():
@@ -141,6 +144,21 @@ class DataLayer(ABC):
 
         self._meta = meta
 
+        # Handle required / default logic
+        if meta_kwargs["required"] is True:
+            if "default" in meta_kwargs:
+                if data is None:
+                    data = meta_kwargs["default"]
+            else:
+                if data is None:
+                    raise ValueError(f"`{name}` is required, but data is None and no defaults were given. \nEither set `required=False`, `default=...`, or `data=` to solve this issue..")
+        
+        self._data = data
+        
+        # Run data validation
+        if data is not None:
+            self.validate_data(data, self._meta)
+        
         # Prepare the tile meta
         tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
         if isinstance(translate, Tuple):
@@ -148,9 +166,6 @@ class DataLayer(ABC):
         self._tile_meta = tile_meta
         self._sync_tile_meta(self._tile_meta)
 
-        # Run data validation
-        if data is not None:
-            self.validate_data(data, self._meta)
 
         # Merger
         if isinstance(merger, Merger):

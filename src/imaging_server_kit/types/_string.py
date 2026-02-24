@@ -16,6 +16,7 @@ class String(DataLayer):
         name="String",
         description="String parameter",
         default: str = "",
+        required: bool = True,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -27,5 +28,6 @@ class String(DataLayer):
             tile_meta=tile_meta,
             description=description,
             default=default,
+            required=required,
             **kwargs,
         )

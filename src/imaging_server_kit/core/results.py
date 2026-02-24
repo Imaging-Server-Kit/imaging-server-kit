@@ -169,7 +169,10 @@ class Results(LayerStackBase):
             if data_layer.pixel_domain is not None:
                 domains.append(data_layer.pixel_domain)
         if len(domains):
-            # Final domain is the max bound of all parameter domains
+            # Final domain is the max bound of all layer domains
+            # TODO: Should we handle cases where, e.g. 2D and 3D data are both present?
+            # For ex. by casting the lowest dimensionality layers to higher-dim?
+            # For now, this is not supported (result layers must have ndim=None or all the the same).
             return np.max(np.stack(domains), axis=0).tolist()
 
     @staticmethod

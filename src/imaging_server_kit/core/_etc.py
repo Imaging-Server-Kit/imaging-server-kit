@@ -105,14 +105,16 @@ def resolve_params(
     for algo_param_key, algo_param_value in algo_params.items():
         if algo_param_key not in resolved:
             resolved[algo_param_key] = algo_param_value
-            
-    # Default values
-    param_defaults = {
-        param_name: algo_param_defs[param_name].get("default")
-        for param_name in algo_param_defs.keys()
-    }
-
-    # Lastly, fill the remaining ordered_params based on the decorator defaults
+    
+    # Default values (used if required is True and no data is passed)
+    param_defaults = {}
+    for param_name in algo_param_defs:
+        if algo_param_defs[param_name]["required"] is True:
+            param_defaults[param_name] = algo_param_defs[param_name].get("default")
+        else:
+            param_defaults[param_name] = None
+    
+    # Fill the remaining ordered_params based on the param defaults
     for signature_param in signature_params:
         if signature_param not in resolved:
             resolved[signature_param] = param_defaults.get(signature_param)

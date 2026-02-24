@@ -33,7 +33,6 @@ class Progress(DataLayer):
         max_val: Optional[int] = 1,
         name="Progress",
         description="Progress bar",
-        default: Optional[int] = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -47,7 +46,6 @@ class Progress(DataLayer):
             meta=meta,
             tile_meta=tile_meta,
             description=description,
-            default=default,
             max_val=max_val,
             **kwargs,
         )
