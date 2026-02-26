@@ -308,13 +308,19 @@ class DataLayer(ABC):
             yield self.get_tile(tile_meta)
         else:
             for tile_meta in generate_nd_tiles(
-                pixel_domain=self.pixel_domain,
+                pixel_domain=self.data_pixel_domain,
                 tile_size_px=ctx.tile_size_px,
                 overlap_percent=ctx.overlap_percent,
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                yield self.get_tile(tile_meta)
+                
+                tile = self.get_tile(tile_meta)
+                
+                # Tiles inherit the global translation:
+                tile.tile_meta.coords_min = self.tile_meta.coords_min
+                
+                yield tile
 
     def serialize(self, client_origin: str) -> Dict[str, Any]:
         """Serialize a layer."""
