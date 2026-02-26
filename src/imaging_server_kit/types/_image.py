@@ -25,12 +25,7 @@ class ImageOverrideMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            # Will set src_layer.tile_meta and src_layer.pixel_domain
-            data_pixel_domain = [1] * dst_layer.ndim
-            if dst_layer.meta["rgb"] is True:
-                data_pixel_domain.extend([3])
-            data_pixel_domain = tuple(data_pixel_domain)
-            src_layer.data = src_layer._get_initial_data(data_pixel_domain)
+            src_layer.data = dst_layer.initialize([1] * dst_layer.ndim)
             src_layer.meta = dst_layer.meta
 
         if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None):
@@ -40,23 +35,21 @@ class ImageOverrideMerger(DefaultMerger):
         if _slices is not None:
             _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
             _pixel_domain = np.max(_stack, axis=0).tolist()
-
             # If the incoming tile extends the pixel domain, we create a new Image,
             # write src_layer.data into it, then merge the tile
             if _pixel_domain != src_layer.pixel_domain:
-                if dst_layer.meta["rgb"] is True:
-                    _pixel_domain.extend([3])
-                new = Image.initialize(_pixel_domain)
-                new_data = new.data
+                new_data = dst_layer.initialize(_pixel_domain)
                 new_data[src_layer.tile_meta.slices] = src_layer.data
             else:
                 new_data = src_layer.data
 
             # New tile overrides existing data
             new_data[_slices] = dst_layer.data  # type: ignore
-
             src_layer.data = new_data
             src_layer.meta = dst_layer.meta
+
+    def first_tile_hook(self, src_layer: Image, dst_layer: Image):
+        src_layer.meta = dst_layer.meta
 
 
 class ImageTileOverlapMerger(DefaultMerger):
@@ -75,12 +68,7 @@ class ImageTileOverlapMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            # Will set src_layer.tile_meta and src_layer.pixel_domain
-            data_pixel_domain = [1] * dst_layer.ndim
-            if dst_layer.meta["rgb"] is True:
-                data_pixel_domain.extend([3])
-            data_pixel_domain = tuple(data_pixel_domain)
-            src_layer.data = src_layer._get_initial_data(data_pixel_domain)
+            src_layer.data = dst_layer.initialize([1] * dst_layer.ndim)
             src_layer.meta = dst_layer.meta
 
         if (src_layer.pixel_domain is None) or (src_layer.tile_meta is None):
@@ -91,28 +79,27 @@ class ImageTileOverlapMerger(DefaultMerger):
         _slices = dst_layer.tile_meta.slices
         if (_slices is not None) and (_overlap_count_map is not None):
             _stack = np.stack([src_layer.pixel_domain, dst_layer.pixel_domain])
-            _pixel_domain = np.max(_stack, axis=0).tolist()
-
+            _pixel_domain = np.max(_stack, axis=0).tolist()  # (x, y)
             # If the incoming tile extends the pixel domain, we create a new Image,
             # write src_layer.data into it, then merge the tile
             if _pixel_domain != src_layer.pixel_domain:
-                if dst_layer.meta["rgb"] is True:
-                    _pixel_domain.extend([3])
-                new = Image.initialize(_pixel_domain)
-                new_data = new.data
+                new_data = dst_layer.initialize(_pixel_domain)
                 new_data[src_layer.tile_meta.slices] = src_layer.data
             else:
                 new_data = src_layer.data
-
             # We `add` the incoming image data to merge it cleanly
-            new_data[_slices] = new_data[_slices] + dst_layer.data / _overlap_count_map  # type: ignore
-
+            # Add fake dims (fixes the RGB case)
+            _overlap_count_map_dims_matched = _overlap_count_map.reshape(
+                _overlap_count_map.shape
+                + (1,) * (dst_layer.data.ndim - _overlap_count_map.ndim)
+            )
+            new_data[_slices] = new_data[_slices] + dst_layer.data / _overlap_count_map_dims_matched  # type: ignore
             src_layer.data = new_data
             src_layer.meta = dst_layer.meta
 
-    def first_tile_hook(self, src_layer: DataLayer, dst_layer: DataLayer):
+    def first_tile_hook(self, src_layer: Image, dst_layer: Image):
         # Re-initialize image data on first tile to avoid accumulating data indefinitely on multiple runs
-        src_layer.data = Image._get_initial_data(src_layer.pixel_domain)
+        src_layer.data = dst_layer.initialize([1] * dst_layer.ndim)
         src_layer.meta = dst_layer.meta
 
 
@@ -211,9 +198,10 @@ class Image(DataLayer):
             return
         return np.zeros(pixel_domain, dtype=np.float32)
 
-    @classmethod
-    def initialize(cls, pixel_domain: Union[Tuple, List]) -> Image:
-        return cls(data=cls._get_initial_data(pixel_domain))
+    def initialize(self, domain: List[int]) -> Optional[np.ndarray]:
+        if self.meta["rgb"] is True:
+            domain.extend([3])
+        return self._get_initial_data(domain)
 
     @staticmethod
     def validate_data(data, meta):

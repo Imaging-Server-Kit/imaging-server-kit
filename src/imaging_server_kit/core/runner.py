@@ -110,7 +110,10 @@ class AlgorithmRunner(ABC):
                         # of domain sizes between params_tile and result_tile to infer the new coords_min instead?
                         if params_tile_meta.coords_min is not None:
                             l.tile_meta.coords_min = params_tile_meta.coords_min
-                        l.tile_meta.overlap_px = params_tile_meta.overlap_px
+
+                        if params_tile_meta.overlap_px is not None:
+                            l.tile_meta.overlap_px = params_tile_meta.overlap_px
+                        
                         l.tile_meta.first_tile = params_tile_meta.first_tile
                         l.tile_meta.last_tile = params_tile_meta.last_tile
                         

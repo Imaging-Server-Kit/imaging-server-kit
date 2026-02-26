@@ -188,7 +188,7 @@ class MaskOverrideMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            src_layer.data = src_layer._get_initial_data(tuple([1] * dst_layer.ndim))
+            src_layer.data = src_layer._get_initial_data([1] * dst_layer.ndim)
             src_layer.meta = dst_layer.meta
 
         if (
@@ -204,7 +204,7 @@ class MaskOverrideMerger(DefaultMerger):
         _pixel_domain = np.max(_stack, axis=0).tolist()
 
         if _pixel_domain != src_layer.pixel_domain:
-            new = Mask.initialize(_pixel_domain)
+            new = Mask._get_initial_data(_pixel_domain)
             new_data = new.data
             new_data[src_layer.tile_meta.slices] = src_layer.data
         else:
@@ -297,7 +297,7 @@ class InstanceMaskTileMerger(DefaultMerger):
         _pixel_domain = np.max(_stack, axis=0).tolist()
 
         if _pixel_domain != src_layer.pixel_domain:
-            new = Mask.initialize(_pixel_domain)
+            new = Mask._get_initial_data(_pixel_domain)
             new_data = new.data
             new_data[src_layer.tile_meta.slices] = src_layer.data
         else:
@@ -330,9 +330,8 @@ class InstanceMaskTileMerger(DefaultMerger):
 
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
-        self.tile_tracker = (
-            InstanceTileTracker()
-        )  # Important: just calling .initialize() would not work
+        # Important: just calling .initialize() would not work
+        self.tile_tracker = InstanceTileTracker()  
 
     def last_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = self.tile_tracker.resolve(src_layer.data)
@@ -436,10 +435,6 @@ class Mask(DataLayer):
     ) -> Optional[np.ndarray]:
         if pixel_domain is not None:
             return np.zeros(np.array(pixel_domain).astype(np.uint16), dtype=np.uint16)
-
-    @classmethod
-    def initialize(cls, pixel_domain: Union[Tuple, List]) -> Mask:
-        return cls(data=cls._get_initial_data(pixel_domain))
 
     @staticmethod
     def validate_data(data, meta):

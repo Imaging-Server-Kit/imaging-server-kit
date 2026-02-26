@@ -1,6 +1,7 @@
 """
 nD-Tiling module for the Imaging Server Kit.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -46,7 +47,7 @@ class TileMeta:
         self._overlap_px = overlap_px
         self._tile_size = tile_size
         self._coords_min = tile_pos
-    
+
     def __str__(self):
         message = "TileMeta"
         message += "\n"
@@ -160,7 +161,9 @@ class TileMeta:
 
         overlap_count_arr = np.ones(self.tile_size, dtype=np.int16)
         for c in per_axis:
-            overlap_count_arr *= c
+            overlap_count_arr *= c.reshape(
+                c.shape + (1,) * (overlap_count_arr.ndim - c.ndim)  # Add fake dims (fixes the RGB case)
+            )
 
         return overlap_count_arr
 
@@ -171,7 +174,7 @@ class TileMeta:
                 return tuple([False] * self.ndim)
         else:
             return tuple(self._first_tile)
-        
+
     @first_tile.setter
     def first_tile(self, value: Optional[Tuple]):
         self._first_tile = value
@@ -183,7 +186,7 @@ class TileMeta:
                 return tuple([False] * self.ndim)
         else:
             return tuple(self._last_tile)
-    
+
     @last_tile.setter
     def last_tile(self, value: Optional[Tuple]):
         self._last_tile = value
@@ -210,7 +213,7 @@ class TileMeta:
             "tile_size": self._tile_size,
             "tile_pos": self._coords_min,
         }
-    
+
     def copy(self) -> TileMeta:
         return TileMeta(**self.serialize())
 
@@ -414,7 +417,7 @@ def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) ->
                 overlap_px.append(int(tile_shape_i - shift_i))
                 tile_size.append(int(tile_size_i))
                 tile_pos.append(int(pos_i))
-            
+
             tile_meta = TileMeta(
                 tile_idx=tile_idx,
                 n_tiles=len(tile_coords_idx),
@@ -422,6 +425,6 @@ def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) ->
                 last_tile=last_tile,
                 overlap_px=overlap_px,
                 tile_size=tile_size,
-                tile_pos=tile_pos,                       
+                tile_pos=tile_pos,
             )
             yield tile_meta
