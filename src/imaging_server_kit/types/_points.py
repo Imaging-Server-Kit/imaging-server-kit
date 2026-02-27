@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
-from geojson import Feature, Point
 
-from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.common import (
     extract_meta_tile,
     ObjectTileMerger,
     ObjectMerger,
 )
-from imaging_server_kit.types.data_serializer import DataSerializer
 from imaging_server_kit.types.data_layer import DataLayer, Merger
 
 
@@ -33,57 +30,6 @@ def _get_tile(points: Points, tile_meta: TileMeta):
     return points_data_tile, points_meta_tile, tile_filter
 
 
-def decode_point_features(features: List[Feature]) -> np.ndarray:
-    if len(features):
-        points = np.array([feature["geometry"]["coordinates"] for feature in features])
-        points = points[:, 0, :]  # Remove an extra dimension
-        points = points[:, ::-1]  # Invert XY
-        return points.astype(float)
-    else:
-        return np.asarray(features)
-
-
-def encode_point_features(points: np.ndarray) -> List[Feature]:
-    point_features = []
-    point_coords = np.asarray(points)[:, ::-1]  # Invert XY
-    for detection_id, point in enumerate(point_coords):
-        try:
-            geom = Point(coordinates=[np.asarray(point).tolist()])
-            point_features.append(
-                Feature(geometry=geom, properties={"Detection ID": detection_id})
-            )
-        except:
-            print("Invalid point geometry.")
-    return point_features
-
-
-class PointsDataSerializer(DataSerializer):
-    def serialize(
-        self, points: Optional[np.ndarray], client_origin: str
-    ) -> Optional[Union[str, List[Feature]]]:
-        if points is None:
-            return None
-        if client_origin == "Python/Napari":
-            point_features = encode_contents(points.astype(np.float32))
-        elif client_origin == "Java/QuPath":
-            point_features = encode_point_features(points)
-        else:
-            raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return point_features
-
-    def deserialize(
-        self, serialized_points: Optional[Union[str, List[Feature]]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_points is None:
-            return None
-        if isinstance(serialized_points, str):
-            points = decode_contents(serialized_points).astype(float)
-        else:
-            # Points are a List[Features]
-            points = decode_point_features(serialized_points)
-        return points
-
-
 class Points(DataLayer):
     """Data layer used to represent points.
 
@@ -97,9 +43,6 @@ class Points(DataLayer):
         "default": ObjectTileMerger,
         "override": ObjectMerger,
     }
-    data_serializers: Dict[str, Type[DataSerializer]] = {
-        "default": PointsDataSerializer
-    }
 
     def __init__(
         self,
@@ -108,7 +51,6 @@ class Points(DataLayer):
         description="Input points (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         merger: str = "default",
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -121,7 +63,6 @@ class Points(DataLayer):
             tile_meta=tile_meta,
             dimensionality=dimensionality,
             merger=merger,
-            data_serializer=data_serializer,
             **kwargs,
         )
 
@@ -132,7 +73,9 @@ class Points(DataLayer):
             if self.tile_meta.coords_min is not None:
                 data_global_coords = self.data.copy()
                 for dim in range(self.ndim):
-                    data_global_coords[:, dim] = data_global_coords[:, dim] + self.tile_meta.coords_min[dim]
+                    data_global_coords[:, dim] = (
+                        data_global_coords[:, dim] + self.tile_meta.coords_min[dim]
+                    )
                 return data_global_coords
 
     @property

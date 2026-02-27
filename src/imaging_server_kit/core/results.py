@@ -62,7 +62,7 @@ class LayerStackBase(ABC):
                     name=src_layer.name,
                     meta=src_layer.meta,
                     merger=src_layer.merger_type,
-                    data_serializer=src_layer.data_serializer_type,
+                    data_serializer=src_layer.data_serializer,
                     data=None,
                 )
             dst_layers.append(dst_layer)
@@ -74,14 +74,6 @@ class LayerStackBase(ABC):
     
     def post_merge(self, dst_layers: List[DataLayer]):
         pass
-
-    def serialize(self, client_origin: str) -> List[Dict]:
-        """Serialize a layer stack to JSON-compatible representation."""
-        serialized_results = []
-        for layer in self.layers:
-            serialized_layer = layer.serialize(client_origin)
-            serialized_results.append(serialized_layer)
-        return serialized_results
 
     def to_params_dict(self) -> Dict[str, Any]:
         """
@@ -145,7 +137,7 @@ class Results(LayerStackBase):
                     meta=l.meta,
                     tile_meta=l.tile_meta,
                     merger=l.merger_type,
-                    data_serializer=l.data_serializer_type,
+                    data_serializer=l.data_serializer,
                 )
 
     def __str__(self):
@@ -174,16 +166,6 @@ class Results(LayerStackBase):
             # For ex. by casting the lowest dimensionality layers to higher-dim?
             # For now, this is not supported (result layers must have ndim=None or all the the same).
             return np.max(np.stack(domains), axis=0).tolist()
-
-    @staticmethod
-    def deserialize(serialized_results: List[Dict], client_origin: str) -> Results:
-        layers = []
-        for serialized_layer in serialized_results:
-            kind = serialized_layer["kind"]
-            layer_cls: Type[DataLayer] = DATA_TYPES[kind]
-            layer = layer_cls().deserialize(serialized_layer, client_origin)
-            layers.append(layer)
-        return Results(layers=layers)
 
     def create(self, kind: str, name: Optional[str] = None, **kwargs) -> DataLayer:
         """Create a new layer in the results stack.

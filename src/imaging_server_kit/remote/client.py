@@ -14,9 +14,19 @@ from imaging_server_kit.core.errors import (
     AlgorithmServerError,
     AlgorithmTimeoutError,
     InvalidAlgorithmParametersError,
-    ServerRequestError,
 )
 from imaging_server_kit.core.results import Results
+from imaging_server_kit.remote.results_serializer import ResultsSerializer
+
+
+class ServerRequestError(Exception):
+    """Exception raised when HTTP requests fail."""
+
+    def __init__(self, url: str, error: Exception, message="Request to server failed"):
+        self.url = url
+        self.error = error
+        self.message = f"{message} ({url=}): {error}"
+        super().__init__(self.message)
 
 
 class Client(AlgorithmRunner):
@@ -86,7 +96,8 @@ class Client(AlgorithmRunner):
             )
         endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
         serialized_sample_results = self._access_algo_get_endpoint(endpoint)
-        sample_results = Results.deserialize(
+        results_serializer = ResultsSerializer()
+        sample_results = results_serializer.deserialize(
             serialized_sample_results, client_origin="Python/Napari"
         )
         return sample_results
@@ -111,12 +122,13 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     def _stream(self, algorithm, params_res: Results):
+        results_serializer = ResultsSerializer()
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
             try:
                 response = client.post(
                     endpoint,
-                    json=params_res.serialize("Python/Napari"),
+                    json=results_serializer.serialize(params_res, "Python/Napari"),
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.token}",
@@ -135,7 +147,7 @@ class Client(AlgorithmRunner):
                         continue
                     unpacker.feed(chunk)
                     for serialized_results in unpacker:
-                        yield Results.deserialize([serialized_results], "Python/Napari")
+                        yield results_serializer.deserialize([serialized_results], "Python/Napari")
             else:
                 self._handle_response_errored(response)
 

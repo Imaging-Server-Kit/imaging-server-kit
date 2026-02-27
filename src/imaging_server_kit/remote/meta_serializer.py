@@ -1,24 +1,23 @@
+from typing import Any, Dict, Optional
+import base64
 
 import numpy as np
-from imaging_server_kit.core.encoding import encode_contents, decode_contents
-import base64
-from typing import Any, Dict, Optional
-from abc import ABC, abstractmethod
+from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.encoding import encode_contents, decode_contents
+from imaging_server_kit.types.data_layer import DataLayer
 
 
-class MetaSerializer(ABC):
-    @abstractmethod
-    def serialize(self, meta: Dict, client_origin: str) -> Any: ...
+class DefalutMetaSerializer(Serializer):
+    @staticmethod
+    def serialize(layer: Optional[DataLayer], client_origin: Optional[str]=None) -> Optional[Dict]:
+        if layer is not None:
+            if layer.meta is not None:
+                return _serialize_meta(layer.meta)
+            else:
+                return {}
     
-    @abstractmethod
-    def deserialize(self, serialized_meta: Dict, client_origin: str) -> Any: ...
-
-
-class DefalutMetaSerializer(MetaSerializer):
-    def serialize(self, meta: Optional[Dict], client_origin: Optional[str]=None) -> Dict:
-        return _serialize_meta(meta) if meta else {}
-    
-    def deserialize(self, serialized_meta: Dict, client_origin: Optional[str]=None) -> Any:
+    @staticmethod
+    def deserialize(serialized_meta: Dict, client_origin: Optional[str]=None) -> Any:
         return _deserialize_meta(serialized_meta)
 
 

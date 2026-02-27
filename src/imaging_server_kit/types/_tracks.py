@@ -1,24 +1,9 @@
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
-from imaging_server_kit.types.data_serializer import DataSerializer
 
-
-class TracksDataSerializer(DataSerializer):
-    def serialize(self, tracks: Optional[np.ndarray], client_origin: str) -> Optional[str]:
-        if tracks is not None:
-            return encode_contents(tracks.astype(np.float32))
-    
-    def deserialize(self, serialized_tracks: Optional[str], client_origin: str) -> Optional[np.ndarray]:
-        if serialized_tracks is None:
-            return None
-        if isinstance(serialized_tracks, str):
-            serialized_tracks = decode_contents(serialized_tracks)
-        return serialized_tracks.astype(float)
-    
 
 class Tracks(DataLayer):
     """Data layer used to represent tracking data.
@@ -29,7 +14,6 @@ class Tracks(DataLayer):
     """
 
     kind = "tracks"
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": TracksDataSerializer}
 
     def __init__(
         self,
@@ -37,7 +21,6 @@ class Tracks(DataLayer):
         name="Tracks",
         description="Input tracks (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -49,13 +32,12 @@ class Tracks(DataLayer):
             tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
-            data_serializer=data_serializer,
             **kwargs,
         )
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+        pixel_domain: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
         if pixel_domain is None:
             return

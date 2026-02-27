@@ -59,16 +59,6 @@ class InvalidAlgorithmParametersError(Exception):
         super().__init__(self.message)
 
 
-class ServerRequestError(Exception):
-    """Exception raised when HTTP requests fail."""
-
-    def __init__(self, url: str, error: Exception, message="Request to server failed"):
-        self.url = url
-        self.error = error
-        self.message = f"{message} ({url=}): {error}"
-        super().__init__(self.message)
-
-
 class AlgorithmStreamError(Exception):
     """Exception raised when an algorithm is incorrectly used as a stream."""
 

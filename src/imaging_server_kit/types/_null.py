@@ -1,17 +1,6 @@
 from typing import Any, Dict, Optional, Type
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
-from imaging_server_kit.types.data_serializer import DataSerializer
-
-
-class NullDataSerializer(DataSerializer):
-    def serialize(self, data, client_origin: str) -> Any:
-        if data is not None:
-            raise ValueError(f"Cannot serialize this object: {data}")
-        return None
-
-    def deserialize(self, serialized_data, client_origin: str) -> None:
-        return None
 
 
 class Null(DataLayer):
@@ -21,8 +10,7 @@ class Null(DataLayer):
 
     kind = "null"
     type = type(None)
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": NullDataSerializer}
-
+    
     def __init__(
         self,
         data: Optional[Any] = None,

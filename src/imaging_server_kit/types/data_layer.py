@@ -5,9 +5,6 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Type, Union
 import numpy as np
 
 from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
-from imaging_server_kit.types.data_serializer import DataSerializer
-from imaging_server_kit.types.data_serializer import DefaultDataSerializer
-from imaging_server_kit.types.meta_serializer import DefalutMetaSerializer
 
 
 def merge_layers(layers: List[DataLayer]) -> DataLayer:
@@ -35,7 +32,7 @@ def merge_layers(layers: List[DataLayer]) -> DataLayer:
             domains.append(l.pixel_domain)
     if len(domains):
         _domain = np.max(np.stack(domains), axis=0).tolist()
-    
+
     # Create a new instance
     merged_layer = cls(
         data=cls._get_initial_data(_domain),
@@ -94,18 +91,11 @@ class DataLayer(ABC):
     -------
     validate_data():
         Validates a set of data and meta values.
-    serialize():
-        Serializes the class into a JSON-compatible representation.
-    deserialize():
-        Reconstructs an instance from a JSON representation.
     """
 
     kind: str = ""
     type = Union[str, np.ndarray, type(None)]
     mergers: Dict[str, Type[Merger]] = {"default": DefaultMerger}
-    data_serializers: Dict[str, Type[DataSerializer]] = {
-        "default": DefaultDataSerializer
-    }
 
     def __init__(
         self,
@@ -116,7 +106,7 @@ class DataLayer(ABC):
         translate: Optional[Tuple] = None,
         description: str = "",
         merger: Union[str, Merger] = "default",
-        data_serializer: Union[str, DataSerializer] = "default",
+        data_serializer: str = "default",
         **meta_kwargs,
     ):
         # self._data = data
@@ -132,10 +122,10 @@ class DataLayer(ABC):
         if "dimensionality" in meta_kwargs:
             if meta_kwargs.get("dimensionality") is None:
                 meta_kwargs["dimensionality"] = np.arange(6).tolist()
-        
+
         if "required" not in meta_kwargs:
             meta_kwargs["required"] = False
-            
+
         # Add the meta kwargs
         # NOTE: this is important - only parameters passed to meta here get serialized
         for k, v in meta_kwargs.items():
@@ -151,21 +141,22 @@ class DataLayer(ABC):
                     data = meta_kwargs["default"]
             else:
                 if data is None:
-                    raise ValueError(f"`{name}` is required, but data is None and no defaults were given. \nEither set `required=False`, `default=...`, or `data=` to solve this issue..")
-        
+                    raise ValueError(
+                        f"`{name}` is required, but data is None and no defaults were given. \nEither set `required=False`, `default=...`, or `data=` to solve this issue.."
+                    )
+
         self._data = data
-        
+
         # Run data validation
         if data is not None:
             self.validate_data(data, self._meta)
-        
+
         # Prepare the tile meta
         tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
         if isinstance(translate, Tuple):
             tile_meta.coords_min = translate
         self._tile_meta = tile_meta
         self._sync_tile_meta(self._tile_meta)
-
 
         # Merger
         if isinstance(merger, Merger):
@@ -181,16 +172,7 @@ class DataLayer(ABC):
             self.merger = merger_cls()
 
         # Data serializer
-        if isinstance(data_serializer, DataSerializer):
-            self.data_serializer = data_serializer
-        else:
-            if data_serializer not in self.data_serializers:
-                raise ValueError(
-                    f"Data serializer `{data_serializer}` is not supported. Available: {list(self.data_serializers.keys())}"
-                )
-            self.data_serializer_type = data_serializer
-            data_serializer_cls = self.data_serializers[data_serializer]
-            self.data_serializer = data_serializer_cls()
+        self.data_serializer = data_serializer
 
     def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
         new_tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
@@ -314,54 +296,13 @@ class DataLayer(ABC):
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                
+
                 tile = self.get_tile(tile_meta)
-                
+
                 # Tiles inherit the global translation:
                 tile.tile_meta.coords_min = self.tile_meta.coords_min
-                
+
                 yield tile
-
-    def serialize(self, client_origin: str) -> Dict[str, Any]:
-        """Serialize a layer."""
-        serialized_data = self.data_serializer.serialize(self.data, client_origin)
-        serialized_meta = DefalutMetaSerializer().serialize(self.meta)
-        serialized_tile_meta = self.tile_meta.serialize() if self.tile_meta else None
-        return {
-            "kind": self.kind,
-            "data": serialized_data,
-            "name": self.name,
-            "meta": serialized_meta,
-            "tile_meta": serialized_tile_meta,
-            "merger": self.merger_type,
-            "data_serializer": self.data_serializer_type,
-        }
-
-    def deserialize(
-        self, serialized_layer: Dict[str, Any], client_origin: str
-    ) -> DataLayer:
-        """Deserialize a layer."""
-        name = serialized_layer["name"]
-        data = serialized_layer["data"]
-        meta = serialized_layer["meta"]
-        tile_meta = serialized_layer["tile_meta"]
-        merger_type = serialized_layer["merger"]
-        data_serializer_type = serialized_layer["data_serializer"]
-        data_serializer_cls: Type[DataSerializer] = self.data_serializers[
-            data_serializer_type
-        ]
-        decoded_data = data_serializer_cls().deserialize(data, client_origin)
-        decoded_meta = DefalutMetaSerializer().deserialize(meta)
-        decoded_tile_meta = TileMeta(**tile_meta)
-        cls = type(self)
-        return cls(
-            data=decoded_data,
-            name=name,
-            meta=decoded_meta,
-            tile_meta=decoded_tile_meta,
-            merger=merger_type,
-            data_serizlizer=data_serializer_type,
-        )
 
     @staticmethod
     def validate_data(data: Any, meta: Dict):
@@ -369,6 +310,6 @@ class DataLayer(ABC):
 
     @staticmethod
     def _get_initial_data(
-        pixel_domain: Optional[Union[List[int], Tuple]]
+        pixel_domain: Optional[Union[List[int], Tuple]],
     ) -> Optional[np.ndarray]:
         pass

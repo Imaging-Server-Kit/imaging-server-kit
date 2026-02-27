@@ -9,9 +9,7 @@ from skimage.draw import polygon2mask
 import networkx as nx
 from skimage.util import map_array
 
-from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_serializer import DataSerializer
 from imaging_server_kit.types.data_layer import DataLayer, Merger, DefaultMerger
 
 
@@ -188,7 +186,7 @@ class MaskOverrideMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            src_layer.data = src_layer._get_initial_data([1] * dst_layer.ndim)
+            src_layer.data = src_layer.initialize([1] * dst_layer.ndim)
             src_layer.meta = dst_layer.meta
 
         if (
@@ -204,15 +202,13 @@ class MaskOverrideMerger(DefaultMerger):
         _pixel_domain = np.max(_stack, axis=0).tolist()
 
         if _pixel_domain != src_layer.pixel_domain:
-            new = Mask._get_initial_data(_pixel_domain)
-            new_data = new.data
+            new_data = dst_layer.initialize(_pixel_domain)
             new_data[src_layer.tile_meta.slices] = src_layer.data
         else:
             new_data = src_layer.data
 
         # `Override` strategy:
         new_data[_slices] = dst_layer.data
-
         src_layer.data = new_data
         src_layer.meta = dst_layer.meta
 
@@ -282,7 +278,7 @@ class InstanceMaskTileMerger(DefaultMerger):
             or (src_layer.tile_meta is None)
             or (src_layer.pixel_domain is None)
         ):
-            src_layer.data = src_layer._get_initial_data(tuple([1] * dst_layer.ndim))
+            src_layer.data = dst_layer.initialize(tuple([1] * dst_layer.ndim))
             src_layer.meta = dst_layer.meta
 
         if (
@@ -297,8 +293,7 @@ class InstanceMaskTileMerger(DefaultMerger):
         _pixel_domain = np.max(_stack, axis=0).tolist()
 
         if _pixel_domain != src_layer.pixel_domain:
-            new = Mask._get_initial_data(_pixel_domain)
-            new_data = new.data
+            new_data = dst_layer.initialize(_pixel_domain)
             new_data[src_layer.tile_meta.slices] = src_layer.data
         else:
             new_data = src_layer.data
@@ -329,40 +324,13 @@ class InstanceMaskTileMerger(DefaultMerger):
         src_layer.meta = dst_layer.meta
 
     def first_tile_hook(self, src_layer: Mask, dst_layer: Mask):
-        src_layer.data = Mask._get_initial_data(src_layer.pixel_domain)
         # Important: just calling .initialize() would not work
+        src_layer.data = dst_layer.initialize([1] * dst_layer.ndim)
         self.tile_tracker = InstanceTileTracker()  
 
     def last_tile_hook(self, src_layer: Mask, dst_layer: Mask):
         src_layer.data = self.tile_tracker.resolve(src_layer.data)
         self.tile_tracker = InstanceTileTracker()
-
-
-class MaskDataSerializer(DataSerializer):
-    def serialize(
-        self, mask: Optional[np.ndarray], client_origin: str
-    ) -> Optional[Union[List[Feature], str]]:
-        if mask is None:
-            return None
-        if client_origin == "Python/Napari":
-            features = encode_contents(mask.astype(np.uint16))
-        elif client_origin == "Java/QuPath":
-            features = mask2features(mask)
-        else:
-            raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return features
-
-    def deserialize(
-        self, serialized_mask: Optional[Union[List[Feature], str]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_mask is None:
-            return None
-        if isinstance(serialized_mask, str):
-            if client_origin == "Python/Napari":
-                mask = decode_contents(serialized_mask).astype(int)
-            else:
-                raise ValueError(f"Unrecognized client origin: {client_origin}")
-        return mask
 
 
 class Mask(DataLayer):
@@ -380,7 +348,6 @@ class Mask(DataLayer):
         "instances": InstanceMaskTileMerger,
         "override": MaskOverrideMerger,
     }
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": MaskDataSerializer}
 
     def __init__(
         self,
@@ -389,7 +356,6 @@ class Mask(DataLayer):
         description: str = "Segmentation mask (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         merger: str = "default",
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -402,7 +368,6 @@ class Mask(DataLayer):
             tile_meta=tile_meta,
             dimensionality=dimensionality,
             merger=merger,
-            data_serializer=data_serializer,
             **kwargs,
         )
 
@@ -435,6 +400,9 @@ class Mask(DataLayer):
     ) -> Optional[np.ndarray]:
         if pixel_domain is not None:
             return np.zeros(np.array(pixel_domain).astype(np.uint16), dtype=np.uint16)
+    
+    def initialize(self, domain: List[int]) -> Optional[np.ndarray]:
+        return self._get_initial_data(domain)
 
     @staticmethod
     def validate_data(data, meta):

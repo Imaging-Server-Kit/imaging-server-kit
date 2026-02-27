@@ -17,6 +17,8 @@ from imaging_server_kit._version import __version__
 from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.results import Results
 from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.remote.results_serializer import ResultsSerializer
+
 
 templates_dir = pathlib.Path(
     importlib.resources.files("imaging_server_kit.core").joinpath("templates")  # type: ignore
@@ -162,7 +164,8 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             sample = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
             if sample is not None:
-                return sample.serialize("Python/Napari")
+                results_serializer = ResultsSerializer()
+                return results_serializer.serialize(sample, "Python/Napari")
 
         @self.app.get(
             "/{algorithm_name}/n_samples",
@@ -212,8 +215,8 @@ class AlgorithmApp:
             client_origin = str(request.headers.get("User-Agent"))
 
             # Reconstruct the algo parameters as a `Results` object
-            # params_res = deserialize_results(encoded_params, client_origin)
-            params_res = Results.deserialize(encoded_params, client_origin)
+            results_serializer = ResultsSerializer()
+            params_res = results_serializer.deserialize(encoded_params, client_origin)
 
             # Special case: when request is sent from QuPath, the image is named `qupath-image`
             # and should be assigned to whichever parameter is an image in the algo (we assume)
@@ -253,6 +256,7 @@ class AlgorithmApp:
             return StreamingResponse(msgpack_stream, media_type="application/msgpack")
 
     def _stream_msgpack(self, stream_generator: Iterable[Results], client_origin: str):
+        results_serializer = ResultsSerializer()
         for results in stream_generator:
-            for r in results.serialize(client_origin):
+            for r in results_serializer.serialize(results, client_origin):
                 yield msgpack.packb(r)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
-from geojson import Feature, Polygon
 
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.common import (
@@ -10,7 +9,6 @@ from imaging_server_kit.types.common import (
     ObjectMerger,
     ObjectTileMerger,
 )
-from imaging_server_kit.types.data_serializer import DataSerializer
 from imaging_server_kit.types.data_layer import DataLayer, Merger
 
 
@@ -34,43 +32,6 @@ def _get_tile(boxes: Boxes, tile_meta: TileMeta):
     return boxes_data_tile, boxes_meta_tile, tile_filter
 
 
-class BoxesDataSerializer(DataSerializer):
-    def serialize(
-        self, boxes: Optional[np.ndarray], client_origin: str
-    ) -> Optional[List[Feature]]:
-        if boxes is None:
-            return None
-        features = []
-        for i, box in enumerate(boxes):
-            coords = np.array(box)[:, ::-1]  # Invert XY
-            coords = coords.tolist()
-            coords.append(coords[0])  # Close the Polygon
-            try:
-                geom = Polygon(coordinates=[coords], validate=True)
-                features.append(Feature(geometry=geom, properties={"Detection ID": i}))
-            except ValueError:
-                print(
-                    "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box."
-                )
-        return features
-
-    def deserialize(
-        self, serialized_boxes: Optional[List[Feature]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_boxes is None:
-            return None
-        boxes = np.array(
-            [feature["geometry"]["coordinates"] for feature in serialized_boxes]
-        )
-        boxes = np.array(
-            [box[0] for box in boxes]
-        )  # We get back a shape of (N, 1, 5, 2) - so we remove dim. 1
-        if len(boxes) > 0:
-            boxes = boxes[:, :-1]  # Remove the last element
-            boxes = boxes[:, :, ::-1]  # Invert XY
-        return boxes
-
-
 class Boxes(DataLayer):
     """Data layer used to represent boxes (rectangular bounding boxes).
 
@@ -84,7 +45,6 @@ class Boxes(DataLayer):
         "default": ObjectTileMerger,
         "override": ObjectMerger,
     }
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": BoxesDataSerializer}
 
     def __init__(
         self,
@@ -93,7 +53,6 @@ class Boxes(DataLayer):
         description="Bounding boxes.",
         dimensionality: Optional[List[int]] = None,
         merger: str = "default",
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -106,7 +65,6 @@ class Boxes(DataLayer):
             tile_meta=tile_meta,
             dimensionality=dimensionality,
             merger=merger,
-            data_serializer=data_serializer,
             **kwargs,
         )
 

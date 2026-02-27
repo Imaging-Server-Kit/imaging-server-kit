@@ -1,26 +1,8 @@
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.encoding import decode_contents, encode_contents
 from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
-from imaging_server_kit.types.data_serializer import DataSerializer
-
-
-class PathDataSerializer(DataSerializer):
-    def serialize(self, paths: Optional[List[np.ndarray]], client_origin: str) -> Optional[List[str]]:
-        if paths is not None:
-            return [encode_contents(arr.astype(np.float32)) for arr in paths]
-    
-    def deserialize(self, serialized_paths: Optional[List[str]], client_origin: str) -> Optional[List[np.ndarray]]:
-        if serialized_paths is None:
-            return None
-        data = []
-        for f in serialized_paths:
-            if isinstance(f, str):
-                f = decode_contents(f)
-                data.append(f.astype(float))
-        return data
 
 
 class Paths(DataLayer):
@@ -33,8 +15,7 @@ class Paths(DataLayer):
     """
 
     kind = "paths"
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": PathDataSerializer}
-
+    
     def __init__(
         self,
         data: Optional[List] = None,

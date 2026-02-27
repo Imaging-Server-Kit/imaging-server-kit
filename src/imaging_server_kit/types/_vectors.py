@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
-from geojson import Feature, LineString
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.types.data_serializer import DataSerializer
 from imaging_server_kit.types.data_layer import DataLayer, Merger
 from imaging_server_kit.types.common import (
     extract_meta_tile,
@@ -32,44 +30,6 @@ def _get_tile(vectors: Vectors, tile_meta: TileMeta):
     return vectors_tile, vectors_meta_tile, tile_filter
 
 
-class VectorsDataSerializer(DataSerializer):
-    def serialize(
-        self, vectors: Optional[np.ndarray], client_origin: str
-    ) -> Optional[List[Feature]]:
-        if vectors is None:
-            return None
-        serialized_vectors = []
-        vectors = vectors[:, :, ::-1]  # Invert XY
-        for i, vector in enumerate(vectors):
-            point_start = list(vector[0])
-            point_end = list(vector[0] + vector[1])
-            coords = [point_start, point_end]
-            try:
-                geom = LineString(coordinates=coords)
-                serialized_vectors.append(
-                    Feature(geometry=geom, properties={"Detection ID": i})
-                )
-            except ValueError:
-                print("Invalid line string geometry.")
-        return serialized_vectors
-
-    def deserialize(
-        self, serialized_vectors: Optional[List[Feature]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_vectors is None:
-            return None
-
-        vectors_arr = np.array(
-            [feature["geometry"]["coordinates"] for feature in serialized_vectors]
-        )
-        vector_coords = vectors_arr[:, 0]
-        displacements = vectors_arr[:, 1] - vector_coords
-        vectors = np.stack((vector_coords, displacements))
-        vectors = np.rollaxis(vectors, 1)
-        vectors = vectors[:, :, ::-1]  # Invert XY
-        return vectors
-
-
 class Vectors(DataLayer):
     """Data layer used to represent vectors.
 
@@ -85,9 +45,6 @@ class Vectors(DataLayer):
         "default": ObjectTileMerger,
         "override": ObjectMerger,
     }
-    data_serializers: Dict[str, Type[DataSerializer]] = {
-        "default": VectorsDataSerializer
-    }
 
     def __init__(
         self,
@@ -96,7 +53,6 @@ class Vectors(DataLayer):
         description="Input vectors (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         merger: str = "default",
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -109,7 +65,6 @@ class Vectors(DataLayer):
             description=description,
             dimensionality=dimensionality,
             merger=merger,
-            data_serializer=data_serializer,
             **kwargs,
         )
 

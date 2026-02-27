@@ -7,7 +7,6 @@ except ImportError:
     __version__ = "unknown"
 
 from .core import (
-    Client,
     algorithm,
     Algorithm,
     MultiAlgorithm,
@@ -17,6 +16,8 @@ from .core import (
     generate_nd_tiles,
     TileMeta,
 )
+
+from .remote import Client, serve
 
 from .types import (
     Image,
@@ -92,33 +93,6 @@ def to_napari(
         add_as_widget(viewer, algorithm)
 
     return viewer
-
-
-def serve(
-    algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs
-) -> None:
-    """
-    Serve an algorithm as an HTTP server.
-
-    Parameters
-    ----------
-    algorithm : The algorithm object to serve.
-    host : The IP of the host (default: "0.0.0.0")
-    port : The network port (default: 8000)
-    """
-    from imaging_server_kit.core.app import AlgorithmApp
-
-    if isinstance(algorithm, Algorithm):
-        algorithm_servers = [algorithm]
-    elif isinstance(algorithm, MultiAlgorithm):
-        algorithm_servers = list(algorithm.algorithms_dict.values())
-    else:
-        # Assuming the user has passed a "raw" Python function, we attempt to convert it to an Algorithm:
-        algorithm = Algorithm(algorithm)
-        algorithm_servers = [algorithm]
-
-    algo_app = AlgorithmApp(algorithms=algorithm_servers, name=algorithm.name)
-    algo_app.serve(*args, **kwargs)
 
 
 def convert(

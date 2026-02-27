@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple, Type, Union
 import numpy as np
 
-from imaging_server_kit.core.encoding import decode_contents, encode_contents
-from imaging_server_kit.types.data_serializer import DataSerializer
 from imaging_server_kit.types.data_layer import DataLayer, DefaultMerger, Merger
 from imaging_server_kit.core.tiling import TileMeta
 
@@ -103,22 +101,6 @@ class ImageTileOverlapMerger(DefaultMerger):
         src_layer.meta = dst_layer.meta
 
 
-class ImageDataSerializer(DataSerializer):
-    def serialize(
-        self, data: Optional[np.ndarray], client_origin: str
-    ) -> Optional[str]:
-        if data is not None:
-            return encode_contents(data.astype(np.float32))
-
-    def deserialize(
-        self, serialized_data: Optional[str], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_data is not None:
-            if isinstance(serialized_data, str):
-                serialized_data = decode_contents(serialized_data)
-                return serialized_data.astype(float)
-
-
 class Image(DataLayer):
     """Data layer used to represent images and image-like data.
 
@@ -134,7 +116,6 @@ class Image(DataLayer):
         "default": ImageTileOverlapMerger,
         "override": ImageOverrideMerger,
     }
-    data_serializers: Dict[str, Type[DataSerializer]] = {"default": ImageDataSerializer}
 
     def __init__(
         self,
@@ -143,7 +124,6 @@ class Image(DataLayer):
         description="Input image (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         merger: str = "default",
-        data_serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         rgb: bool = False,
@@ -157,7 +137,6 @@ class Image(DataLayer):
             description=description,
             dimensionality=dimensionality,
             merger=merger,
-            data_serializer=data_serializer,
             rgb=rgb,
             **kwargs,
         )
