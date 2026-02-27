@@ -403,15 +403,3 @@ class Mask(DataLayer):
     
     def initialize(self, domain: List[int]) -> Optional[np.ndarray]:
         return self._get_initial_data(domain)
-
-    @staticmethod
-    def validate_data(data, meta):
-        assert isinstance(
-            data, np.ndarray
-        ), f"Mask data ({type(data)}) is not a Numpy array"
-
-        if not all(data.shape):
-            raise ValueError("Image array has an invalid shape: ", data.shape)
-
-        if len(data.shape) not in meta["dimensionality"]:
-            raise ValueError("Image array has the wrong dimensionality.")

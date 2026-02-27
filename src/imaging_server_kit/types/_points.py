@@ -118,10 +118,3 @@ class Points(DataLayer):
         if pixel_domain is None:
             return
         return np.zeros((0, len(pixel_domain)), dtype=np.float32)
-
-    @staticmethod
-    def validate_data(data, meta):
-        assert isinstance(
-            data, np.ndarray
-        ), f"Points data ({type(data)}) is not a Numpy array"
-        assert len(data.shape) == 2, "Points data should have shape (N, D)"

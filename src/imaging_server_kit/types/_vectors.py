@@ -12,24 +12,6 @@ from imaging_server_kit.types.common import (
 )
 
 
-def _get_tile(vectors: Vectors, tile_meta: TileMeta):
-    # Mask of vector coordinates in the tile
-    vector_coords_in_tile = (vectors.data[:, 0] >= tile_meta.coords_min) & (
-        vectors.data[:, 0] < tile_meta.coords_max
-    )
-
-    # All coordinates must be in the tile bounds
-    tile_filter = vector_coords_in_tile.all(axis=1)  # (N,)
-
-    # Select vectors in the tile
-    vectors_tile = vectors.data[tile_filter]
-
-    # Select meta of vectors in the tile
-    vectors_meta_tile = extract_meta_tile(vectors.meta, vectors.n_objects, tile_filter)
-
-    return vectors_tile, vectors_meta_tile, tile_filter
-
-
 class Vectors(DataLayer):
     """Data layer used to represent vectors.
 
@@ -98,11 +80,26 @@ class Vectors(DataLayer):
             _data = self._get_initial_data(self.pixel_domain)
             _meta = self.meta
         else:
-            vectors_tile_data, vectors_tile_meta, _ = _get_tile(self, tile_meta)
+            # Mask of vector coordinates in the tile
+            vector_coords_in_tile = (self.data[:, 0] >= tile_meta.coords_min) & (
+                self.data[:, 0] < tile_meta.coords_max
+            )
+
+            # All coordinates must be in the tile bounds
+            tile_filter = vector_coords_in_tile.all(axis=1)  # (N,)
+
+            # Select vectors in the tile
+            vectors_tile_data = self.data[tile_filter]
+
+            # Select meta of vectors in the tile
+            vectors_tile_meta = extract_meta_tile(self.meta, self.n_objects, tile_filter)
+            
             if vectors_tile_data is not None:
                 vectors_tile_data[:, 0] = vectors_tile_data[:, 0] - tile_meta.coords_min
+            
             _data = vectors_tile_data
             _meta = vectors_tile_meta
+        
         return Vectors(
             data=_data,
             name=self.name,
@@ -118,11 +115,3 @@ class Vectors(DataLayer):
             return
         ndim = len(pixel_domain)
         return np.zeros((0, 2, ndim), dtype=np.float32)
-
-    @staticmethod
-    def validate_data(data, meta):
-        assert isinstance(
-            data, np.ndarray
-        ), f"Vectors data ({type(data)}) is not a Numpy array"
-        assert len(data.shape) == 3, "Vectors data should have shape (N, 2, D)"
-        assert data.shape[1] == 2, "Vectors data should have shape (N, 2, D)"

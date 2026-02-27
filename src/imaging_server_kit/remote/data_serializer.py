@@ -12,17 +12,21 @@ class Serializer(ABC):
     deserialize():
         Reconstructs an instance from a JSON representation.
     """
+    @staticmethod
     @abstractmethod
-    def serialize(self, layer: Optional[DataLayer], client_origin: str) -> Any: ...
+    def serialize(layer: Optional[DataLayer], client_origin: str) -> Any: ...
 
+    @staticmethod
     @abstractmethod
-    def deserialize(self, serialized_data: Any, client_origin: str) -> Any: ...
+    def deserialize(serialized_data: Any, client_origin: str) -> Any: ...
 
 
 class DefaultDataSerializer(Serializer):
-    def serialize(self, layer: Optional[DataLayer], client_origin: str) -> Any:
+    @staticmethod
+    def serialize(layer: Optional[DataLayer], client_origin: str) -> Any:
         if layer is not None:
             return layer.data
 
-    def deserialize(self, serialized_data: Any, client_origin: str) -> Any:
+    @staticmethod
+    def deserialize(serialized_data: Any, client_origin: str) -> Any:
         return serialized_data

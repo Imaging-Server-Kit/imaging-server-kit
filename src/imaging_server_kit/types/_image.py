@@ -181,21 +181,3 @@ class Image(DataLayer):
         if self.meta["rgb"] is True:
             domain.extend([3])
         return self._get_initial_data(domain)
-
-    @staticmethod
-    def validate_data(data, meta):
-        assert isinstance(
-            data, np.ndarray
-        ), f"Image data ({type(data)}) is not a Numpy array"
-
-        if not all(data.shape):
-            raise ValueError("Image array has an invalid shape: ", data.shape)
-
-        if len(data.shape) not in meta["dimensionality"]:
-            raise ValueError("Image array has the wrong dimensionality.")
-
-        if meta["rgb"] is True:
-            if len(data.shape) != 3:
-                raise ValueError("Image should be RGB.")
-            if data.shape[2] != 3:
-                raise ValueError("Image should be RGB.")

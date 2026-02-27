@@ -32,6 +32,7 @@ from imaging_server_kit.core.runner import (
     validate_algorithm,
 )
 from imaging_server_kit.types import DATA_TYPES, DataLayer
+from imaging_server_kit.validation.layer_validator import LayerValidator
 
 TYPE_MAPPINGS: Dict[Any, Type[DataLayer]] = {
     int: skt.Integer,
@@ -170,7 +171,8 @@ def _parse_pydantic_params_schema(
         } | layer_field_constraints
 
         # Resolve the validator function
-        val_func = partial(data_layer._validate, meta=meta)
+        layer_validator = LayerValidator()
+        val_func = partial(layer_validator.validate, layer=data_layer)
 
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"

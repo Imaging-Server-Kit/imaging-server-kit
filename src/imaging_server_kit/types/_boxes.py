@@ -12,26 +12,6 @@ from imaging_server_kit.types.common import (
 from imaging_server_kit.types.data_layer import DataLayer, Merger
 
 
-def _get_tile(boxes: Boxes, tile_meta: TileMeta):
-    # Mask of box coordinates in the tile
-    boxes_coords_in_tile = (boxes.data >= tile_meta.coords_min) & (
-        boxes.data < tile_meta.coords_max
-    )
-
-    # All coordinates must be in the tile bounds
-    tile_filter = boxes_coords_in_tile.reshape((len(boxes_coords_in_tile), -1)).all(
-        axis=1
-    )
-
-    # Select boxes in the tile
-    boxes_data_tile = boxes.data[tile_filter]
-
-    # Select meta of boxes in the tile
-    boxes_meta_tile = extract_meta_tile(boxes.meta, boxes.n_objects, tile_filter)
-
-    return boxes_data_tile, boxes_meta_tile, tile_filter
-
-
 class Boxes(DataLayer):
     """Data layer used to represent boxes (rectangular bounding boxes).
 
@@ -99,11 +79,28 @@ class Boxes(DataLayer):
             _data = self._get_initial_data(self.pixel_domain)
             _meta = self.meta
         else:
-            boxes_tile_data, boxes_tile_meta, _ = _get_tile(self, tile_meta)
+            # Mask of box coordinates in the tile
+            boxes_coords_in_tile = (self.data >= tile_meta.coords_min) & (
+                self.data < tile_meta.coords_max
+            )
+
+            # All coordinates must be in the tile bounds
+            tile_filter = boxes_coords_in_tile.reshape((len(boxes_coords_in_tile), -1)).all(
+                axis=1
+            )
+
+            # Select boxes in the tile
+            boxes_tile_data = self.data[tile_filter]
+
+            # Select meta of boxes in the tile
+            boxes_tile_meta = extract_meta_tile(self.meta, self.n_objects, tile_filter)
+            
             if boxes_tile_data is not None:
                 boxes_tile_data = boxes_tile_data - tile_meta.coords_min
+                
             _data = boxes_tile_data
             _meta = boxes_tile_meta
+        
         return Boxes(
             data=_data,
             name=self.name,
@@ -118,16 +115,3 @@ class Boxes(DataLayer):
         if pixel_domain is None:
             return
         return np.zeros((0, 4, len(pixel_domain)), dtype=np.float32)
-
-    @staticmethod
-    def validate_data(data, meta):
-        assert isinstance(
-            data, np.ndarray
-        ), f"Boxes data ({type(data)}) is not a Numpy array"
-
-        assert len(data.shape) == 3, "Boxes data should have shape (N, 4, D)"
-
-        allowed_dims = meta["dimensionality"]
-        assert (
-            data.shape[2] in allowed_dims
-        ), f"Boxes have an unsupported dimensionality: {data.shape[2]} (accepted: {allowed_dims})"

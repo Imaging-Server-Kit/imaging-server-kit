@@ -107,6 +107,7 @@ class DataLayer(ABC):
         description: str = "",
         merger: Union[str, Merger] = "default",
         data_serializer: str = "default",
+        validator: str = "default",
         **meta_kwargs,
     ):
         # self._data = data
@@ -147,10 +148,6 @@ class DataLayer(ABC):
 
         self._data = data
 
-        # Run data validation
-        if data is not None:
-            self.validate_data(data, self._meta)
-
         # Prepare the tile meta
         tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
         if isinstance(translate, Tuple):
@@ -173,6 +170,16 @@ class DataLayer(ABC):
 
         # Data serializer
         self.data_serializer = data_serializer
+        
+        # Validator
+        self.validator = validator
+        
+        # Run validation (`post-init`)
+        if self.data is not None:
+            # We can't do the import earlier.. is that a problem?
+            from imaging_server_kit.validation.layer_validator import find_layer_validator
+            v = find_layer_validator(self)
+            v.validate(self)
 
     def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
         new_tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
@@ -261,11 +268,6 @@ class DataLayer(ABC):
     def __repr__(self):
         return self.__str__()
 
-    def _validate(self, cls, v, meta):
-        if v is not None:
-            self.validate_data(v, meta)
-        return v
-
     def refresh(self):
         pass
 
@@ -303,10 +305,6 @@ class DataLayer(ABC):
                 tile.tile_meta.coords_min = self.tile_meta.coords_min
 
                 yield tile
-
-    @staticmethod
-    def validate_data(data: Any, meta: Dict):
-        pass
 
     @staticmethod
     def _get_initial_data(

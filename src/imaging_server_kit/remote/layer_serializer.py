@@ -27,18 +27,13 @@ LAYER_DATA_SERIALIZERS: Dict[str, Dict[str, Type[Serializer]]] = {
 
 
 def find_layer_serializer(layer: DataLayer) -> Serializer:
-    kind = layer.kind
-    data_serializer = layer.data_serializer
-    
-    if isinstance(data_serializer, str):
-        if kind in LAYER_DATA_SERIALIZERS:
-            lds = LAYER_DATA_SERIALIZERS[kind]
-            data_serializer_cls = lds.get(data_serializer, DefaultDataSerializer)
-        else:
-            data_serializer_cls = DefaultDataSerializer
-        data_serializer = data_serializer_cls()
-    
-    return data_serializer
+    if layer.kind in LAYER_DATA_SERIALIZERS:
+        lds = LAYER_DATA_SERIALIZERS[layer.kind]
+        data_serializer_cls = lds.get(layer.data_serializer, DefaultDataSerializer)
+    else:
+        data_serializer_cls = DefaultDataSerializer
+
+    return data_serializer_cls()
 
 
 class LayerSerializer(Serializer):
