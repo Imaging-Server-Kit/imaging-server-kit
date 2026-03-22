@@ -175,6 +175,7 @@ def test_sk_tiled_streaming():
 ### Tiled max projection
 from imaging_server_kit.demo import project
 
+
 def test_sk_tiled_max_proj():
     image = np.random.random((10, 30, 30))
     results = project.run(
@@ -193,10 +194,12 @@ def test_sk_tiled_max_proj():
 ### Tiled instance mask
 from skimage.morphology import label
 
+
 @sk.algorithm
 def label_algo(mask):
     labelled = label(mask)
     return sk.Mask(labelled, merger="instances")
+
 
 def test_sk_label():
     mask = skimage.data.coins() > 100
@@ -204,6 +207,39 @@ def test_sk_label():
     data = results[0].data
     labelled = label(mask)
     assert len(np.unique(labelled)) == len(np.unique(data))
+
+
+### -- Selecting data -- ###
+
+# In an Image, via indexing
+def test_select_indexing_image():
+    data = np.random.random((20, 20, 20))
+    image = sk.Image(data)
+    
+    extract1 = data[2:, 3:7]
+    image_extract1 = image[2:, 3:7].data
+    assert np.allclose(extract1, image_extract1)
+    
+    extract2 = data[:, :, :4]
+    image_extract2 = image[:, :, :4].data
+    assert np.allclose(extract2, image_extract2)
+
+
+# In a Results, via indexing
+def test_select_indexing_results():
+    results = sk.Results(
+        layers=[
+            sk.Image(np.random.random((10, 10))),
+            sk.Mask(np.ones((10, 10))),
+        ]
+    )
+    
+    extract = results[:, :3, 1:5]
+    assert len(extract) == 2
+    assert extract[0].data.shape[0] == 3
+    assert extract[0].data.shape[1] == 4
+    assert extract[1].data.shape[0] == 3
+    assert extract[1].data.shape[1] == 4
 
 
 ### -- Merging data -- ###
@@ -214,7 +250,10 @@ def test_merge_images():
     _sum1 = img1.data.sum()
     img2 = sk.Image(np.ones((20, 20)), translate=(30, 30))
     _sum2 = img2.data.sum()
-    img1.merge(img2)
+
+    merger = sk.LayerMerger()
+    merger.merge(img1, img2)
+
     assert img1.shape == (50, 50)
     assert img1.data.sum() == _sum1 + _sum2
 
@@ -222,24 +261,24 @@ def test_merge_images():
 ### Merging Results (and getting tiles) - heterogeneous data
 def test_merge_results():
     rx, ry = 30, 20
-    
+
     image1 = np.ones((rx, ry))
     image2 = np.ones((rx, ry))
-    
+
     mask1 = np.ones((rx, ry), dtype=np.uint8)
     mask2 = np.ones((rx, ry), dtype=np.uint8)
-    
+
     points1 = np.random.random((10, 2))
     points1[:, 0] = points1[:, 0] * rx
     points1[:, 1] = points1[:, 1] * ry
     points2 = points1.copy()
-    
+
     delta = np.random.random(points1.shape)
     vectors1 = np.zeros((len(points1), 2, points1.shape[1]))
     vectors1[:, 0] = points1
     vectors1[:, 1] = delta
     vectors2 = vectors1.copy()
-    
+
     boxes1 = np.zeros((len(points1), 4, points1.shape[1]))
     height = np.random.random(len(points1))
     width = np.random.random(len(points1))
@@ -252,67 +291,67 @@ def test_merge_results():
     boxes1[:, 2, 0] = points1[:, 0] + height
     boxes1[:, 2, 1] = points1[:, 1] + width
     boxes2 = boxes1.copy()
-    
+
     img1 = sk.Image(image1, merger="override")
     msk1 = sk.Mask(mask1, merger="override")
     pts1 = sk.Points(points1, merger="override")
     vct1 = sk.Vectors(vectors1, merger="override")
     box1 = sk.Boxes(boxes1, merger="override")
-    
+
     tx = rx
     ty = ry
     translate = (tx, ty)
-    
+
     img2 = sk.Image(image2, translate=translate)
     msk2 = sk.Mask(mask2, translate=translate)
     pts2 = sk.Points(points2, translate=translate)
     vct2 = sk.Vectors(vectors2, translate=translate)
     box2 = sk.Boxes(boxes2, translate=translate)
-    
+
     results1 = sk.Results([img1, msk1, pts1, vct1, box1])
     results2 = sk.Results([img2, msk2, pts2, vct2, box2])
-    
+
     # Merge results
     results1.merge(results2)
-    
+
     out_img1 = results1.read(img1.name)
     out_msk1 = results1.read(msk1.name)
     out_pts1 = results1.read(pts1.name)
     out_vct1 = results1.read(vct1.name)
     out_box1 = results1.read(box1.name)
-    
+
     tm1 = sk.TileMeta(tile_size=(rx, ry), tile_pos=(0, 0))
     tm2 = sk.TileMeta(tile_size=(rx, ry), tile_pos=(rx, ry))
-    
+
     assert np.allclose(out_img1.data[:rx, :ry], image1)
     assert np.allclose(out_img1.data[rx:, ry:], image2)
     assert out_img1.data.sum() == image1.sum() + image2.sum()
-    assert np.allclose(out_img1.get_tile(tm1).data, image1)
-    assert np.allclose(out_img1.get_tile(tm2).data, image2)
-    
+    assert np.allclose(out_img1.select(tm1).data, image1)
+    assert np.allclose(out_img1.select(tm2).data, image2)
+
     assert np.allclose(out_msk1.data[:rx, :ry], mask1)
     assert np.allclose(out_msk1.data[rx:, ry:], mask2)
     assert out_msk1.data.sum() == mask1.sum() + mask2.sum()
-    assert np.allclose(out_msk1.get_tile(tm1).data, mask1)
-    assert np.allclose(out_msk1.get_tile(tm2).data, mask2)
-    
+    assert np.allclose(out_msk1.select(tm1).data, mask1)
+    assert np.allclose(out_msk1.select(tm2).data, mask2)
+
     assert len(out_pts1.data) == len(points1) + len(points2)
-    assert np.allclose(out_pts1.get_tile(tm1).data, points1)
-    assert np.allclose(out_pts1.get_tile(tm2).data, points2)
-    
+    assert np.allclose(out_pts1.select(tm1).data, points1)
+    assert np.allclose(out_pts1.select(tm2).data, points2)
+
     assert len(out_vct1.data) == len(vectors1) + len(vectors2)
-    assert np.allclose(out_vct1.get_tile(tm1).data, vectors1)
-    assert np.allclose(out_vct1.get_tile(tm2).data, vectors2)
-    
+    assert np.allclose(out_vct1.select(tm1).data, vectors1)
+    assert np.allclose(out_vct1.select(tm2).data, vectors2)
+
     assert len(out_box1.data) == len(boxes1) + len(boxes2)
-    
-    res1 = results1.get_tile(tm1)
+
+    res1 = results1.select(tm1)
     assert np.allclose(res1.read(img1.name).data, image1)
     assert np.allclose(res1.read(msk1.name).data, mask1)
     assert np.allclose(res1.read(pts1.name).data, points1)
     assert np.allclose(res1.read(vct1.name).data, vectors1)
-    
-    res2 = results1.get_tile(tm2)
+
+    res2 = results1.select(tm2)
     assert np.allclose(res2.read(img1.name).data, image2)
     assert np.allclose(res2.read(msk1.name).data, mask2)
     assert np.allclose(res2.read(pts1.name).data, points2)
