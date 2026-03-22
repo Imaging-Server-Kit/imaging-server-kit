@@ -7,7 +7,7 @@ from imaging_server_kit.core.errors import (
     AlgorithmRuntimeError,
     napari_available,
 )
-from imaging_server_kit.core.results import LayerStackBase, Results
+from imaging_server_kit.core.results import LayerStackBase, Results, ResultsTileGenerator
 from imaging_server_kit.core.tiling import TilingContext
 
 NAPARI_INSTALLED = napari_available()
@@ -69,17 +69,18 @@ class AlgorithmRunner(ABC):
         tiling_ctx: Optional[TilingContext] = None,
     ):
         tile_progress_needed = tiling_ctx is not None
-        
+
         if tiling_ctx is None:
             tiling_ctx = (
-                TilingContext(tile_size_px=params_res.pixel_domain)
-                if params_res.pixel_domain
+                TilingContext(tile_size=params_res.bounds)
+                if params_res.bounds
                 else None
             )
 
-        for params_tile in params_res.generate_tiles(tiling_ctx):
+        results_tile_gen = ResultsTileGenerator()
+        for params_tile in results_tile_gen.generate_tiles(params_res, tiling_ctx):
             for result_tile in self._stream(algorithm, params_tile):
-                
+
                 # Construct the progress data
                 params_tile_meta = None
                 progress_data = 0
@@ -98,14 +99,14 @@ class AlgorithmRunner(ABC):
                         data=progress_data,
                         max_val=progress_max_val,
                     )
-                
+
                 # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
                 if params_tile_meta is not None:
                     # Set the tile index to be the current index for all result layers
                     for l in result_tile:
                         l.tile_meta.tile_idx = params_tile_meta.tile_idx
                         l.tile_meta.n_tiles = params_tile_meta.n_tiles
-                        # TODO: This will be wrong if the pixel_domain of result_tile is different
+                        # TODO: This will be wrong if the bounds of the result_tile is different
                         # from that of the params_tile... could we look at the ratios
                         # of domain sizes between params_tile and result_tile to infer the new coords_min instead?
                         if params_tile_meta.coords_min is not None:
@@ -113,10 +114,10 @@ class AlgorithmRunner(ABC):
 
                         if params_tile_meta.overlap_px is not None:
                             l.tile_meta.overlap_px = params_tile_meta.overlap_px
-                        
+
                         l.tile_meta.first_tile = params_tile_meta.first_tile
                         l.tile_meta.last_tile = params_tile_meta.last_tile
-                        
+
                 yield result_tile
 
     def run(
@@ -172,9 +173,9 @@ class AlgorithmRunner(ABC):
         params_res = Results()
         for name, data in resolved_params.items():
             kw = algo_param_defs[name]
-            kind = kw.pop('param_type')
-            if 'anyOf' in kw:
-                kw.pop('anyOf')  # added by Pydantic - we don't need it.
+            kind = kw.pop("param_type")
+            if "anyOf" in kw:
+                kw.pop("anyOf")  # added by Pydantic - we don't need it.
             params_res.create(kind=kind, data=data, name=name, **kw)
 
         if results is None:
@@ -193,8 +194,8 @@ class AlgorithmRunner(ABC):
         # Construct the tiling context
         if tiled:
             tiling_ctx = TilingContext(
-                tile_size_px=tile_size_px,
-                overlap_percent=overlap_percent,
+                tile_size=tile_size_px,
+                overlap=overlap_percent,
                 randomize=randomize,
                 delay_sec=delay_sec,
             )
@@ -205,7 +206,7 @@ class AlgorithmRunner(ABC):
         for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
             results.merge(tile_results)
 
-        # TODO: Instead of calling merge many times, each time increasing the domain, 
+        # TODO: Instead of calling merge many times, each time increasing the domain,
         # we could do a single merge at the end (with no intermediate updates of the container).
         # Or, we could call results.merge at a given update frequency (every N tiles).
 

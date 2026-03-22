@@ -13,18 +13,18 @@ import numpy as np
 class TilingError(Exception):
     def __init__(
         self,
-        pixel_domain,
+        bounds,
         provided_shape,
-        message="Error during tiling occured. Provided shape (overlap or tile) is inconsistent with the pixel domain: ",
+        message="Error during tiling occured. Provided shape (overlap or tile) is inconsistent with the pixel bounds: ",
     ):
-        self.message = message + f"{pixel_domain=}, {provided_shape=}"
+        self.message = message + f"{bounds=}, {provided_shape=}"
         super().__init__(self.message)
 
 
 @dataclass
 class TilingContext:
-    tile_size_px: Union[int, Tuple, List] = 64
-    overlap_percent: Union[float, Tuple, List] = 0.0
+    tile_size: Union[int, Tuple, List] = 64
+    overlap: Union[float, Tuple, List] = 0.0
     randomize: bool = False
     delay_sec: float = 0.0
 
@@ -162,7 +162,11 @@ class TileMeta:
         overlap_count_arr = np.ones(self.tile_size, dtype=np.int16)
         for c in per_axis:
             overlap_count_arr *= c.reshape(
-                c.shape + (1,) * (overlap_count_arr.ndim - c.ndim)  # Add fake dims (fixes the RGB case)
+                c.shape
+                + (1,)
+                * (
+                    overlap_count_arr.ndim - c.ndim
+                )  # Add fake dims (fixes the RGB case)
             )
 
         return overlap_count_arr
@@ -218,42 +222,42 @@ class TileMeta:
         return TileMeta(**self.serialize())
 
 
-def valid_tile_size(
-    tile_size_px: Union[int, Tuple, List], pixel_domain: Union[Tuple, List]
+def _valid_tile_size(
+    tile_size: Union[int, Tuple, List], bounds: Union[Tuple, List]
 ) -> bool:
-    """Validates that the tile size is positive and compatible with the pixel domain."""
-    if isinstance(tile_size_px, int):
-        if tile_size_px <= 0:
+    """Validates that the tile size is positive and compatible with the pixel bounds."""
+    if isinstance(tile_size, int):
+        if tile_size <= 0:
             return False
-    elif isinstance(tile_size_px, (List, Tuple)):
-        if len(tile_size_px) != len(pixel_domain):
+    elif isinstance(tile_size, (List, Tuple)):
+        if len(tile_size) != len(bounds):
             return False
-        for t in tile_size_px:
+        for t in tile_size:
             if t <= 0:
                 return False
     return True
 
 
-def valid_overlap(
-    overlap_percent: Union[float, Tuple, List], pixel_domain: Union[Tuple, List]
+def _valid_overlap(
+    overlap: Union[float, Tuple, List], bounds: Union[Tuple, List]
 ) -> bool:
-    """Validate that the overlap is in the range [0-1] and compatible with the pixel domain."""
-    if isinstance(overlap_percent, float):
-        if (overlap_percent < 0.0) or (overlap_percent > 1.0):
+    """Validate that the overlap is in the range [0-1] and compatible with the pixel bounds."""
+    if isinstance(overlap, float):
+        if (overlap < 0.0) or (overlap > 1.0):
             return False
-    elif isinstance(overlap_percent, (Tuple, List)):
-        if len(overlap_percent) != len(pixel_domain):
+    elif isinstance(overlap, (Tuple, List)):
+        if len(overlap) != len(bounds):
             return False
-        for o in overlap_percent:
+        for o in overlap:
             if (o < 0.0) or (o > 1):
                 return False
     return True
 
 
-def generate_nd_tiles(
-    pixel_domain: Optional[Union[Tuple, List]] = None,
-    tile_size_px: Union[int, Tuple, List] = 64,
-    overlap_percent: Union[float, Tuple, List] = 0.0,
+def generate_tiles(
+    bounds: Optional[Union[Tuple, List]] = None,
+    tile_size: Union[int, Tuple, List] = 64,
+    overlap: Union[float, Tuple, List] = 0.0,
     randomize: bool = False,
     delay_sec: float = 0.0,
 ) -> Generator[TileMeta, None, None]:
@@ -261,13 +265,13 @@ def generate_nd_tiles(
 
     Parameters
     ----------
-    pixel_domain : tuple or list
+    bounds : tuple or list
         The size of the domain to partition into tiles, in pixels (typically, `image.shape` can be used).
-    tile_size_px : int or tuple or list (optional)
+    tile_size : int or tuple or list (optional)
         The size of an individual tile, in pixels. If an integer is provided, the same size is used
-        for all dimensions. If a tuple or list is provided, it must match the dimensionality of `pixel_domain`.
+        for all dimensions. If a tuple or list is provided, it must match the dimensionality of `bounds`.
         Default is 64.
-    overlap_percent : float or tuple or list (optional)
+    overlap : float or tuple or list (optional)
         Relative overlap between adjacent tiles (in the range [0, 1]). If an integer is provided, the same relative
         overlap is used for all dimensions.
         Default is 0.0 (no overlap).
@@ -280,30 +284,30 @@ def generate_nd_tiles(
     ------
     A dictionary `tile_info` that contains metadata about the generated tile, including its position, size, and index in the tile series.
     """
-    if pixel_domain is None:
+    if bounds is None:
         yield TileMeta()
     else:
         if delay_sec < 0:
             raise ValueError("Time delay (delay_sec) should be positive.")
 
-        if not valid_overlap(overlap_percent, pixel_domain):
+        if not _valid_overlap(overlap=overlap, bounds=bounds):
             raise ValueError(
-                f"Invalid tile overlap: {overlap_percent}. Expected a value or list/tuple in the range [0-1] compatible with the pixel domain ({pixel_domain})."
+                f"Invalid tile overlap: {overlap}. Expected a value or list/tuple in the range [0-1] compatible with the pixel domain ({bounds})."
             )
 
-        if not valid_tile_size(tile_size_px, pixel_domain):
+        if not _valid_tile_size(tile_size=tile_size, bounds=bounds):
             raise ValueError(
-                f"Invalid tile size: {tile_size_px}. Expected a positive integer, or list/tuple of positive integers compatible with the pixel domain ({pixel_domain})."
+                f"Invalid tile size: {tile_size}. Expected a positive integer, or list/tuple of positive integers compatible with the pixel domain ({bounds})."
             )
 
-        tiling_ctx = TilingContext(
-            tile_size_px=tile_size_px,
-            overlap_percent=overlap_percent,
+        ctx = TilingContext(
+            tile_size=tile_size,
+            overlap=overlap,
             randomize=randomize,
             delay_sec=delay_sec,
         )
 
-        for tile_meta in _generate_tile_meta(pixel_domain, tiling_ctx):
+        for tile_meta in _generate_tile_meta(bounds=bounds, ctx=ctx):
             time.sleep(delay_sec)
             yield tile_meta
 
@@ -328,7 +332,7 @@ def _tiles_info_axis(size_i: int, tile_size_i: int, overlap_px_i: int):
 def _get_tile_pos_and_size_i(
     idx_i: int, size_i: int, shift_i: int, half_pad_i: int, tile_size_i: int
 ):
-    """Compute the tile position and size and remove parts of border tiles outside of the pixel domain."""
+    """Compute the tile position and size and remove parts of border tiles outside of the pixel bounds."""
     coord_i = idx_i * shift_i - half_pad_i
     if coord_i < 0:
         pos_i = 0
@@ -351,24 +355,26 @@ def _get_tile_pos_and_size_i(
     return pos_i, tile_size_i, is_first_tile_i, is_last_tile_i
 
 
-def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) -> Generator[TileMeta, None, None]:
+def _generate_tile_meta(
+    bounds: Union[Tuple, List], ctx: TilingContext
+) -> Generator[TileMeta, None, None]:
     """Tiling in N-dimensions."""
-    ndim = len(pixel_domain)
+    ndim = len(bounds)
 
     # Resolve the tile shape and overlap
-    if isinstance(ctx.tile_size_px, (list, tuple)):
-        tile_shape = ctx.tile_size_px
+    if isinstance(ctx.tile_size, (list, tuple)):
+        tile_shape = ctx.tile_size
         if len(tile_shape) != ndim:
-            raise TilingError(pixel_domain=pixel_domain, provided_shape=tile_shape)
+            raise TilingError(bounds=bounds, provided_shape=tile_shape)
     else:
-        tile_shape = [ctx.tile_size_px] * ndim  # Isotropic tile
+        tile_shape = [ctx.tile_size] * ndim  # Isotropic tile
 
-    if isinstance(ctx.overlap_percent, (list, tuple)):
-        overlap = ctx.overlap_percent
+    if isinstance(ctx.overlap, (list, tuple)):
+        overlap = ctx.overlap
         if len(overlap) != ndim:
-            raise TilingError(pixel_domain=pixel_domain, provided_shape=overlap)
+            raise TilingError(bounds=bounds, provided_shape=overlap)
     else:
-        overlap = [ctx.overlap_percent] * ndim
+        overlap = [ctx.overlap] * ndim
 
     # Overlap in pixels (TODO: we could allow users to pass an overlap in pixels directly)
     overlap_px = [
@@ -377,7 +383,7 @@ def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) ->
     ]
 
     tile_infos_axes = [
-        _tiles_info_axis(pixel_domain[axis], tile_shape[axis], overlap_px[axis])
+        _tiles_info_axis(bounds[axis], tile_shape[axis], overlap_px[axis])
         for axis in range(ndim)
     ]
     n_pix_ax = [returns[0] for returns in tile_infos_axes]
@@ -405,12 +411,14 @@ def _generate_tile_meta(pixel_domain: Union[Tuple, List], ctx: TilingContext) ->
                 zip(tile_coord_ax, n_pix_ax, shift_ax, half_pad_ax)
             ):
                 tile_shape_i = tile_shape[axis]
-                pos_i, tile_size_i, first_tile_i, last_tile_i = _get_tile_pos_and_size_i(
-                    coord_i,
-                    n_pix_i,
-                    shift_i,
-                    half_pad_i,
-                    tile_shape_i,
+                pos_i, tile_size_i, first_tile_i, last_tile_i = (
+                    _get_tile_pos_and_size_i(
+                        coord_i,
+                        n_pix_i,
+                        shift_i,
+                        half_pad_i,
+                        tile_shape_i,
+                    )
                 )
                 first_tile.append(first_tile_i)
                 last_tile.append(last_tile_i)

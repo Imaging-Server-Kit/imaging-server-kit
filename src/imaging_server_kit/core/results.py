@@ -5,8 +5,9 @@ from typing import Any, Dict, Generator, List, Optional, Type
 
 import numpy as np
 
+from imaging_server_kit.merge.layer_merger import LayerMerger
 from imaging_server_kit.types import DATA_TYPES, DataLayer
-from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_nd_tiles
+from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_tiles
 
 
 class LayerStackBase(ABC):
@@ -29,7 +30,7 @@ class LayerStackBase(ABC):
 
     @property
     @abstractmethod
-    def pixel_domain(self) -> Optional[List]: ...
+    def bounds(self) -> Optional[List]: ...
 
     def __len__(self):
         return len(self.layers)
@@ -37,8 +38,8 @@ class LayerStackBase(ABC):
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, idx: int) -> DataLayer:
-        return self.layers[idx]
+    def __getitem__(self, key) -> DataLayer:   
+        return self.layers[key]
 
     def merge(self, layer_stack: Optional[LayerStackBase]) -> None:
         """Merge another layer stack, based on layer names.
@@ -53,26 +54,27 @@ class LayerStackBase(ABC):
         if layer_stack is None:
             return
 
-        dst_layers = []
-        for src_layer in layer_stack:
-            dst_layer = self.read(src_layer.name)
-            if dst_layer is None:
-                dst_layer = self.create(
-                    kind=src_layer.kind,
-                    name=src_layer.name,
-                    meta=src_layer.meta,
-                    merger=src_layer.merger_type,
-                    data_serializer=src_layer.data_serializer,
+        receiving_layers = []
+        for incoming_layer in layer_stack:
+            receiving_layer = self.read(incoming_layer.name)
+            if receiving_layer is None:
+                receiving_layer = self.create(
+                    kind=incoming_layer.kind,
+                    name=incoming_layer.name,
+                    meta=incoming_layer.meta,
+                    merger=incoming_layer.merger,
+                    serializer=incoming_layer.serializer,
                     data=None,
                 )
-            dst_layers.append(dst_layer)
+            receiving_layers.append(receiving_layer)
 
-        for src_layer, dst_layer in zip(layer_stack, dst_layers):
-            dst_layer.merge(src_layer)
-        
-        self.post_merge(dst_layers)
-    
-    def post_merge(self, dst_layers: List[DataLayer]):
+        layer_merger = LayerMerger()
+        for incoming_layer, receiving_layer in zip(layer_stack, receiving_layers):
+            layer_merger.merge(receiving_layer, incoming_layer)
+
+        self.post_merge(receiving_layers)
+
+    def post_merge(self, receiving_layers: List[DataLayer]):
         pass
 
     def to_params_dict(self) -> Dict[str, Any]:
@@ -92,7 +94,7 @@ class LayerStackBase(ABC):
             algo_params[layer.name] = layer.data
         return algo_params
 
-    def resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:
+    def _resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:
         # Make sure layer has a name
         if name is None:
             name = kind.capitalize()
@@ -136,8 +138,8 @@ class Results(LayerStackBase):
                     name=l.name,
                     meta=l.meta,
                     tile_meta=l.tile_meta,
-                    merger=l.merger_type,
-                    data_serializer=l.data_serializer,
+                    merger=l.merger,
+                    serializer=l.serializer,
                 )
 
     def __str__(self):
@@ -149,23 +151,93 @@ class Results(LayerStackBase):
 
     def __repr__(self):
         return self.__str__()
+    
+    
+    # def __getitem__(self, key) -> DataLayer:
+    #     # Results have a `layers` dimension (first dimension)
+    #     # so we index as [Layer, Dim0, Dim1, .., DimN]
+    #     if not isinstance(key, tuple):
+    #         key = (key,)
+        
+    #     layer_key = key[0]
+            
+    #     tile_size = []
+    #     tile_pos = []
+    #     if len(key) > 1:
+    #         # We are selecting in the layers; we skip the `layers` dimension
+    #         for dim, k in enumerate(key[1:]):
+    #             if isinstance(k, slice):
+    #                 start = 0 if k.start is None else k.start
+    #                 stop = self.bounds[dim] if k.stop is None else k.stop
+    #                 tile_pos.append(start)
+    #                 tile_size.append(stop - start)
+    #             else:
+    #                 tile_pos.append(k)
+    #                 tile_size.append(0)
+            
+    #     if self.ndim is not None:
+    #         if len(tile_size) < self.ndim:
+    #             for dim in range(len(tile_size), self.ndim):
+    #                 tile_size.append(self.bounds[dim])
+    #                 tile_pos.append(self.tile_meta.coords_min[dim])
 
+    #     tile_meta = TileMeta(
+    #         tile_size=tile_size,
+    #         tile_pos=tile_pos,
+    #     )
+        
+    #     extract: Results = self.select(tile_meta=tile_meta)
+
+    #     if isinstance(layer_key, slice):
+    #         start = 0 if layer_key.start is None else layer_key.start
+    #         stop = len(self.layers) if layer_key.stop is None else layer_key.stop
+    #         layer_selection = extract.layers[start:stop]
+    #     else:
+    #         # Layer_key is an int
+    #         ## TODO: extract has a.. hard copy of the layers?
+    #         layer_selection = extract.layers[layer_key]
+    #         # layer_selection = self.layers[layer_key]
+        
+    #     return layer_selection
+    
+    @property
+    def ndim(self) -> Optional[int]:
+        if self.bounds is not None:
+            return len(self.bounds)
+        
+    @property
+    def tile_meta(self) -> TileMeta:
+        if self.ndim is not None:
+            tile_size = []
+            tile_pos = []
+            for dim in range(self.ndim):
+                tile_size.append(self.bounds[dim])
+                tile_pos.append(0)  # No global results offset (for now)
+
+            return TileMeta(
+                tile_size=tile_size,
+                tile_pos=tile_pos,
+            )
+        else:
+            return TileMeta()
+    
+    
     @property
     def layers(self) -> List[DataLayer]:
         return self._layers
 
     @property
-    def pixel_domain(self) -> Optional[List[int]]:
-        domains = []
+    def bounds(self) -> Optional[List[int]]:
+        layer_bounds = []
         for data_layer in self.layers:
-            if data_layer.pixel_domain is not None:
-                domains.append(data_layer.pixel_domain)
-        if len(domains):
-            # Final domain is the max bound of all layer domains
+            if data_layer.bounds is not None:
+                layer_bounds.append(data_layer.bounds)
+        if len(layer_bounds):
+            # Final domain is the max of all layer bounds
             # TODO: Should we handle cases where, e.g. 2D and 3D data are both present?
             # For ex. by casting the lowest dimensionality layers to higher-dim?
             # For now, this is not supported (result layers must have ndim=None or all the the same).
-            return np.max(np.stack(domains), axis=0).tolist()
+            return np.max(np.stack(layer_bounds), axis=0).tolist()
 
     def create(self, kind: str, name: Optional[str] = None, **kwargs) -> DataLayer:
         """Create a new layer in the results stack.
@@ -181,12 +253,12 @@ class Results(LayerStackBase):
             raise ValueError(f"{kind} layers cannot be handled.")
 
         # Instantiate layer
-        name = self.resolve_layer_name(kind, name)
+        name = self._resolve_layer_name(kind, name)
         layer = cls(name=name, **kwargs)
 
         # Add layer to the stack
         self._layers.append(layer)
-        
+
         self.post_create(layer)
 
         return layer
@@ -205,27 +277,30 @@ class Results(LayerStackBase):
         for idx, layer in enumerate(self.layers):
             if layer.name == name:
                 self._layers.pop(idx)
-        
+
         self.post_delete(name)
-    
+
     def post_delete(self, name: str) -> None:
         pass
 
+    def select(self, tile_meta: TileMeta) -> Results:
+        return Results(layers=[l.select(tile_meta.copy()) for l in self.layers])
+
+
+class ResultsTileGenerator:
+    @staticmethod
     def generate_tiles(
-        self, ctx: Optional[TilingContext]
+        results: Results, ctx: Optional[TilingContext]
     ) -> Generator[Results, None, None]:
         if ctx is None:
             tile_meta = TileMeta()
-            yield self.get_tile(tile_meta)
+            yield results.select(tile_meta)
         else:
-            for tile_meta in generate_nd_tiles(
-                pixel_domain=self.pixel_domain,
-                tile_size_px=ctx.tile_size_px,
-                overlap_percent=ctx.overlap_percent,
+            for tile_meta in generate_tiles(
+                bounds=results.bounds,
+                tile_size=ctx.tile_size,
+                overlap=ctx.overlap,
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                yield self.get_tile(tile_meta)
-
-    def get_tile(self, tile_meta: TileMeta) -> Results:
-        return Results(layers=[l.get_tile(tile_meta.copy()) for l in self.layers])
+                yield results.select(tile_meta)

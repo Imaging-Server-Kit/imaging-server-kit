@@ -13,7 +13,7 @@ from .core import (
     combine,
     LayerStackBase,
     Results,
-    generate_nd_tiles,
+    generate_tiles,
     TileMeta,
 )
 
@@ -35,8 +35,9 @@ from .types import (
     Notification,
     Null,
     Progress,
-    merge_layers,
 )
+
+from .merge import merge_layers, LayerMerger
 
 from .core.errors import napari_available
 
