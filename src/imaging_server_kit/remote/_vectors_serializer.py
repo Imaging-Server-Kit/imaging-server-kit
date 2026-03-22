@@ -3,7 +3,7 @@ from geojson import Feature, LineString
 
 import numpy as np
 
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.types._vectors import Vectors
 
 

@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 
 from imaging_server_kit.core.tiling import TileMeta
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.types.data_layer import DataLayer
 
 

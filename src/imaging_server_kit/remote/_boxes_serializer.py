@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from geojson import Feature, Polygon
 import numpy as np
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.types._boxes import Boxes
 
 

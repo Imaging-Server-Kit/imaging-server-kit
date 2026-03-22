@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.remote.encoding import decode_contents, encode_contents
 from imaging_server_kit.types._tracks import Tracks
 

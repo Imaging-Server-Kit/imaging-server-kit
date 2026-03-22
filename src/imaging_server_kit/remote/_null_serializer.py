@@ -1,7 +1,7 @@
 
 from typing import Optional
 
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.types._null import Null
 
 

@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 from geojson import Feature, Point
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.remote.encoding import decode_contents, encode_contents
 import numpy as np
 

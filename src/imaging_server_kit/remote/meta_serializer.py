@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 import base64
 
 import numpy as np
-from imaging_server_kit.remote.data_serializer import Serializer
+from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.remote.encoding import encode_contents, decode_contents
 from imaging_server_kit.types.data_layer import DataLayer
 
