@@ -17,7 +17,7 @@ class Null(DataLayer):
         name="None",
         description="Null (None) type",
         default=None,
-        data_serializer: str = "default",
+        serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -29,6 +29,6 @@ class Null(DataLayer):
             data=data,
             tile_meta=tile_meta,
             default=default,
-            data_serializer=data_serializer,
+            serializer=serializer,
             **kwargs,
         )

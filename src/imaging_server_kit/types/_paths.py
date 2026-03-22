@@ -15,14 +15,14 @@ class Paths(DataLayer):
     """
 
     kind = "paths"
-    
+
     def __init__(
         self,
         data: Optional[List] = None,
         name="Paths",
         description="Input paths shapes (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        data_serializer: str = "default",
+        serializer: str = "default",
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
         **kwargs,
@@ -34,10 +34,10 @@ class Paths(DataLayer):
             data=data,
             tile_meta=tile_meta,
             dimensionality=dimensionality,
-            data_serializer=data_serializer,
+            serializer=serializer,
             **kwargs,
         )
-        
+
     def __str__(self) -> str:
         return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
 
@@ -49,22 +49,20 @@ class Paths(DataLayer):
             return len(self.data)
 
     @property
-    def data_pixel_domain(self) -> Optional[Tuple]:
+    def data_bounds(self) -> Optional[Tuple]:
         if self.data is None:
             return
         if self.n_objects > 0:
-            path_domains = []
+            path_bounds = []
             for path in self.data:
-                path_domain = np.max(path, axis=0)
-                path_domains.append(list(path_domain))
-            path_domains = np.asarray(path_domains)
-            pixel_domain = np.max(path_domains, axis=0)
-            return tuple(pixel_domain)
+                path_bounds.append(list(np.max(path, axis=0)))
+            bounds = np.max(np.asarray(path_bounds), axis=0).tolist()
+            return tuple(bounds)
 
     @staticmethod
-    def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]]
+    def initialize_data(
+        bounds: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
-        if pixel_domain is None:
+        if bounds is None:
             return
         return np.asarray([])

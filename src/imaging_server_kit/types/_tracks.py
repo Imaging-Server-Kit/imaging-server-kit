@@ -36,12 +36,12 @@ class Tracks(DataLayer):
         )
 
     @staticmethod
-    def _get_initial_data(
-        pixel_domain: Optional[Union[Tuple, List]],
+    def initialize_data(
+        bounds: Optional[Union[Tuple, List]],
     ) -> Optional[np.ndarray]:
-        if pixel_domain is None:
+        if bounds is None:
             return
-        return np.zeros((1, len(pixel_domain) + 2), dtype=np.float32)
+        return np.zeros((1, len(bounds) + 2), dtype=np.float32)
 
     @property
     def n_objects(self) -> int:
@@ -51,7 +51,7 @@ class Tracks(DataLayer):
             return len(self.data)
 
     @property
-    def data_pixel_domain(self) -> Optional[Tuple]:
+    def data_bounds(self) -> Optional[Tuple]:
         if self.data is None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0)[2:])
