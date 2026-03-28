@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.types.data_layer import DataLayer
-from imaging_server_kit.core.tiling import TileMeta
+from imaging_server_kit.core.tiling import Domain
 
 
 class Image(DataLayer):
@@ -25,16 +25,12 @@ class Image(DataLayer):
         name="Image",
         description="Input image (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         rgb: bool = False,
         **kwargs,
     ):
         super().__init__(
-            name=name,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
+            name=name,
             description=description,
             dimensionality=dimensionality,
             rgb=rgb,
@@ -42,7 +38,7 @@ class Image(DataLayer):
         )
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if self._data is None:
             return
         if self.meta is None:
@@ -52,21 +48,26 @@ class Image(DataLayer):
         else:
             return self._data.shape
 
-    def select(self, tile_meta: TileMeta) -> Image:
+    def select(self, domain: Domain) -> Image:
         if (
             (self.data is None)
-            or (tile_meta.coords_max is None)
-            or (self.bounds is None)
+            or (domain.coords_max is None)
+            or (self.coords_max is None)
         ):
             _data = None
         else:
-            _data = self.data[tile_meta.slices]
+            # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
+            domain_local = domain.copy()
+            domain_local.coords_min = tuple(np.array(domain_local.coords_min) - np.array(self.coords_min))
+            # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
+            _data = self.data[domain_local.slices]
 
         return Image(
             data=_data,
             name=self.name,
             meta=self.meta,
-            tile_meta=tile_meta,
+            tile_meta=self.tile_meta,
+            domain=domain,
         )
 
     @staticmethod

@@ -3,6 +3,7 @@ from typing import Any, Dict, Type
 from imaging_server_kit.types import DataLayer, DATA_TYPES
 from imaging_server_kit.remote.meta_serializer import DefalutMetaSerializer
 from imaging_server_kit.remote.tile_serializer import TileMetaSerializer
+from imaging_server_kit.remote.domain_serializer import DomainSerializer
 from imaging_server_kit.remote.serializer import Serializer, DefaultDataSerializer
 from imaging_server_kit.remote._image_serializer import ImageDataSerializer
 from imaging_server_kit.remote._mask_serializer import MaskDataSerializer
@@ -49,6 +50,9 @@ class LayerSerializer(Serializer):
 
         tile_serializer = TileMetaSerializer()
         serialized_tile_meta = tile_serializer.serialize(layer, client_origin)
+        
+        domain_serializer = DomainSerializer()
+        serialized_domain = domain_serializer.serialize(layer, client_origin)
 
         return {
             "kind": layer.kind,
@@ -56,6 +60,7 @@ class LayerSerializer(Serializer):
             "name": layer.name,
             "meta": serialized_meta,
             "tile_meta": serialized_tile_meta,
+            "domain": serialized_domain,
             "merger": layer.merger,
             "serializer": layer.serializer,
         }
@@ -68,6 +73,7 @@ class LayerSerializer(Serializer):
         encoded_data = serialized_layer["data"]
         encoded_meta = serialized_layer["meta"]
         encoded_tile_meta = serialized_layer["tile_meta"]
+        encoded_domain = serialized_layer["domain"]
         merger = serialized_layer["merger"]
         serializer = serialized_layer["serializer"]
 
@@ -81,12 +87,16 @@ class LayerSerializer(Serializer):
 
         tile_serializer = TileMetaSerializer()
         tile_meta = tile_serializer.deserialize(encoded_tile_meta, client_origin)
+        
+        domain_serializer = DomainSerializer()
+        domain = domain_serializer.deserialize(encoded_domain, client_origin)
 
         return cls(
             data=data,
             name=name,
             meta=meta,
             tile_meta=tile_meta,
+            domain=domain,
             merger=merger,
             serializer=serializer,
         )

@@ -111,8 +111,8 @@ def test_sk_tiled_vectors():
     assert len(vectors) == 40
 
     results = sk_tiled_vectors_input.run(image, vectors, tiled=True, tile_size_px=25)
-    new_points = results.read("Vectors").data
-    assert np.sum(new_points[:, :, 0]) - np.sum(vectors[:, :, 1]) < 1e-6
+    new_vectors = results.read("Vectors").data
+    assert np.sum(new_vectors) - np.sum(vectors) < 1e-6
 
 
 ### Tiled boxes
@@ -211,7 +211,7 @@ def test_sk_label():
 
 ### -- Selecting data -- ###
 
-# In an Image, via indexing
+# In an Image, via indexing and select()
 def test_select_indexing_image():
     data = np.random.random((20, 20, 20))
     image = sk.Image(data)
@@ -223,9 +223,9 @@ def test_select_indexing_image():
     extract2 = data[:, :, :4]
     image_extract2 = image[:, :, :4].data
     assert np.allclose(extract2, image_extract2)
+    
 
-
-# In a Results, via indexing
+# In a Results, via indexing and select()
 def test_select_indexing_results():
     results = sk.Results(
         layers=[
@@ -320,38 +320,38 @@ def test_merge_results():
     out_vct1 = results1.read(vct1.name)
     out_box1 = results1.read(box1.name)
 
-    tm1 = sk.TileMeta(tile_size=(rx, ry), tile_pos=(0, 0))
-    tm2 = sk.TileMeta(tile_size=(rx, ry), tile_pos=(rx, ry))
-
+    domain1 = sk.Domain(size=(rx, ry), position=(0, 0))
+    domain2 = sk.Domain(size=(rx, ry), position=(rx, ry))
+    
     assert np.allclose(out_img1.data[:rx, :ry], image1)
     assert np.allclose(out_img1.data[rx:, ry:], image2)
     assert out_img1.data.sum() == image1.sum() + image2.sum()
-    assert np.allclose(out_img1.select(tm1).data, image1)
-    assert np.allclose(out_img1.select(tm2).data, image2)
+    assert np.allclose(out_img1.select(domain1).data, image1)
+    assert np.allclose(out_img1.select(domain2).data, image2)
 
     assert np.allclose(out_msk1.data[:rx, :ry], mask1)
     assert np.allclose(out_msk1.data[rx:, ry:], mask2)
     assert out_msk1.data.sum() == mask1.sum() + mask2.sum()
-    assert np.allclose(out_msk1.select(tm1).data, mask1)
-    assert np.allclose(out_msk1.select(tm2).data, mask2)
+    assert np.allclose(out_msk1.select(domain1).data, mask1)
+    assert np.allclose(out_msk1.select(domain2).data, mask2)
 
     assert len(out_pts1.data) == len(points1) + len(points2)
-    assert np.allclose(out_pts1.select(tm1).data, points1)
-    assert np.allclose(out_pts1.select(tm2).data, points2)
+    assert np.allclose(out_pts1.select(domain1).data, points1)
+    assert np.allclose(out_pts1.select(domain2).data, points2)
 
     assert len(out_vct1.data) == len(vectors1) + len(vectors2)
-    assert np.allclose(out_vct1.select(tm1).data, vectors1)
-    assert np.allclose(out_vct1.select(tm2).data, vectors2)
+    assert np.allclose(out_vct1.select(domain1).data, vectors1)
+    assert np.allclose(out_vct1.select(domain2).data, vectors2)
 
     assert len(out_box1.data) == len(boxes1) + len(boxes2)
 
-    res1 = results1.select(tm1)
+    res1 = results1.select(domain1)
     assert np.allclose(res1.read(img1.name).data, image1)
     assert np.allclose(res1.read(msk1.name).data, mask1)
     assert np.allclose(res1.read(pts1.name).data, points1)
     assert np.allclose(res1.read(vct1.name).data, vectors1)
 
-    res2 = results1.select(tm2)
+    res2 = results1.select(domain2)
     assert np.allclose(res2.read(img1.name).data, image2)
     assert np.allclose(res2.read(msk1.name).data, mask2)
     assert np.allclose(res2.read(pts1.name).data, points2)

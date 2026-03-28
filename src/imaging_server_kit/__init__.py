@@ -15,6 +15,7 @@ from .core import (
     Results,
     generate_tiles,
     TileMeta,
+    Domain,
 )
 
 from .remote import Client, serve
@@ -135,6 +136,10 @@ def convert(
             data=layer.data,
             name=layer.name,
             meta=layer.meta,
+            tile_meta=layer.tile_meta,
+            domain=layer.domain,
+            merger=layer.merger,
+            serializer=layer.serializer,
         )
 
     if to == "napari":

@@ -1,11 +1,10 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 try:
     from typing import Literal
 except ImportError:
     from typing_extensions import Literal
 
-from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -30,16 +29,12 @@ class Choice(DataLayer):
         required: bool = True,
         default: str = "",
         auto_call: bool = False,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             description=description,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
             required=required,
             default=default,
             auto_call=auto_call,

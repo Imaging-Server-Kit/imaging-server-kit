@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generator, List, Optional, Type
+from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
 import numpy as np
 
 from imaging_server_kit.merge.layer_merger import LayerMerger
 from imaging_server_kit.types import DATA_TYPES, DataLayer
-from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_tiles
+from imaging_server_kit.core.tiling import (
+    TileMeta,
+    TilingContext,
+    generate_tiles,
+    Domain,
+)
 
 
 class LayerStackBase(ABC):
@@ -28,17 +33,13 @@ class LayerStackBase(ABC):
     @abstractmethod
     def delete(self, name: str) -> None: ...
 
-    @property
-    @abstractmethod
-    def bounds(self) -> Optional[List]: ...
-
     def __len__(self):
         return len(self.layers)
 
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, key) -> DataLayer:   
+    def __getitem__(self, key) -> DataLayer:
         return self.layers[key]
 
     def merge(self, layer_stack: Optional[LayerStackBase]) -> None:
@@ -62,6 +63,9 @@ class LayerStackBase(ABC):
                     kind=incoming_layer.kind,
                     name=incoming_layer.name,
                     meta=incoming_layer.meta,
+                    # TODO: correct?
+                    tile_meta=incoming_layer.tile_meta,
+                    domain=incoming_layer.domain,
                     merger=incoming_layer.merger,
                     serializer=incoming_layer.serializer,
                     data=None,
@@ -128,7 +132,11 @@ class Results(LayerStackBase):
         Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
     """
 
-    def __init__(self, layers: Optional[List[DataLayer]] = None):
+    def __init__(
+        self,
+        layers: Optional[List[DataLayer]] = None,
+        tile_meta: Optional[TileMeta] = None,
+    ):
         self._layers: List[DataLayer] = []
         if layers is not None:
             for l in layers:
@@ -138,9 +146,13 @@ class Results(LayerStackBase):
                     name=l.name,
                     meta=l.meta,
                     tile_meta=l.tile_meta,
+                    domain=l.domain,
                     merger=l.merger,
                     serializer=l.serializer,
                 )
+
+        tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+        self._tile_meta = tile_meta
 
     def __str__(self):
         message = f"Results (Layers: {len(self.layers)})"
@@ -151,93 +163,54 @@ class Results(LayerStackBase):
 
     def __repr__(self):
         return self.__str__()
-    
-    
-    # def __getitem__(self, key) -> DataLayer:
-    #     # Results have a `layers` dimension (first dimension)
-    #     # so we index as [Layer, Dim0, Dim1, .., DimN]
-    #     if not isinstance(key, tuple):
-    #         key = (key,)
-        
-    #     layer_key = key[0]
-            
-    #     tile_size = []
-    #     tile_pos = []
-    #     if len(key) > 1:
-    #         # We are selecting in the layers; we skip the `layers` dimension
-    #         for dim, k in enumerate(key[1:]):
-    #             if isinstance(k, slice):
-    #                 start = 0 if k.start is None else k.start
-    #                 stop = self.bounds[dim] if k.stop is None else k.stop
-    #                 tile_pos.append(start)
-    #                 tile_size.append(stop - start)
-    #             else:
-    #                 tile_pos.append(k)
-    #                 tile_size.append(0)
-            
-    #     if self.ndim is not None:
-    #         if len(tile_size) < self.ndim:
-    #             for dim in range(len(tile_size), self.ndim):
-    #                 tile_size.append(self.bounds[dim])
-    #                 tile_pos.append(self.tile_meta.coords_min[dim])
 
-    #     tile_meta = TileMeta(
-    #         tile_size=tile_size,
-    #         tile_pos=tile_pos,
-    #     )
-        
-    #     extract: Results = self.select(tile_meta=tile_meta)
-
-    #     if isinstance(layer_key, slice):
-    #         start = 0 if layer_key.start is None else layer_key.start
-    #         stop = len(self.layers) if layer_key.stop is None else layer_key.stop
-    #         layer_selection = extract.layers[start:stop]
-    #     else:
-    #         # Layer_key is an int
-    #         ## TODO: extract has a.. hard copy of the layers?
-    #         layer_selection = extract.layers[layer_key]
-    #         # layer_selection = self.layers[layer_key]
-        
-    #     return layer_selection
-    
-    @property
-    def ndim(self) -> Optional[int]:
-        if self.bounds is not None:
-            return len(self.bounds)
-        
-    @property
-    def tile_meta(self) -> TileMeta:
-        if self.ndim is not None:
-            tile_size = []
-            tile_pos = []
-            for dim in range(self.ndim):
-                tile_size.append(self.bounds[dim])
-                tile_pos.append(0)  # No global results offset (for now)
-
-            return TileMeta(
-                tile_size=tile_size,
-                tile_pos=tile_pos,
-            )
-        else:
-            return TileMeta()
-    
-    
     @property
     def layers(self) -> List[DataLayer]:
         return self._layers
 
     @property
-    def bounds(self) -> Optional[List[int]]:
-        layer_bounds = []
-        for data_layer in self.layers:
-            if data_layer.bounds is not None:
-                layer_bounds.append(data_layer.bounds)
-        if len(layer_bounds):
+    def tile_meta(self) -> TileMeta:
+        return self._tile_meta
+
+    @tile_meta.setter
+    def tile_meta(self, value: TileMeta):
+        self._tile_meta = value
+
+    @property
+    def ndim(self) -> Optional[int]:
+        if self.coords_max is not None:
+            return len(self.coords_max)
+
+    @property
+    def domain(self) -> Optional[Domain]:
+        if (self.coords_max is not None) & (self.coords_min is not None):
+            size = tuple(np.array(self.coords_max) - np.array(self.coords_min))
+            return Domain(
+                position=self.coords_min,
+                size=size,
+            )
+
+    @property
+    def coords_min(self) -> Optional[List[int]]:
+        layer_coords_min = []
+        for layer in self.layers:
+            if layer.coords_min is not None:
+                layer_coords_min.append(layer.coords_min)
+        if len(layer_coords_min):
+            return np.min(np.stack(layer_coords_min), axis=0).tolist()
+
+    @property
+    def coords_max(self) -> Optional[List[int]]:
+        layer_coords_max = []
+        for layer in self.layers:
+            if layer.coords_max is not None:
+                layer_coords_max.append(layer.coords_max)
+        if len(layer_coords_max):
             # Final domain is the max of all layer bounds
             # TODO: Should we handle cases where, e.g. 2D and 3D data are both present?
             # For ex. by casting the lowest dimensionality layers to higher-dim?
-            # For now, this is not supported (result layers must have ndim=None or all the the same).
-            return np.max(np.stack(layer_bounds), axis=0).tolist()
+            # For now, this is not supported (result layers must have ndim=None or all the same ndims).
+            return np.max(np.stack(layer_coords_max), axis=0).tolist()
 
     def create(self, kind: str, name: Optional[str] = None, **kwargs) -> DataLayer:
         """Create a new layer in the results stack.
@@ -283,8 +256,65 @@ class Results(LayerStackBase):
     def post_delete(self, name: str) -> None:
         pass
 
-    def select(self, tile_meta: TileMeta) -> Results:
-        return Results(layers=[l.select(tile_meta.copy()) for l in self.layers])
+    def select(self, domain: Domain) -> Results:
+        return Results(layers=[l.select(domain=domain.copy()) for l in self.layers])
+
+    def __getitem__(self, key) -> List[DataLayer]:
+        # Results have a `layers` dimension (first dimension)
+        # so we index as [Layer, Dim0, Dim1, .., DimN]
+        if not isinstance(key, tuple):
+            key = (key,)
+
+        layer_key = key[0]
+
+        if len(key) > 1:
+            position = []
+            size = []
+            # We are selecting in the layers; we skip the `layers` dimension
+            for dim, k in enumerate(key[1:]):
+                if (
+                    isinstance(k, slice)
+                    & (self.coords_max is not None)
+                    & (self.coords_min is not None)
+                ):
+                    start = (
+                        self.coords_min[dim]
+                        if k.start is None
+                        else self.coords_min[dim] + k.start
+                    )
+                    stop = (
+                        self.coords_max[dim]
+                        if k.stop is None
+                        else self.coords_min[dim] + k.stop
+                    )
+                    position.append(start)
+                    size.append(stop - start)
+                else:
+                    position.append(self.coords_min[dim] + k)
+                    size.append(1)
+
+            if self.ndim is not None:
+                if len(size) < self.ndim:
+                    for dim in range(len(size), self.ndim):
+                        position.append(self.coords_min[dim])
+                        size.append(self.coords_max[dim] - self.coords_min[dim])
+
+            domain = Domain(position=position, size=size)
+
+            extract = self.select(domain=domain)
+        else:
+            extract = self
+
+        if isinstance(layer_key, slice):
+            start = 0 if layer_key.start is None else layer_key.start
+            stop = len(self.layers) if layer_key.stop is None else layer_key.stop
+            layer_selection = extract.layers[start:stop]
+        else:
+            # Layer_key is an int
+            ## TODO: extract as a.. hard copy of the layers?
+            layer_selection = extract.layers[layer_key]
+
+        return layer_selection
 
 
 class ResultsTileGenerator:
@@ -293,14 +323,19 @@ class ResultsTileGenerator:
         results: Results, ctx: Optional[TilingContext]
     ) -> Generator[Results, None, None]:
         if ctx is None:
-            tile_meta = TileMeta()
-            yield results.select(tile_meta)
+            tile_domain = Domain()
+            yield results.select(domain=tile_domain)
         else:
-            for tile_meta in generate_tiles(
-                bounds=results.bounds,
+            for tile_meta, tile_domain in generate_tiles(
+                # TODO: This should be a sk.Domain?
+                domain=results.domain,
                 tile_size=ctx.tile_size,
                 overlap=ctx.overlap,
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                yield results.select(tile_meta)
+                res_tile = results.select(domain=tile_domain)
+
+                res_tile.tile_meta = tile_meta
+
+                yield res_tile

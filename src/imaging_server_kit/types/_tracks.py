@@ -1,7 +1,6 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -21,15 +20,11 @@ class Tracks(DataLayer):
         name="Tracks",
         description="Input tracks (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             data=data,
-            meta=meta,
-            tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
             **kwargs,
@@ -51,7 +46,7 @@ class Tracks(DataLayer):
             return len(self.data)
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if self.data is None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0)[2:])

@@ -74,10 +74,11 @@ def merge_layers(layers: List[DataLayer]) -> DataLayer:
             raise ValueError("Layers to merge must be of the same type.")
 
     # Find the layers domain (note: same as Results.bounds)
+    # TODO: change this using sk.Domain()
     bounds = []
     for l in layers:
-        if l.bounds is not None:
-            bounds.append(l.bounds)
+        if l.coords_max is not None:
+            bounds.append(l.coords_max)
     if len(bounds):
         _bounds = np.max(np.stack(bounds), axis=0).tolist()
 

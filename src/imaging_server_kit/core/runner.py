@@ -7,8 +7,14 @@ from imaging_server_kit.core.errors import (
     AlgorithmRuntimeError,
     napari_available,
 )
-from imaging_server_kit.core.results import LayerStackBase, Results, ResultsTileGenerator
+from imaging_server_kit.core.results import (
+    LayerStackBase,
+    Results,
+    ResultsTileGenerator,
+)
 from imaging_server_kit.core.tiling import TilingContext
+from imaging_server_kit.core.domain import Domain
+
 
 NAPARI_INSTALLED = napari_available()
 
@@ -72,51 +78,39 @@ class AlgorithmRunner(ABC):
 
         if tiling_ctx is None:
             tiling_ctx = (
-                TilingContext(tile_size=params_res.bounds)
-                if params_res.bounds
+                TilingContext(tile_size=params_res.coords_max)
+                if params_res.coords_max
                 else None
             )
 
         results_tile_gen = ResultsTileGenerator()
-        for params_tile in results_tile_gen.generate_tiles(params_res, tiling_ctx):
-            for result_tile in self._stream(algorithm, params_tile):
-
-                # Construct the progress data
-                params_tile_meta = None
-                progress_data = 0
-                progress_max_val = 1
-                if len(params_tile) > 0:
-                    params_tile_meta = params_tile[0].tile_meta
-                    if params_tile_meta is not None:
-                        progress_data = params_tile_meta.tile_idx + 1
-                        progress_max_val = params_tile_meta.n_tiles
+        for params_tile_res in results_tile_gen.generate_tiles(params_res, tiling_ctx):
+            
+            tm = params_tile_res.tile_meta
+            dst_coords_min = params_tile_res.coords_min
+            
+            for result_tile in self._stream(algorithm, params_tile_res):
+                
+                result_tile.tile_meta = tm
 
                 if tile_progress_needed:
                     # Create a progress layer at the current step
                     result_tile.create(
                         kind="progress",
                         name="Tile progress",
-                        data=progress_data,
-                        max_val=progress_max_val,
+                        data=tm.tile_idx + 1,
+                        max_val=tm.n_tiles,
                     )
-
-                # Set the tile_idx, n_tiles, etc. of all result layers based on the params tile
-                if params_tile_meta is not None:
-                    # Set the tile index to be the current index for all result layers
-                    for l in result_tile:
-                        l.tile_meta.tile_idx = params_tile_meta.tile_idx
-                        l.tile_meta.n_tiles = params_tile_meta.n_tiles
-                        # TODO: This will be wrong if the bounds of the result_tile is different
-                        # from that of the params_tile... could we look at the ratios
-                        # of domain sizes between params_tile and result_tile to infer the new coords_min instead?
-                        if params_tile_meta.coords_min is not None:
-                            l.tile_meta.coords_min = params_tile_meta.coords_min
-
-                        if params_tile_meta.overlap_px is not None:
-                            l.tile_meta.overlap_px = params_tile_meta.overlap_px
-
-                        l.tile_meta.first_tile = params_tile_meta.first_tile
-                        l.tile_meta.last_tile = params_tile_meta.last_tile
+                    
+                for l in result_tile:
+                    l.tile_meta.tile_idx = tm.tile_idx
+                    l.tile_meta.n_tiles = tm.n_tiles
+                    l.tile_meta.first_tile = tm.first_tile
+                    l.tile_meta.last_tile = tm.last_tile
+                    if tm.overlap_px is not None:
+                        l.tile_meta.overlap_px = tm.overlap_px
+                    if dst_coords_min is not None:
+                        l.domain.coords_min = dst_coords_min
 
                 yield result_tile
 
@@ -130,6 +124,7 @@ class AlgorithmRunner(ABC):
         delay_sec: float = 0.0,
         randomize: bool = False,
         results: Union[LayerStackBase, "napari.Viewer"] = None,  # type: ignore
+        domain: Optional[Domain] = None,
         **algo_params,
     ) -> Union[LayerStackBase, "napari.Viewer"]:  # type: ignore
         """
@@ -144,6 +139,7 @@ class AlgorithmRunner(ABC):
         delay_sec: Artificial delay (sleep) time between each tile processing.
         randomize: Process tiles in a random order.
         results: An optional layer stack object to collect results into.
+        domain: An optional domain in which to perform the computation.
         """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 
@@ -201,6 +197,10 @@ class AlgorithmRunner(ABC):
             )
         else:
             tiling_ctx = None
+            
+        # If a domain is passed, restrict the computation to that domain
+        if domain:
+            params_res = params_res.select(domain=domain)
 
         # Run the algorithm and assemble the results
         for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
@@ -212,7 +212,7 @@ class AlgorithmRunner(ABC):
 
         # Remove the progress bar
         results.delete("Tile progress")
-
+        
         # Return the results
         if special_napari_case:
             return results.viewer  # type: ignore

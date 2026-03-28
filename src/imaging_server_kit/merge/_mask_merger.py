@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 
 from imaging_server_kit.merge.layer_merger import Merger
@@ -11,36 +13,24 @@ class MaskOverrideMerger(Merger):
 
     @staticmethod
     def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
-        if (
-            (incoming_layer.data is None)
-            or (incoming_layer.tile_meta is None)
-            or (incoming_layer.bounds is None)
-        ):
+        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
             return
 
-        if (
-            (receiving_layer.data is None)
-            or (receiving_layer.tile_meta is None)
-            or (receiving_layer.bounds is None)
-        ):
+        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
             receiving_layer.data = receiving_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.meta = incoming_layer.meta
 
-        if (
-            (receiving_layer.bounds is None)
-            or (receiving_layer.tile_meta is None)
-            or (receiving_layer.data is None)
-        ):
+        if (receiving_layer.coords_max is None) or (receiving_layer.data is None):
             return  # This should never happen (just there for type hints)
 
         # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
-        _slices = incoming_layer.tile_meta.slices
-        _stack = np.stack([receiving_layer.bounds, incoming_layer.bounds])
+        _slices = incoming_layer.domain.slices
+        _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
         _bounds = np.max(_stack, axis=0).tolist()
 
-        if _bounds != receiving_layer.bounds:
+        if _bounds != receiving_layer.coords_max:
             new_data = incoming_layer.initialize(_bounds)
-            new_data[receiving_layer.tile_meta.slices] = receiving_layer.data
+            new_data[receiving_layer.domain.slices] = receiving_layer.data
         else:
             new_data = receiving_layer.data
 
@@ -62,7 +52,7 @@ class MaskTileOverrideMerger(MaskOverrideMerger):
     """Merge two masks using an `override` strategy: incoming data overrides existnig data."""
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
-        receiving_layer.data = incoming_layer.initialize(receiving_layer.bounds)
+        receiving_layer.data = incoming_layer.initialize(receiving_layer.coords_max)
         receiving_layer.meta = incoming_layer.meta
 
 
@@ -106,49 +96,53 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
     return np.unique(labels[labels > 0])
 
 
+def overlap_border_mask(layer: Mask) -> Optional[np.ndarray]:
+    """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
+    if (layer.tile_meta.overlap_px is None) or (layer.size is None):
+        return
+
+    overlap_slices = tuple(
+        [
+            slice(pos, max_pos - pos)
+            for pos, max_pos in zip(layer.tile_meta.overlap_px, layer.size)
+        ]
+    )
+    mask = np.ones(layer.size)
+    mask[overlap_slices] = 0
+    return mask == 1
+
+
 class InstanceMaskTileMerger(Merger):
     def __init__(self, min_intersecting_px: int = 1) -> None:
         self.min_intersecting_px = min_intersecting_px
         self.tile_tracker = InstanceTileTracker()
 
     def merge(self, receiving_layer: Mask, incoming_layer: Mask) -> None:
-        if (
-            (incoming_layer.data is None)
-            or (incoming_layer.tile_meta is None)
-            or (incoming_layer.bounds is None)
-        ):
+        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
             return
 
-        if (
-            (receiving_layer.data is None)
-            or (receiving_layer.tile_meta is None)
-            or (receiving_layer.bounds is None)
-        ):
+        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
             receiving_layer.data = incoming_layer.initialize(
                 tuple([1] * incoming_layer.ndim)
             )
             receiving_layer.meta = incoming_layer.meta
 
-        if (
-            (receiving_layer.bounds is None)
-            or (receiving_layer.tile_meta is None)
-            or (receiving_layer.data is None)
-        ):
+        if (receiving_layer.coords_max is None) or (receiving_layer.data is None):
             return  # This should never happen (just there for type hints)
 
-        _slices = incoming_layer.tile_meta.slices
-        _stack = np.stack([receiving_layer.bounds, incoming_layer.bounds])
+        _slices = incoming_layer.domain.slices
+        _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
         _bounds = np.max(_stack, axis=0).tolist()
 
-        if _bounds != receiving_layer.bounds:
+        if _bounds != receiving_layer.coords_max:
             new_data = incoming_layer.initialize(_bounds)
-            new_data[receiving_layer.tile_meta.slices] = receiving_layer.data
+            new_data[receiving_layer.domain.slices] = receiving_layer.data
         else:
             new_data = receiving_layer.data
 
         receiving_layer.data = new_data  # Extend the source layer data
 
-        src_tile = receiving_layer.select(incoming_layer.tile_meta)
+        src_tile = receiving_layer.select(domain=incoming_layer.domain)
         if src_tile.data is None:
             raise ValueError(f"Could not get a mask tile where it was requested.")
 
@@ -157,7 +151,8 @@ class InstanceMaskTileMerger(Merger):
         for new_label in unique_positive(dst_arr):
             self.tile_tracker.add_node(new_label)
 
-        border_mask = incoming_layer.tile_meta.overlap_border_mask
+        border_mask = overlap_border_mask(incoming_layer)
+        
         if border_mask is not None:
             for dst_lab in unique_positive(dst_arr[border_mask]):
                 filt = np.logical_and(border_mask, dst_arr == dst_lab)

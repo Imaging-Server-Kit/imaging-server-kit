@@ -1,6 +1,5 @@
-from typing import Dict, Optional
+from typing import Optional
 
-from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -22,8 +21,6 @@ class Notification(DataLayer):
         level: Optional[str] = "info",
         name="Notification",
         description="Text notification",
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         required: bool = True,
         default: str = "",
         **kwargs,
@@ -31,9 +28,7 @@ class Notification(DataLayer):
         super().__init__(
             name=name,
             description=description,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
             level=level,
             required=required,
             default=default,

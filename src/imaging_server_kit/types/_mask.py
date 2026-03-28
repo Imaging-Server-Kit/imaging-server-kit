@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Union
 
 import imantics
 import numpy as np
 from geojson import Feature, Polygon
 from skimage.draw import polygon2mask
 
-from imaging_server_kit.core.tiling import TileMeta
+from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -181,41 +181,42 @@ class Mask(DataLayer):
         name: str = "Mask",
         description: str = "Segmentation mask (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             description=description,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
             dimensionality=dimensionality,
             **kwargs,
         )
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if isinstance(self.data, np.ndarray):
             return self.data.shape
 
-    def select(self, tile_meta: TileMeta) -> Mask:
+    def select(self, domain: Domain) -> Mask:
         if (
             (self.data is None)
-            or (tile_meta.coords_max is None)
-            or (self.bounds is None)
+            or (domain.coords_max is None)
+            or (self.coords_max is None)
         ):
             _data = None
-        elif (tile_meta.coords_max > np.asarray(self.bounds)).any():
+        elif (domain.coords_max > np.asarray(self.coords_max)).any():
             _data = None
         else:
-            _data = self.data[tile_meta.slices]
+            # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
+            domain_local = domain.copy()
+            domain_local.coords_min = tuple(np.array(domain_local.coords_min) - np.array(self.coords_min))
+            # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
+            _data = self.data[domain_local.slices]
         return Mask(
             data=_data,
             name=self.name,
             meta=self.meta,
-            tile_meta=tile_meta,
+            tile_meta=self.tile_meta,
+            domain=domain,
         )
 
     @staticmethod

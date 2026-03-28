@@ -9,6 +9,8 @@ import time
 from typing import Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 
+from imaging_server_kit.core.domain import Domain
+
 
 class TilingError(Exception):
     def __init__(
@@ -37,62 +39,23 @@ class TileMeta:
         first_tile: Optional[Union[Tuple, List]] = None,
         last_tile: Optional[Union[Tuple, List]] = None,
         overlap_px: Optional[Union[Tuple, List]] = None,
-        tile_size: Optional[Union[Tuple, List]] = None,
-        tile_pos: Optional[Union[Tuple, List]] = None,
     ):
         self.tile_idx = 0 if tile_idx is None else tile_idx
         self.n_tiles = 1 if n_tiles is None else n_tiles
         self._first_tile = first_tile
         self._last_tile = last_tile
         self._overlap_px = overlap_px
-        self._tile_size = tile_size
-        self._coords_min = tile_pos
 
     def __str__(self):
-        message = "TileMeta"
+        message = "Tile Meta"
         message += "\n"
-        message += f"coords_min: {self.coords_min}"
+        message += f"Index: {self.tile_idx}"
         message += "\n"
-        message += f"tile_size: {self.tile_size}"
+        message += f"Tiles: {self.n_tiles}"
         return message
 
     def __repr__(self):
         return self.__str__()
-
-    @property
-    def tile_size(self) -> Optional[Tuple]:
-        if self._tile_size is not None:
-            return tuple(self._tile_size)
-
-    @tile_size.setter
-    def tile_size(self, value: Optional[Tuple]):
-        self._tile_size = value
-
-    @property
-    def coords_min(self) -> Optional[Tuple]:
-        if self._coords_min is not None:
-            return tuple(self._coords_min)
-
-    @coords_min.setter
-    def coords_min(self, value: Optional[Tuple]):
-        self._coords_min = value
-
-    @property
-    def coords_max(self) -> Optional[Tuple]:
-        if (self.coords_min is None) or (self.tile_size is None):
-            return
-
-        return tuple(
-            [
-                tile_pos + tile_size
-                for (tile_pos, tile_size) in zip(self.coords_min, self.tile_size)
-            ]
-        )
-
-    @property
-    def ndim(self) -> Optional[int]:
-        if self.coords_max is not None:
-            return len(self.coords_max)
 
     @property
     def overlap_px(self) -> Optional[Tuple]:
@@ -104,79 +67,8 @@ class TileMeta:
         self._overlap_px = value
 
     @property
-    def slices(self) -> Optional[Tuple]:
-        if (self.coords_min is None) or (self.coords_max is None):
-            return
-
-        return tuple(
-            [
-                slice(pos, max_pos)
-                for pos, max_pos in zip(self.coords_min, self.coords_max)
-            ]
-        )
-
-    @property
-    def overlap_border_mask(self) -> Optional[np.ndarray]:
-        """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
-        if (self.overlap_px is None) or (self.tile_size is None):
-            return
-
-        overlap_slices = tuple(
-            [
-                slice(pos, max_pos - pos)
-                for pos, max_pos in zip(self.overlap_px, self.tile_size)
-            ]
-        )
-        mask = np.ones(self.tile_size)
-        mask[overlap_slices] = 0
-        return mask == 1
-
-    @property
-    def overlap_count_map(self) -> Optional[np.ndarray]:
-        """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
-        if (
-            (self.first_tile is None)
-            or (self.last_tile is None)
-            or (self.tile_size is None)
-            or (self.overlap_px is None)
-            or (self.ndim is None)
-        ):
-            return
-
-        per_axis = []
-        for n, ov, first_tile, last_tile in zip(
-            self.tile_size, self.overlap_px, self.first_tile, self.last_tile
-        ):
-            i = np.arange(n)
-            c = np.ones(n, dtype=np.int16)
-            if not first_tile:
-                c = c + (i < ov).astype(np.int16)
-            if not last_tile:
-                c = c + (i >= n - ov).astype(np.int16)
-            per_axis.append(
-                c.reshape(
-                    (1,) * len(per_axis) + (n,) + (1,) * (self.ndim - len(per_axis) - 1)
-                )
-            )
-
-        overlap_count_arr = np.ones(self.tile_size, dtype=np.int16)
-        for c in per_axis:
-            overlap_count_arr *= c.reshape(
-                c.shape
-                + (1,)
-                * (
-                    overlap_count_arr.ndim - c.ndim
-                )  # Add fake dims (fixes the RGB case)
-            )
-
-        return overlap_count_arr
-
-    @property
     def first_tile(self) -> Optional[Tuple]:
-        if self._first_tile is None:
-            if self.ndim is not None:
-                return tuple([False] * self.ndim)
-        else:
+        if self._first_tile is not None:
             return tuple(self._first_tile)
 
     @first_tile.setter
@@ -185,10 +77,7 @@ class TileMeta:
 
     @property
     def last_tile(self) -> Optional[Tuple]:
-        if self._last_tile is None:
-            if self.ndim is not None:
-                return tuple([False] * self.ndim)
-        else:
+        if self._last_tile is not None:
             return tuple(self._last_tile)
 
     @last_tile.setter
@@ -214,8 +103,6 @@ class TileMeta:
             "first_tile": self.first_tile,
             "last_tile": self.last_tile,
             "overlap_px": self.overlap_px,
-            "tile_size": self._tile_size,
-            "tile_pos": self._coords_min,
         }
 
     def copy(self) -> TileMeta:
@@ -255,18 +142,18 @@ def _valid_overlap(
 
 
 def generate_tiles(
-    bounds: Optional[Union[Tuple, List]] = None,
+    domain: Optional[Domain] = None,
     tile_size: Union[int, Tuple, List] = 64,
     overlap: Union[float, Tuple, List] = 0.0,
     randomize: bool = False,
     delay_sec: float = 0.0,
-) -> Generator[TileMeta, None, None]:
+) -> Generator[Tuple[TileMeta, Domain], None, None]:
     """Generate tile metadata for overlapping N-dimensional tiles over a pixel domain.
 
     Parameters
     ----------
-    bounds : tuple or list
-        The size of the domain to partition into tiles, in pixels (typically, `image.shape` can be used).
+    bounds : optional sk.Domain
+        The domain to partition into tiles.
     tile_size : int or tuple or list (optional)
         The size of an individual tile, in pixels. If an integer is provided, the same size is used
         for all dimensions. If a tuple or list is provided, it must match the dimensionality of `bounds`.
@@ -284,20 +171,20 @@ def generate_tiles(
     ------
     A dictionary `tile_info` that contains metadata about the generated tile, including its position, size, and index in the tile series.
     """
-    if bounds is None:
-        yield TileMeta()
+    if domain is None:
+        yield (TileMeta(), Domain())
     else:
         if delay_sec < 0:
             raise ValueError("Time delay (delay_sec) should be positive.")
 
-        if not _valid_overlap(overlap=overlap, bounds=bounds):
+        if not _valid_overlap(overlap=overlap, bounds=domain.size):
             raise ValueError(
-                f"Invalid tile overlap: {overlap}. Expected a value or list/tuple in the range [0-1] compatible with the pixel domain ({bounds})."
+                f"Invalid tile overlap: {overlap}. Expected a value or list/tuple in the range [0-1] compatible with the domain size ({domain.size})."
             )
 
-        if not _valid_tile_size(tile_size=tile_size, bounds=bounds):
+        if not _valid_tile_size(tile_size=tile_size, bounds=domain.size):
             raise ValueError(
-                f"Invalid tile size: {tile_size}. Expected a positive integer, or list/tuple of positive integers compatible with the pixel domain ({bounds})."
+                f"Invalid tile size: {tile_size}. Expected a positive integer, or list/tuple of positive integers compatible with the domain size ({domain.size})."
             )
 
         ctx = TilingContext(
@@ -307,9 +194,9 @@ def generate_tiles(
             delay_sec=delay_sec,
         )
 
-        for tile_meta in _generate_tile_meta(bounds=bounds, ctx=ctx):
+        for tile_meta, tile_domain in _generate_tile_meta(domain=domain, ctx=ctx):
             time.sleep(delay_sec)
-            yield tile_meta
+            yield (tile_meta, tile_domain)
 
 
 def _tiles_info_axis(size_i: int, tile_size_i: int, overlap_px_i: int):
@@ -356,23 +243,25 @@ def _get_tile_pos_and_size_i(
 
 
 def _generate_tile_meta(
-    bounds: Union[Tuple, List], ctx: TilingContext
-) -> Generator[TileMeta, None, None]:
+    domain: Domain, ctx: TilingContext
+) -> Generator[Tuple[TileMeta, Domain], None, None]:
     """Tiling in N-dimensions."""
-    ndim = len(bounds)
+    ndim = domain.ndim
+    size = domain.size
+    coords_min = domain.coords_min
 
     # Resolve the tile shape and overlap
     if isinstance(ctx.tile_size, (list, tuple)):
         tile_shape = ctx.tile_size
         if len(tile_shape) != ndim:
-            raise TilingError(bounds=bounds, provided_shape=tile_shape)
+            raise TilingError(bounds=size, provided_shape=tile_shape)
     else:
         tile_shape = [ctx.tile_size] * ndim  # Isotropic tile
 
     if isinstance(ctx.overlap, (list, tuple)):
         overlap = ctx.overlap
         if len(overlap) != ndim:
-            raise TilingError(bounds=bounds, provided_shape=overlap)
+            raise TilingError(bounds=size, provided_shape=overlap)
     else:
         overlap = [ctx.overlap] * ndim
 
@@ -383,7 +272,7 @@ def _generate_tile_meta(
     ]
 
     tile_infos_axes = [
-        _tiles_info_axis(bounds[axis], tile_shape[axis], overlap_px[axis])
+        _tiles_info_axis(size[axis], tile_shape[axis], overlap_px[axis])
         for axis in range(ndim)
     ]
     n_pix_ax = [returns[0] for returns in tile_infos_axes]
@@ -399,7 +288,7 @@ def _generate_tile_meta(
 
     n_tiles = len(tile_coords_idx)
     if n_tiles == 0:
-        yield TileMeta()
+        yield (TileMeta(), Domain())
     else:
         for tile_idx, tile_coord_ax in enumerate(tile_coords_idx):
             first_tile = []
@@ -420,6 +309,7 @@ def _generate_tile_meta(
                         tile_shape_i,
                     )
                 )
+
                 first_tile.append(first_tile_i)
                 last_tile.append(last_tile_i)
                 overlap_px.append(int(tile_shape_i - shift_i))
@@ -432,7 +322,13 @@ def _generate_tile_meta(
                 first_tile=first_tile,
                 last_tile=last_tile,
                 overlap_px=overlap_px,
-                tile_size=tile_size,
-                tile_pos=tile_pos,
             )
-            yield tile_meta
+
+            position = [tile_pos[i] + coords_min[i] for i in range(ndim)]
+
+            tile_domain = Domain(
+                size=tile_size,
+                position=position,
+            )
+
+            yield (tile_meta, tile_domain)

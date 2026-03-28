@@ -50,18 +50,10 @@ class ObjectMerger(Merger):
         receiving_layer: Union[Points, Vectors, Boxes],
         incoming_layer: Union[Points, Vectors, Boxes],
     ) -> None:
-        if (
-            (incoming_layer.data is None)
-            or (incoming_layer.tile_meta is None)
-            or (incoming_layer.bounds is None)
-        ):
+        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
             return
 
-        if (
-            (receiving_layer.data is None)
-            or (receiving_layer.tile_meta is None)
-            or (receiving_layer.bounds is None)
-        ):
+        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
             receiving_layer.data = incoming_layer.data_global_coords
             receiving_layer.meta = incoming_layer.meta
         else:
@@ -72,7 +64,7 @@ class ObjectMerger(Merger):
                         incoming_layer.data_global_coords,
                     )
                 )
-                merged_data = merged_data - receiving_layer.tile_meta.coords_min
+                merged_data = merged_data - receiving_layer.domain.coords_min
                 merged_meta = merge_meta_tile(
                     receiving_layer.meta, incoming_layer.meta, receiving_layer.n_objects
                 )
@@ -106,6 +98,6 @@ class ObjectTileMerger(ObjectMerger):
     ):
         # Erase all of the data before tiling
         receiving_layer.data = receiving_layer.initialize_data(
-            receiving_layer.data_bounds
+            receiving_layer._data_bounds
         )
         # receiving_layer.meta = incoming_layer.meta  # TODO: Needed?

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Optional
 
-from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 from tqdm import tqdm
@@ -33,8 +32,6 @@ class Progress(DataLayer):
         max_val: Optional[int] = 1,
         name="Progress",
         description="Progress bar",
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):        
         if data is None:
@@ -43,8 +40,6 @@ class Progress(DataLayer):
         super().__init__(
             name=name,
             data=data,
-            meta=meta,
-            tile_meta=tile_meta,
             description=description,
             max_val=max_val,
             **kwargs,

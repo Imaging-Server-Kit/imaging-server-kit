@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import TileMeta
+from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.common import extract_meta_tile
 from imaging_server_kit.types.data_layer import DataLayer
 
@@ -24,16 +24,12 @@ class Points(DataLayer):
         name="Points",
         description="Input points (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             description=description,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
             dimensionality=dimensionality,
             **kwargs,
         )
@@ -41,14 +37,12 @@ class Points(DataLayer):
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
         """Data in global coordinate reference instead of local to the tile."""
-        if (self.data is not None) and (self.tile_meta is not None):
-            if self.tile_meta.coords_min is not None:
-                data_global_coords = self.data.copy()
+        if (self.data is not None) and (self.domain is not None):
+            if self.domain.coords_min is not None:
+                data_global = self.data.copy()
                 for dim in range(self.ndim):
-                    data_global_coords[:, dim] = (
-                        data_global_coords[:, dim] + self.tile_meta.coords_min[dim]
-                    )
-                return data_global_coords
+                    data_global[:, dim] = data_global[:, dim] + self.domain.coords_min[dim]
+                return data_global
 
     @property
     def n_objects(self) -> int:
@@ -58,21 +52,22 @@ class Points(DataLayer):
             return len(self.data)
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0).tolist())
 
-    def select(self, tile_meta: TileMeta) -> Points:
+    def select(self, domain: Domain) -> Points:
         if self.data is None:
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(self.bounds)
+            _data = self.initialize_data(self.coords_max)
             _meta = self.meta
         else:
-            points_in_tile = (self.data >= tile_meta.coords_min) & (
-                self.data < tile_meta.coords_max
+            # Select points via global coordinates
+            points_in_tile = (self.data_global_coords >= domain.coords_min) & (
+                self.data_global_coords < domain.coords_max
             )
 
             # All coordinates must be in the tile bounds
@@ -84,8 +79,14 @@ class Points(DataLayer):
             # Select meta of points in the tile
             points_tile_meta = extract_meta_tile(self.meta, self.n_objects, tile_filter)
 
-            if points_tile_data is not None:
-                points_tile_data = points_tile_data - tile_meta.coords_min
+            if len(points_tile_data) > 0:
+                # Adjust the data so that the origin is zero at the origin of `domain`
+                ptd = points_tile_data.copy()
+                for dim in range(self.ndim):
+                    ptd[:, dim] = ptd[:, dim] + (
+                        self.domain.coords_min[dim] - domain.coords_min[dim]
+                    )
+                points_tile_data = ptd
 
             _data = points_tile_data
             _meta = points_tile_meta
@@ -94,7 +95,8 @@ class Points(DataLayer):
             data=_data,
             name=self.name,
             meta=_meta,
-            tile_meta=tile_meta,
+            tile_meta=self.tile_meta,
+            domain=domain,
         )
 
     @staticmethod

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from abc import ABC
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import TileMeta, TilingContext, generate_tiles
+from imaging_server_kit.core.tiling import (
+    TileMeta,
+    TilingContext,
+    generate_tiles,
+    Domain,
+)
 
 
-class DataLayer(ABC):
+class DataLayer:
     """
     Data layer container for a particular data type.
 
@@ -36,6 +40,7 @@ class DataLayer(ABC):
         data: Any = None,
         meta: Optional[Dict] = None,
         tile_meta: Optional[TileMeta] = None,
+        domain: Optional[Domain] = None,
         translate: Optional[Tuple] = None,
         description: str = "",
         merger: str = "default",
@@ -82,10 +87,15 @@ class DataLayer(ABC):
 
         # Prepare the tile meta
         tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
-        if isinstance(translate, Tuple):
-            tile_meta.coords_min = translate
         self._tile_meta = tile_meta
-        self._sync_tile_meta(self._tile_meta)
+
+        # Assign a domain
+        domain = Domain() if domain is None else domain.copy()
+        if isinstance(translate, Tuple):
+            domain.coords_min = translate
+        self._domain = domain
+
+        self._sync()
 
         # Merger
         self.merger = merger  # Merger `type`
@@ -109,28 +119,23 @@ class DataLayer(ABC):
             v = find_layer_validator(self)
             v.validate(self)
 
-    def _sync_tile_meta(self, tile_meta: Optional[TileMeta]):
-        new_tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+    def _sync(self):
+        """Adjusts the domain to match new data set in the layer."""
+        new_tile_meta = self.tile_meta.copy()
+        new_domain = self.domain.copy()
 
-        if self.data_bounds is None:
-            new_tile_meta.tile_size = None
-            new_tile_meta.coords_min = None
+        if self._data_bounds is None:
+            new_domain.size = None
+            new_domain.coords_min = None
         else:
-            if tile_meta is None:
-                _tile_pos = tuple([0] * len(self.data_bounds))
-                _overlap_px = tuple([0] * len(self.data_bounds))
-            else:
-                _tile_pos = tile_meta.coords_min
-                if _tile_pos is None:
-                    _tile_pos = tuple([0] * len(self.data_bounds))
-                _overlap_px = tile_meta.overlap_px
-                if _overlap_px is None:
-                    _overlap_px = tuple([0] * len(self.data_bounds))
+            new_domain.size = self._data_bounds
+            if new_domain.coords_min is None:
+                new_domain.coords_min = tuple([0] * len(self._data_bounds))
 
-            new_tile_meta.tile_size = self.data_bounds
-            new_tile_meta.coords_min = _tile_pos
-            new_tile_meta.overlap_px = _overlap_px
+            if new_tile_meta.overlap_px is None:
+                new_tile_meta.overlap_px = tuple([0] * len(self._data_bounds))
 
+        self._domain = new_domain
         self._tile_meta = new_tile_meta
 
     @property
@@ -140,8 +145,7 @@ class DataLayer(ABC):
     @data.setter
     def data(self, value: Any):
         self._data = value
-        # When the data changes, we synchronize the tile meta
-        self._sync_tile_meta(self.tile_meta)
+        self._sync()
         self.refresh()
 
     @property
@@ -162,8 +166,36 @@ class DataLayer(ABC):
         self.refresh()
 
     @property
-    def tile_meta(self) -> Optional[TileMeta]:
+    def tile_meta(self) -> TileMeta:
         return self._tile_meta
+
+    @tile_meta.setter
+    def tile_meta(self, value: TileMeta):
+        self._tile_meta = value
+
+    @property
+    def domain(self) -> Domain:
+        return self._domain
+
+    @property
+    def ndim(self) -> Optional[int]:
+        if self.domain is not None:
+            return self.domain.ndim
+
+    @property
+    def size(self) -> Optional[Tuple]:
+        if self.domain is not None:
+            return self.domain.size
+
+    @property
+    def coords_min(self) -> Optional[Tuple]:
+        if self.domain is not None:
+            return self.domain.coords_min
+
+    @property
+    def coords_max(self) -> Optional[Tuple]:
+        if self.domain is not None:
+            return self.domain.coords_max
 
     @property
     def shape(self) -> Optional[Tuple]:
@@ -171,22 +203,7 @@ class DataLayer(ABC):
             return self.data.shape
 
     @property
-    def ndim(self) -> Optional[int]:
-        if self.tile_meta is not None:
-            return self.tile_meta.ndim
-
-    @property
-    def tile_size(self) -> Optional[Tuple]:
-        if self.tile_meta is not None:
-            return self.tile_meta.tile_size
-
-    @property
-    def bounds(self) -> Optional[Tuple]:
-        if self.tile_meta is not None:
-            return self.tile_meta.coords_max
-
-    @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         pass
 
     @property
@@ -206,41 +223,46 @@ class DataLayer(ABC):
     def refresh(self):
         pass
 
-    def select(self, tile_meta: TileMeta) -> DataLayer:
+    def select(self, domain: Domain) -> DataLayer:
+        """Selection based on a domain in *global* coordinates."""
         cls = type(self)
-        layer_selection = cls(data=self.data, name=self.name, meta=self.meta, 
-            tile_meta=tile_meta,  # TODO: Really? Problem is: we get first_tile=True when indexing..
+        layer_selection = cls(
+            data=self.data,
+            name=self.name,
+            meta=self.meta,
+            tile_meta=self.tile_meta,
+            domain=domain,
         )
         return layer_selection
 
     def __getitem__(self, key):
+        """Selection based on a domain in *local* coordinates."""
         if not isinstance(key, tuple):
             key = (key,)
 
-        tile_size = []
-        tile_pos = []
+        position = []
+        size = []
         for dim, k in enumerate(key):
             if isinstance(k, slice):
                 start = 0 if k.start is None else k.start
-                stop = self.bounds[dim] if k.stop is None else k.stop
-                tile_pos.append(start)
-                tile_size.append(stop - start)
+                stop = self._data_bounds[dim] if k.stop is None else k.stop
+                start_global = self.coords_min[dim] + start
+                position.append(start_global)
+                size.append(stop - start)
             else:
-                tile_pos.append(k)
-                tile_size.append(0)
+                # k is an `int`
+                position.append(self.coords_min[dim] + k)
+                size.append(0)
 
         if self.ndim is not None:
-            if len(tile_size) < self.ndim:
-                for dim in range(len(tile_size), self.ndim):
-                    tile_size.append(self.bounds[dim])
-                    tile_pos.append(self.tile_meta.coords_min[dim])
+            if len(size) < self.ndim:
+                for dim in range(len(size), self.ndim):
+                    size.append(self._data_bounds[dim])
+                    position.append(self.coords_min[dim])
 
-        tile_meta = TileMeta(
-            tile_size=tile_size,
-            tile_pos=tile_pos,
-        )
+        domain = Domain(position=position, size=size)
 
-        return self.select(tile_meta=tile_meta)
+        return self.select(domain=domain)
 
     @staticmethod
     def initialize_data(
@@ -255,17 +277,26 @@ class LayerTileGenerator:
         layer: DataLayer, ctx: Optional[TilingContext]
     ) -> Generator[DataLayer, None, None]:
         if ctx is None:
-            tile_meta = TileMeta()
-            yield layer.select(tile_meta)
+            tile_domain = Domain()
+            yield layer.select(domain=tile_domain)
         else:
-            for tile_meta in generate_tiles(
-                bounds=layer.data_bounds,
+            for tile_meta, tile_domain in generate_tiles(
+                # TODO: correct?
+                # bounds=layer._data_bounds,  # Tile only within the data bounds!
+                domain=layer.domain,
                 tile_size=ctx.tile_size,
                 overlap=ctx.overlap,
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                tile = layer.select(tile_meta)
-                # Tiles inherit the global translation:
-                tile.tile_meta.coords_min = layer.tile_meta.coords_min
+                # domain_global = domain.copy()
+                # domain_global.coords_min = tuple(
+                #     np.array(domain_global.coords_min) + np.array(layer.coords_min)
+                # )
+                # tile = layer.select(domain=domain_global)
+                tile = layer.select(domain=tile_domain)
+
+                # Assign the tile meta from the generator:
+                tile.tile_meta = tile_meta
+
                 yield tile

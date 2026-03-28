@@ -1,7 +1,6 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types.data_layer import DataLayer
 
 
@@ -23,16 +22,12 @@ class Paths(DataLayer):
         description="Input paths shapes (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         serializer: str = "default",
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             description=description,
-            meta=meta,
             data=data,
-            tile_meta=tile_meta,
             dimensionality=dimensionality,
             serializer=serializer,
             **kwargs,
@@ -49,7 +44,7 @@ class Paths(DataLayer):
             return len(self.data)
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if self.data is None:
             return
         if self.n_objects > 0:

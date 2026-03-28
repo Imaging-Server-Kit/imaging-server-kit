@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.tiling import TileMeta
+from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.data_layer import DataLayer
 from imaging_server_kit.types.common import extract_meta_tile
 
@@ -26,15 +26,11 @@ class Vectors(DataLayer):
         name="Vectors",
         description="Input vectors (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
         **kwargs,
     ):
         super().__init__(
             name=name,
             data=data,
-            meta=meta,
-            tile_meta=tile_meta,
             description=description,
             dimensionality=dimensionality,
             **kwargs,
@@ -43,10 +39,11 @@ class Vectors(DataLayer):
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
         """Data in global coordinate reference instead of local to the tile."""
-        if (self.data is not None) and (self.tile_meta is not None):
-            if self.tile_meta.coords_min is not None:
+        if (self.data is not None) and (self.domain is not None):
+            if self.domain.coords_min is not None:
                 data_global = self.data.copy()
-                data_global[:, 0] = data_global[:, 0] + self.tile_meta.coords_min
+                for dim in range(self.ndim):
+                    data_global[:, 0, dim] = data_global[:, 0, dim] + self.domain.coords_min[dim]
                 return data_global
 
     @property
@@ -57,22 +54,22 @@ class Vectors(DataLayer):
             return len(self.data)
 
     @property
-    def data_bounds(self) -> Optional[Tuple]:
+    def _data_bounds(self) -> Optional[Tuple]:
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data[:, 0], axis=0))
 
-    def select(self, tile_meta: TileMeta) -> Vectors:
+    def select(self, domain: Domain) -> Vectors:
         if self.data is None:
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(self.bounds)
+            _data = self.initialize_data(self.coords_max)
             _meta = self.meta
         else:
             # Mask of vector coordinates in the tile
-            vector_coords_in_tile = (self.data[:, 0] >= tile_meta.coords_min) & (
-                self.data[:, 0] < tile_meta.coords_max
+            vector_coords_in_tile = (self.data_global_coords[:, 0] >= domain.coords_min) & (
+                self.data_global_coords[:, 0] < domain.coords_max
             )
 
             # All coordinates must be in the tile bounds
@@ -86,8 +83,11 @@ class Vectors(DataLayer):
                 self.meta, self.n_objects, tile_filter
             )
 
-            if vectors_tile_data is not None:
-                vectors_tile_data[:, 0] = vectors_tile_data[:, 0] - tile_meta.coords_min
+            if len(vectors_tile_data) > 0:
+                vtd = vectors_tile_data.copy()
+                for dim in range(self.ndim):
+                    vtd[:, 0, dim] = vtd[:, 0, dim] + (self.domain.coords_min[dim] - domain.coords_min[dim])
+                vectors_tile_data = vtd
 
             _data = vectors_tile_data
             _meta = vectors_tile_meta
@@ -96,7 +96,8 @@ class Vectors(DataLayer):
             data=_data,
             name=self.name,
             meta=_meta,
-            tile_meta=tile_meta,
+            tile_meta=self.tile_meta,
+            domain=domain,
         )
 
     @staticmethod
