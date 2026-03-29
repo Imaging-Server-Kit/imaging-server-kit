@@ -15,6 +15,8 @@ from imaging_server_kit.merge._mask_merger import (
 )
 from imaging_server_kit.merge._object_merger import ObjectMerger, ObjectTileMerger
 
+from imaging_server_kit.core.domain import Domain
+
 
 LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
     "image": {"default": ImageTileOverlapMerger, "override": ImageOverrideMerger},
@@ -73,18 +75,25 @@ def merge_layers(layers: List[DataLayer]) -> DataLayer:
         if not isinstance(l, cls):
             raise ValueError("Layers to merge must be of the same type.")
 
-    # Find the layers domain (note: same as Results.bounds)
-    # TODO: change this using sk.Domain()
-    bounds = []
+    # Find the layer bounds
+    min_bounds = []
+    max_bounds = []
     for l in layers:
+        if l.coords_min is not None:
+            min_bounds.append(l.coords_min)
         if l.coords_max is not None:
-            bounds.append(l.coords_max)
-    if len(bounds):
-        _bounds = np.max(np.stack(bounds), axis=0).tolist()
+            max_bounds.append(l.coords_max)
+    if len(min_bounds):
+        min_bounds = np.min(np.stack(min_bounds), axis=0).tolist()
+    if len(max_bounds):
+        max_bounds = np.max(np.stack(max_bounds), axis=0).tolist()
+        
+    size = tuple(np.array(max_bounds) - np.array(min_bounds))
+    domain = Domain(position=min_bounds, size=size)
 
     # Create a new instance
     merged_layer = cls(
-        data=cls.initialize_data(_bounds),
+        data=cls.initialize_data(domain=domain),
         name=first_layer.name,  # Use first layer name by convention
     )
 

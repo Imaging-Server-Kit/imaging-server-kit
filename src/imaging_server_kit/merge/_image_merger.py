@@ -11,32 +11,62 @@ class ImageOverrideMerger(Merger):
 
     @staticmethod
     def merge(receiving_layer: Image, incoming_layer: Image) -> None:
-        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
+        if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
+        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.meta = incoming_layer.meta
 
-        if receiving_layer.coords_max is None:
-            return  # This should never happen (just there for type hints)
+        min_bounds = np.min(
+            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
+            axis=0,
+        )
 
-        _slices = incoming_layer.domain.slices
-        if _slices is not None:
-            _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
-            _bounds = np.max(_stack, axis=0).tolist()
-            # If the incoming tile extends the pixel bounds, we create a new Image,
-            # write receiving_layer.data into it, then merge the tile
-            if _bounds != receiving_layer.coords_max:
-                new_data = incoming_layer.initialize(_bounds)
-                new_data[receiving_layer.domain.slices] = receiving_layer.data
-            else:
-                new_data = receiving_layer.data
+        max_bounds = np.max(
+            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
+            axis=0,
+        )
 
-            # New tile overrides existing data
-            new_data[_slices] = incoming_layer.data  # type: ignore
-            receiving_layer.data = new_data
-            receiving_layer.meta = incoming_layer.meta
+        size = max_bounds - min_bounds
+
+        # If the incoming tile extends the pixel bounds, we create a new Image,
+        # write receiving_layer.data into it, then merge the tile
+        if tuple(size) != receiving_layer.size:
+            new_data = incoming_layer.initialize(size)
+            slices_rec = []
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+                receiving_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = 0 if diff < 0 else diff
+                start_receiving = diff if diff < 0 else 0
+                stop = incoming_size + start
+                stop_receiving = receiving_size + start_receiving
+                slices.append(slice(start, stop))
+                slices_rec.append(slice(start_receiving, stop_receiving))
+            new_data[tuple(slices_rec)] = receiving_layer.data
+        else:
+            new_data = receiving_layer.data
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = diff
+                stop = incoming_size + start
+                slices.append(slice(start, stop))
+
+        new_data[tuple(slices)] = incoming_layer.data
+
+        receiving_layer.data = new_data
+        receiving_layer.meta = incoming_layer.meta
 
     @staticmethod
     def on_first_merge(receiving_layer: Image, incoming_layer: Image):
@@ -45,7 +75,6 @@ class ImageOverrideMerger(Merger):
     @staticmethod
     def on_last_merge(receiving_layer: Image, incoming_layer: Image):
         pass
-
 
 
 def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
@@ -58,17 +87,17 @@ def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
         return
 
     per_axis = []
-    
+
     if layer.tile_meta.first_tile is None:
-        first_tile_ = [False]*layer.ndim
+        first_tile_ = [False] * layer.ndim
     else:
         first_tile_ = layer.tile_meta.first_tile
-    
+
     if layer.tile_meta.last_tile is None:
-        last_tile_ = [False]*layer.ndim
+        last_tile_ = [False] * layer.ndim
     else:
         last_tile_ = layer.tile_meta.last_tile
-    
+
     for n, ov, first_tile, last_tile in zip(
         layer.size, layer.tile_meta.overlap_px, first_tile_, last_tile_
     ):
@@ -89,9 +118,7 @@ def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
         overlap_count_arr *= c.reshape(
             c.shape
             + (1,)
-            * (
-                overlap_count_arr.ndim - c.ndim
-            )  # Add fake dims (fixes the RGB case)
+            * (overlap_count_arr.ndim - c.ndim)  # Add fake dims (fixes the RGB case)
         )
 
     return overlap_count_arr
@@ -102,38 +129,69 @@ class ImageTileOverlapMerger(Merger):
 
     @staticmethod
     def merge(receiving_layer: Image, incoming_layer: Image) -> None:
-        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
+        if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
+        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.meta = incoming_layer.meta
 
-        if receiving_layer.coords_max is None:
-            return  # This should never happen (just there for type hints)
-
         _overlap_count_map = overlap_count_map(incoming_layer)
 
-        _slices = incoming_layer.domain.slices
-        if (_slices is not None) and (_overlap_count_map is not None):
-            _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
-            _bounds = np.max(_stack, axis=0).tolist()  # (x, y)
-            # If the incoming tile extends the pixel bounds, we create a new Image,
-            # write receiving_layer.data into it, then merge the tile
-            if _bounds != receiving_layer.coords_max:
-                new_data = incoming_layer.initialize(_bounds)
-                new_data[receiving_layer.domain.slices] = receiving_layer.data
-            else:
-                new_data = receiving_layer.data
-            # We `add` the incoming image data to merge it cleanly
-            # Add fake dims (fixes the RGB case)
-            _overlap_count_map_dims_matched = _overlap_count_map.reshape(
-                _overlap_count_map.shape
-                + (1,) * (incoming_layer.data.ndim - _overlap_count_map.ndim)
-            )
-            new_data[_slices] = new_data[_slices] + incoming_layer.data / _overlap_count_map_dims_matched  # type: ignore
-            receiving_layer.data = new_data
-            receiving_layer.meta = incoming_layer.meta
+        # Add fake dims (fixes the RGB case)
+        _overlap_count_map_dims_matched = _overlap_count_map.reshape(
+            _overlap_count_map.shape
+            + (1,) * (incoming_layer.data.ndim - _overlap_count_map.ndim)
+        )
+        
+        min_bounds = np.min(
+            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
+            axis=0,
+        )
+
+        max_bounds = np.max(
+            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
+            axis=0,
+        )
+
+        size = max_bounds - min_bounds
+
+        if tuple(size) != receiving_layer.size:
+            new_data = incoming_layer.initialize(size)
+            slices_rec = []
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+                receiving_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = 0 if diff < 0 else diff
+                start_receiving = diff if diff < 0 else 0
+                stop = incoming_size + start
+                stop_receiving = receiving_size + start_receiving
+                slices.append(slice(start, stop))
+                slices_rec.append(slice(start_receiving, stop_receiving))
+            new_data[tuple(slices_rec)] = receiving_layer.data
+        else:
+            new_data = receiving_layer.data
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = diff
+                stop = incoming_size + start
+                slices.append(slice(start, stop))
+
+        # We `add` the incoming image data to merge it cleanly
+        new_data[tuple(slices)] = new_data[tuple(slices)] + incoming_layer.data / _overlap_count_map_dims_matched  # type: ignore
+
+        receiving_layer.data = new_data
+        receiving_layer.meta = incoming_layer.meta
 
     @staticmethod
     def on_first_merge(receiving_layer: Image, incoming_layer: Image):

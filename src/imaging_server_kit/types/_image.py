@@ -58,7 +58,9 @@ class Image(DataLayer):
         else:
             # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
             domain_local = domain.copy()
-            domain_local.coords_min = tuple(np.array(domain_local.coords_min) - np.array(self.coords_min))
+            domain_local.coords_min = tuple(
+                np.array(domain_local.coords_min) - np.array(self.coords_min)
+            )
             # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
             _data = self.data[domain_local.slices]
 
@@ -71,14 +73,11 @@ class Image(DataLayer):
         )
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
-            return
-        return np.zeros(bounds, dtype=np.float32)
+    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+        if domain is not None:
+            return np.zeros(domain.size, dtype=np.float32)
 
-    def initialize(self, bounds: List[int]) -> Optional[np.ndarray]:
+    def initialize(self, domain_size: List[int]) -> Optional[np.ndarray]:
         if self.meta["rgb"] is True:
-            bounds.extend([3])
-        return self.initialize_data(bounds)
+            domain_size.extend([3])
+        return np.zeros(domain_size, dtype=np.float32)

@@ -208,7 +208,9 @@ class Mask(DataLayer):
         else:
             # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
             domain_local = domain.copy()
-            domain_local.coords_min = tuple(np.array(domain_local.coords_min) - np.array(self.coords_min))
+            domain_local.coords_min = tuple(
+                np.array(domain_local.coords_min) - np.array(self.coords_min)
+            )
             # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
             _data = self.data[domain_local.slices]
         return Mask(
@@ -220,11 +222,9 @@ class Mask(DataLayer):
         )
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is not None:
-            return np.zeros(np.array(bounds).astype(np.uint16), dtype=np.uint16)
+    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+        if domain is not None:
+            return np.zeros(domain.size, dtype=np.uint16)
 
-    def initialize(self, bounds: List[int]) -> Optional[np.ndarray]:
-        return self.initialize_data(bounds)
+    def initialize(self, domain_size: List[int]) -> Optional[np.ndarray]:
+        return np.zeros(domain_size, dtype=np.uint16)

@@ -41,7 +41,9 @@ class Points(DataLayer):
             if self.domain.coords_min is not None:
                 data_global = self.data.copy()
                 for dim in range(self.ndim):
-                    data_global[:, dim] = data_global[:, dim] + self.domain.coords_min[dim]
+                    data_global[:, dim] = (
+                        data_global[:, dim] + self.domain.coords_min[dim]
+                    )
                 return data_global
 
     @property
@@ -62,7 +64,7 @@ class Points(DataLayer):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(self.coords_max)
+            _data = self.initialize_data(domain=self.domain)
             _meta = self.meta
         else:
             # Select points via global coordinates
@@ -100,9 +102,7 @@ class Points(DataLayer):
         )
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
+    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+        if domain is None:
             return
-        return np.zeros((0, len(bounds)), dtype=np.float32)
+        return np.zeros((0, domain.ndim), dtype=np.float32)

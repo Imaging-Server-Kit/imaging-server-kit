@@ -43,7 +43,9 @@ class Vectors(DataLayer):
             if self.domain.coords_min is not None:
                 data_global = self.data.copy()
                 for dim in range(self.ndim):
-                    data_global[:, 0, dim] = data_global[:, 0, dim] + self.domain.coords_min[dim]
+                    data_global[:, 0, dim] = (
+                        data_global[:, 0, dim] + self.domain.coords_min[dim]
+                    )
                 return data_global
 
     @property
@@ -64,13 +66,13 @@ class Vectors(DataLayer):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(self.coords_max)
+            _data = self.initialize_data(domain=self.domain)
             _meta = self.meta
         else:
             # Mask of vector coordinates in the tile
-            vector_coords_in_tile = (self.data_global_coords[:, 0] >= domain.coords_min) & (
-                self.data_global_coords[:, 0] < domain.coords_max
-            )
+            vector_coords_in_tile = (
+                self.data_global_coords[:, 0] >= domain.coords_min
+            ) & (self.data_global_coords[:, 0] < domain.coords_max)
 
             # All coordinates must be in the tile bounds
             tile_filter = vector_coords_in_tile.all(axis=1)  # (N,)
@@ -86,7 +88,9 @@ class Vectors(DataLayer):
             if len(vectors_tile_data) > 0:
                 vtd = vectors_tile_data.copy()
                 for dim in range(self.ndim):
-                    vtd[:, 0, dim] = vtd[:, 0, dim] + (self.domain.coords_min[dim] - domain.coords_min[dim])
+                    vtd[:, 0, dim] = vtd[:, 0, dim] + (
+                        self.domain.coords_min[dim] - domain.coords_min[dim]
+                    )
                 vectors_tile_data = vtd
 
             _data = vectors_tile_data
@@ -101,10 +105,7 @@ class Vectors(DataLayer):
         )
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
+    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+        if domain is None:
             return
-        ndim = len(bounds)
-        return np.zeros((0, 2, ndim), dtype=np.float32)
+        return np.zeros((0, 2, domain.ndim), dtype=np.float32)

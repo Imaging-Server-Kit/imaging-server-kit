@@ -13,29 +13,60 @@ class MaskOverrideMerger(Merger):
 
     @staticmethod
     def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
-        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
+        if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
+        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = receiving_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.meta = incoming_layer.meta
 
-        if (receiving_layer.coords_max is None) or (receiving_layer.data is None):
-            return  # This should never happen (just there for type hints)
+        min_bounds = np.min(
+            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
+            axis=0,
+        )
 
-        # Simple "Override" strategy; could be improved with pixel-wise majority voting between overlapping tiles
-        _slices = incoming_layer.domain.slices
-        _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
-        _bounds = np.max(_stack, axis=0).tolist()
+        max_bounds = np.max(
+            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
+            axis=0,
+        )
 
-        if _bounds != receiving_layer.coords_max:
-            new_data = incoming_layer.initialize(_bounds)
-            new_data[receiving_layer.domain.slices] = receiving_layer.data
+        size = max_bounds - min_bounds
+
+        # If the incoming tile extends the pixel bounds, we create a new Image,
+        # write receiving_layer.data into it, then merge the tile
+        if tuple(size) != receiving_layer.size:
+            new_data = incoming_layer.initialize(size)
+            slices_rec = []
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+                receiving_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = 0 if diff < 0 else diff
+                start_receiving = diff if diff < 0 else 0
+                stop = incoming_size + start
+                stop_receiving = receiving_size + start_receiving
+                slices.append(slice(start, stop))
+                slices_rec.append(slice(start_receiving, stop_receiving))
+            new_data[tuple(slices_rec)] = receiving_layer.data
         else:
             new_data = receiving_layer.data
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = diff
+                stop = incoming_size + start
+                slices.append(slice(start, stop))
 
-        # `Override` strategy:
-        new_data[_slices] = incoming_layer.data
+        new_data[tuple(slices)] = incoming_layer.data
+
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta
 
@@ -52,7 +83,7 @@ class MaskTileOverrideMerger(MaskOverrideMerger):
     """Merge two masks using an `override` strategy: incoming data overrides existnig data."""
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
-        receiving_layer.data = incoming_layer.initialize(receiving_layer.coords_max)
+        receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
         receiving_layer.meta = incoming_layer.meta
 
 
@@ -118,27 +149,65 @@ class InstanceMaskTileMerger(Merger):
         self.tile_tracker = InstanceTileTracker()
 
     def merge(self, receiving_layer: Mask, incoming_layer: Mask) -> None:
-        if (incoming_layer.data is None) or (incoming_layer.coords_max is None):
+        if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.coords_max is None):
-            receiving_layer.data = incoming_layer.initialize(
-                tuple([1] * incoming_layer.ndim)
-            )
+        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
+            receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.meta = incoming_layer.meta
 
-        if (receiving_layer.coords_max is None) or (receiving_layer.data is None):
-            return  # This should never happen (just there for type hints)
+        min_bounds = np.min(
+            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
+            axis=0,
+        )
 
-        _slices = incoming_layer.domain.slices
-        _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
-        _bounds = np.max(_stack, axis=0).tolist()
+        max_bounds = np.max(
+            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
+            axis=0,
+        )
 
-        if _bounds != receiving_layer.coords_max:
-            new_data = incoming_layer.initialize(_bounds)
-            new_data[receiving_layer.domain.slices] = receiving_layer.data
+        size = max_bounds - min_bounds
+
+        if tuple(size) != receiving_layer.size:
+            new_data = incoming_layer.initialize(size)
+            slices_rec = []
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+                receiving_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = 0 if diff < 0 else diff
+                start_receiving = diff if diff < 0 else 0
+                stop = incoming_size + start
+                stop_receiving = receiving_size + start_receiving
+                slices.append(slice(start, stop))
+                slices_rec.append(slice(start_receiving, stop_receiving))
+            new_data[tuple(slices_rec)] = receiving_layer.data
         else:
             new_data = receiving_layer.data
+            slices = []
+            for receiving_cmin, incoming_cmin, incoming_size in zip(
+                receiving_layer.coords_min,
+                incoming_layer.coords_min,
+                incoming_layer.size,
+            ):
+                diff = incoming_cmin - receiving_cmin
+                start = diff
+                stop = incoming_size + start
+                slices.append(slice(start, stop))
+
+        # _slices = incoming_layer.domain.slices
+        # _stack = np.stack([receiving_layer.coords_max, incoming_layer.coords_max])
+        # _bounds = np.max(_stack, axis=0).tolist()
+
+        # if _bounds != receiving_layer.coords_max:
+        #     new_data = incoming_layer.initialize(_bounds)
+        #     new_data[receiving_layer.domain.slices] = receiving_layer.data
+        # else:
+        #     new_data = receiving_layer.data
 
         receiving_layer.data = new_data  # Extend the source layer data
 
@@ -152,7 +221,7 @@ class InstanceMaskTileMerger(Merger):
             self.tile_tracker.add_node(new_label)
 
         border_mask = overlap_border_mask(incoming_layer)
-        
+
         if border_mask is not None:
             for dst_lab in unique_positive(dst_arr[border_mask]):
                 filt = np.logical_and(border_mask, dst_arr == dst_lab)
@@ -162,7 +231,9 @@ class InstanceMaskTileMerger(Merger):
                     if n_intersecting_px > self.min_intersecting_px:
                         self.tile_tracker.add_edge(src_lab, dst_lab)
 
-        new_data[_slices] = dst_arr
+        # new_data[_slices] = dst_arr
+        new_data[tuple(slices)] = dst_arr
+
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta
 

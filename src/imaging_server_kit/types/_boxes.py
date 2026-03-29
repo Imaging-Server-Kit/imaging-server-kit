@@ -64,7 +64,7 @@ class Boxes(DataLayer):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(self.coords_max)
+            _data = self.initialize_data(domain=self.domain)
             _meta = self.meta
         else:
             # Mask of box coordinates in the tile
@@ -86,7 +86,9 @@ class Boxes(DataLayer):
             if len(boxes_tile_data) > 0:
                 btd = boxes_tile_data.copy()
                 for dim in range(self.ndim):
-                    btd[:, :, dim] = btd[:, :, dim] + (self.domain.coords_min[dim] - domain.coords_min[dim])
+                    btd[:, :, dim] = btd[:, :, dim] + (
+                        self.domain.coords_min[dim] - domain.coords_min[dim]
+                    )
                 boxes_tile_data = btd
 
             _data = boxes_tile_data
@@ -101,9 +103,7 @@ class Boxes(DataLayer):
         )
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
+    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+        if domain is None:
             return
-        return np.zeros((0, 4, len(bounds)), dtype=np.float32)
+        return np.zeros((0, 4, domain.ndim), dtype=np.float32)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.tiling import (
@@ -265,9 +265,7 @@ class DataLayer:
         return self.select(domain=domain)
 
     @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[List[int], Tuple]],
-    ) -> Optional[np.ndarray]:
+    def initialize_data(domain: Optional[Domain]) -> Any:
         pass
 
 
@@ -281,19 +279,12 @@ class LayerTileGenerator:
             yield layer.select(domain=tile_domain)
         else:
             for tile_meta, tile_domain in generate_tiles(
-                # TODO: correct?
-                # bounds=layer._data_bounds,  # Tile only within the data bounds!
                 domain=layer.domain,
                 tile_size=ctx.tile_size,
                 overlap=ctx.overlap,
                 delay_sec=ctx.delay_sec,
                 randomize=ctx.randomize,
             ):
-                # domain_global = domain.copy()
-                # domain_global.coords_min = tuple(
-                #     np.array(domain_global.coords_min) + np.array(layer.coords_min)
-                # )
-                # tile = layer.select(domain=domain_global)
                 tile = layer.select(domain=tile_domain)
 
                 # Assign the tile meta from the generator:
