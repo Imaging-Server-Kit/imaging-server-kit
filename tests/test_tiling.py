@@ -27,11 +27,11 @@ def test_sk_gaussian():
     sample = sk_gaussian.get_sample(idx=0)
     image = sample[0].data
 
-    results = sk_gaussian.run(
-        image=image, tiled=True, tile_size_px=256, overlap_percent=0.1, randomize=True
+    stack = sk_gaussian.run(
+        image=image, tiled=True, tile_size=256, tile_overlap=0.1, tile_order_random=True
     )
 
-    blurred = results[0].data
+    blurred = stack[0].data
 
     assert blurred.shape == image.shape
 
@@ -52,8 +52,8 @@ def sk_tiled_rgb(image):
 def test_sk_tiled_rgb():
     sample = sk_tiled_rgb.get_sample().to_params_dict()
     image = sample.get("image")
-    results = sk_tiled_rgb.run(**sample, tiled=True)
-    mask = results[0].data
+    stack = sk_tiled_rgb.run(**sample, tiled=True)
+    mask = stack[0].data
     assert mask.shape == tuple([image.shape[0], image.shape[1]])
 
 
@@ -74,12 +74,12 @@ def sk_tiled_points_input(image, points):
 
 def test_sk_tiled_points():
     image = np.random.random((50, 50))
-    results = sk_tiled_points.run(image, tiled=True, tile_size_px=25)
-    points = results.read("Points").data
+    stack = sk_tiled_points.run(image, tiled=True, tile_size=25)
+    points = stack.read("Points").data
     assert len(points) == 40
 
-    results = sk_tiled_points_input.run(image, points, tiled=True, tile_size_px=25)
-    new_points = results.read("Points").data
+    stack = sk_tiled_points_input.run(image, points, tiled=True, tile_size=25)
+    new_points = stack.read("Points").data
     assert np.sum(new_points[:, 0]) - np.sum(points[:, 1]) < 1e-6
 
 
@@ -106,12 +106,12 @@ def sk_tiled_vectors_input(image, vectors):
 
 def test_sk_tiled_vectors():
     image = np.random.random((50, 50))
-    results = sk_tiled_vectors.run(image, tiled=True, tile_size_px=25)
-    vectors = results.read("Vectors").data
+    stack = sk_tiled_vectors.run(image, tiled=True, tile_size=25)
+    vectors = stack.read("Vectors").data
     assert len(vectors) == 40
 
-    results = sk_tiled_vectors_input.run(image, vectors, tiled=True, tile_size_px=25)
-    new_vectors = results.read("Vectors").data
+    stack = sk_tiled_vectors_input.run(image, vectors, tiled=True, tile_size=25)
+    new_vectors = stack.read("Vectors").data
     assert np.sum(new_vectors) - np.sum(vectors) < 1e-6
 
 
@@ -148,12 +148,12 @@ def sk_tiled_boxes_input(image, boxes):
 
 def test_sk_tiled_boxes():
     image = np.random.random((50, 50))
-    results = sk_tiled_boxes.run(image, tiled=True, tile_size_px=25)
-    boxes = results.read("Boxes").data
+    stack = sk_tiled_boxes.run(image, tiled=True, tile_size=25)
+    boxes = stack.read("Boxes").data
     assert len(boxes) == 40
 
-    results = sk_tiled_boxes_input.run(image, boxes, tiled=True, tile_size_px=25)
-    new_boxes = results.read("Boxes").data
+    stack = sk_tiled_boxes_input.run(image, boxes, tiled=True, tile_size=25)
+    new_boxes = stack.read("Boxes").data
     assert isinstance(new_boxes, np.ndarray)
 
 
@@ -167,9 +167,9 @@ def sk_streamed_tiling(image):
 
 def test_sk_tiled_streaming():
     image = np.random.random((30, 30))
-    results = sk_streamed_tiling.run(image=image, tiled=True, tile_size_px=10)
-    assert results.read("Random").data.shape == image.shape
-    assert results.read("Success").data == "Success"
+    stack = sk_streamed_tiling.run(image=image, tiled=True, tile_size=10)
+    assert stack.read("Random").data.shape == image.shape
+    assert stack.read("Success").data == "Success"
 
 
 ### Tiled max projection
@@ -178,14 +178,13 @@ from imaging_server_kit.demo import project
 
 def test_sk_tiled_max_proj():
     image = np.random.random((10, 30, 30))
-    results = project.run(
+    stack = project.run(
         image=image,
         method="max",
         tiled=True,
-        tile_size_px=[10, 15, 15],  # 3D tiles
-        randomize=False,
+        tile_size=[10, 15, 15],  # 3D tiles
     )
-    data = results.read("Projection").data
+    data = stack.read("Projection").data
     max_proj = np.max(image, axis=0, keepdims=True)
     assert data.shape == max_proj.shape
     assert np.allclose(data, max_proj)
@@ -203,38 +202,39 @@ def label_algo(mask):
 
 def test_sk_label():
     mask = skimage.data.coins() > 100
-    results = label_algo.run(mask=mask, tiled=True, overlap_percent=0.1)
-    data = results[0].data
+    stack = label_algo.run(mask=mask, tiled=True, tile_overlap=0.1)
+    data = stack[0].data
     labelled = label(mask)
     assert len(np.unique(labelled)) == len(np.unique(data))
 
 
 ### -- Selecting data -- ###
 
+
 # In an Image, via indexing and select()
 def test_select_indexing_image():
     data = np.random.random((20, 20, 20))
     image = sk.Image(data)
-    
+
     extract1 = data[2:, 3:7]
     image_extract1 = image[2:, 3:7].data
     assert np.allclose(extract1, image_extract1)
-    
+
     extract2 = data[:, :, :4]
     image_extract2 = image[:, :, :4].data
     assert np.allclose(extract2, image_extract2)
-    
 
-# In a Results, via indexing and select()
-def test_select_indexing_results():
-    results = sk.Results(
+
+# In a Stack, via indexing and select()
+def test_select_indexing_stack():
+    stack = sk.Stack(
         layers=[
             sk.Image(np.random.random((10, 10))),
             sk.Mask(np.ones((10, 10))),
         ]
     )
-    
-    extract = results[:, :3, 1:5]
+
+    extract = stack[:, :3, 1:5]
     assert len(extract) == 2
     assert extract[0].data.shape[0] == 3
     assert extract[0].data.shape[1] == 4
@@ -244,9 +244,10 @@ def test_select_indexing_results():
 
 ### -- Merging data -- ###
 
+
 ### Merging images
 def test_merge_images():
-    img1 = sk.Image(np.ones((20, 20)), merger="override")
+    img1 = sk.Image(np.ones((20, 20)))
     _sum1 = img1.data.sum()
     img2 = sk.Image(np.ones((20, 20)), translate=(30, 30))
     _sum2 = img2.data.sum()
@@ -258,8 +259,8 @@ def test_merge_images():
     assert img1.data.sum() == _sum1 + _sum2
 
 
-### Merging Results (and getting tiles) - heterogeneous data
-def test_merge_results():
+### Merging Stacks (and getting tiles) - heterogeneous data
+def test_merge_stack():
     rx, ry = 30, 20
 
     image1 = np.ones((rx, ry))
@@ -292,11 +293,11 @@ def test_merge_results():
     boxes1[:, 2, 1] = points1[:, 1] + width
     boxes2 = boxes1.copy()
 
-    img1 = sk.Image(image1, merger="override")
-    msk1 = sk.Mask(mask1, merger="override")
-    pts1 = sk.Points(points1, merger="override")
-    vct1 = sk.Vectors(vectors1, merger="override")
-    box1 = sk.Boxes(boxes1, merger="override")
+    img1 = sk.Image(image1)
+    msk1 = sk.Mask(mask1)
+    pts1 = sk.Points(points1)
+    vct1 = sk.Vectors(vectors1)
+    box1 = sk.Boxes(boxes1)
 
     tx = rx
     ty = ry
@@ -308,27 +309,26 @@ def test_merge_results():
     vct2 = sk.Vectors(vectors2, translate=translate)
     box2 = sk.Boxes(boxes2, translate=translate)
 
-    results1 = sk.Results([img1, msk1, pts1, vct1, box1])
-    results2 = sk.Results([img2, msk2, pts2, vct2, box2])
+    stack1 = sk.Stack([img1, msk1, pts1, vct1, box1])
+    stack2 = sk.Stack([img2, msk2, pts2, vct2, box2])
 
-    # Merge results
-    results1.merge(results2)
+    # Merge stacks
+    stack1.merge(stack2)
 
-    out_img1 = results1.read(img1.name)
-    out_msk1 = results1.read(msk1.name)
-    out_pts1 = results1.read(pts1.name)
-    out_vct1 = results1.read(vct1.name)
-    out_box1 = results1.read(box1.name)
+    out_img1 = stack1.read(img1.name)
+    out_msk1 = stack1.read(msk1.name)
+    out_pts1 = stack1.read(pts1.name)
+    out_vct1 = stack1.read(vct1.name)
+    out_box1 = stack1.read(box1.name)
 
     domain1 = sk.Domain(size=(rx, ry), position=(0, 0))
     domain2 = sk.Domain(size=(rx, ry), position=(rx, ry))
-    
+
     assert np.allclose(out_img1.data[:rx, :ry], image1)
     assert np.allclose(out_img1.data[rx:, ry:], image2)
     assert out_img1.data.sum() == image1.sum() + image2.sum()
     assert np.allclose(out_img1.select(domain1).data, image1)
     assert np.allclose(out_img1.select(domain2).data, image2)
-
     assert np.allclose(out_msk1.data[:rx, :ry], mask1)
     assert np.allclose(out_msk1.data[rx:, ry:], mask2)
     assert out_msk1.data.sum() == mask1.sum() + mask2.sum()
@@ -345,13 +345,13 @@ def test_merge_results():
 
     assert len(out_box1.data) == len(boxes1) + len(boxes2)
 
-    res1 = results1.select(domain1)
+    res1 = stack1.select(domain1)
     assert np.allclose(res1.read(img1.name).data, image1)
     assert np.allclose(res1.read(msk1.name).data, mask1)
     assert np.allclose(res1.read(pts1.name).data, points1)
     assert np.allclose(res1.read(vct1.name).data, vectors1)
 
-    res2 = results1.select(domain2)
+    res2 = stack1.select(domain2)
     assert np.allclose(res2.read(img1.name).data, image2)
     assert np.allclose(res2.read(msk1.name).data, mask2)
     assert np.allclose(res2.read(pts1.name).data, points2)
