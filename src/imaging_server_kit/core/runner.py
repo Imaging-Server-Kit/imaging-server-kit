@@ -7,13 +7,10 @@ from imaging_server_kit.core.errors import (
     AlgorithmRuntimeError,
     napari_available,
 )
-from imaging_server_kit.core.results import (
-    LayerStackBase,
-    Results,
-    ResultsTileGenerator,
-)
+from imaging_server_kit.core.results import Results, ResultsTileGenerator
 from imaging_server_kit.core.tiling import TilingContext
 from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.types import layer_factory
 
 
 NAPARI_INSTALLED = napari_available()
@@ -52,7 +49,7 @@ class AlgorithmRunner(ABC):
     def get_parameters(self, algorithm: str) -> Dict: ...
 
     @abstractmethod
-    def get_sample(self, algorithm: str, idx: int = 0) -> LayerStackBase: ...
+    def get_sample(self, algorithm: str, idx: int = 0) -> Results: ...
 
     @abstractmethod
     def get_n_samples(self, algorithm: str) -> int: ...
@@ -85,23 +82,23 @@ class AlgorithmRunner(ABC):
 
         results_tile_gen = ResultsTileGenerator()
         for params_tile_res in results_tile_gen.generate_tiles(params_res, tiling_ctx):
-            
+
             tm = params_tile_res.tile_meta
             dst_coords_min = params_tile_res.coords_min
-            
+
             for result_tile in self._stream(algorithm, params_tile_res):
-                
                 result_tile.tile_meta = tm
 
                 if tile_progress_needed:
                     # Create a progress layer at the current step
-                    result_tile.create(
+                    progress_layer = layer_factory(
                         kind="progress",
                         name="Tile progress",
                         data=tm.tile_idx + 1,
                         max_val=tm.n_tiles,
                     )
-                    
+                    result_tile.create(layer=progress_layer)
+
                 for l in result_tile:
                     l.tile_meta.tile_idx = tm.tile_idx
                     l.tile_meta.n_tiles = tm.n_tiles
@@ -112,7 +109,10 @@ class AlgorithmRunner(ABC):
                     if dst_coords_min is not None:
                         l.domain.coords_min = dst_coords_min
 
-                yield result_tile
+                # TODO: we assume that to be correct most of the time
+                reinitialize_domain = params_res.domain
+
+                yield result_tile, reinitialize_domain
 
     def run(
         self,
@@ -123,10 +123,10 @@ class AlgorithmRunner(ABC):
         overlap_percent: float = 0.0,
         delay_sec: float = 0.0,
         randomize: bool = False,
-        results: Union[LayerStackBase, "napari.Viewer"] = None,  # type: ignore
+        results: Union[Results, "napari.Viewer"] = None,  # type: ignore
         domain: Optional[Domain] = None,
         **algo_params,
-    ) -> Union[LayerStackBase, "napari.Viewer"]:  # type: ignore
+    ) -> Union[Results, "napari.Viewer"]:  # type: ignore
         """
         Execute an algorithm with a set of parameters.
 
@@ -172,7 +172,10 @@ class AlgorithmRunner(ABC):
             kind = kw.pop("param_type")
             if "anyOf" in kw:
                 kw.pop("anyOf")  # added by Pydantic - we don't need it.
-            params_res.create(kind=kind, data=data, name=name, **kw)
+
+            param_layer = layer_factory(kind=kind, data=data, name=name, **kw)
+            params_res.create(layer=param_layer)
+            # params_res.create(kind=kind, data=data, name=name, **kw)
 
         if results is None:
             results = Results()
@@ -197,14 +200,16 @@ class AlgorithmRunner(ABC):
             )
         else:
             tiling_ctx = None
-            
+
         # If a domain is passed, restrict the computation to that domain
         if domain:
             params_res = params_res.select(domain=domain)
 
         # Run the algorithm and assemble the results
-        for tile_results in self.run_generator(algorithm, params_res, tiling_ctx):
-            results.merge(tile_results)
+        for tile_results, reinitialize_domain in self.run_generator(
+            algorithm, params_res, tiling_ctx
+        ):
+            results.merge(tile_results, reinitialize_domain=reinitialize_domain)
 
         # TODO: Instead of calling merge many times, each time increasing the domain,
         # we could do a single merge at the end (with no intermediate updates of the container).
@@ -212,7 +217,7 @@ class AlgorithmRunner(ABC):
 
         # Remove the progress bar
         results.delete("Tile progress")
-        
+
         # Return the results
         if special_napari_case:
             return results.viewer  # type: ignore

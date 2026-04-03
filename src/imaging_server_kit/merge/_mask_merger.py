@@ -2,13 +2,13 @@ from typing import Optional
 
 import numpy as np
 
-from imaging_server_kit.merge.layer_merger import Merger
+from imaging_server_kit.merge.layer_merger import Merger, DefaultMerger
 from imaging_server_kit.types._mask import Mask
 import networkx as nx
 from skimage.util import map_array
 
 
-class MaskOverrideMerger(Merger):
+class MaskOverrideMerger(DefaultMerger):
     """Merge masks using and `override` strategy: last tile overrides existing data in overlapping regions."""
 
     @staticmethod
@@ -19,7 +19,6 @@ class MaskOverrideMerger(Merger):
         if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = receiving_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-            receiving_layer.meta = incoming_layer.meta
 
         min_bounds = np.min(
             np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
@@ -37,7 +36,7 @@ class MaskOverrideMerger(Merger):
         # write receiving_layer.data into it, then merge the tile
         if tuple(size) != receiving_layer.size:
             new_data = incoming_layer.initialize(size)
-            
+
             slices_rec = []
             slices = []
             cmin_diff = []
@@ -52,14 +51,16 @@ class MaskOverrideMerger(Merger):
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
                 start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size 
+                stop_receiving = start_receiving + receiving_size
                 slices_rec.append(slice(start_receiving, stop_receiving))
                 cmin_diff.append(start_receiving)
             new_data[tuple(slices_rec)] = receiving_layer.data
-            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff))
+            receiving_layer.domain.coords_min = tuple(
+                np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff)
+            )
         else:
             new_data = receiving_layer.data
-            
+
             slices = []
             for receiving_cmin, incoming_cmin, incoming_size in zip(
                 receiving_layer.coords_min,
@@ -74,23 +75,6 @@ class MaskOverrideMerger(Merger):
         new_data[tuple(slices)] = incoming_layer.data
 
         receiving_layer.data = new_data
-        receiving_layer.meta = incoming_layer.meta
-
-    @staticmethod
-    def on_first_merge(receiving_layer: Mask, incoming_layer: Mask):
-        receiving_layer.meta = incoming_layer.meta
-
-    @staticmethod
-    def on_last_merge(receiving_layer: Mask, incoming_layer: Mask):
-        pass
-
-
-class MaskTileOverrideMerger(MaskOverrideMerger):
-    """Merge two masks using an `override` strategy: incoming data overrides existnig data."""
-
-    def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
-        receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
-        receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
         receiving_layer.meta = incoming_layer.meta
 
 
@@ -150,7 +134,7 @@ def overlap_border_mask(layer: Mask) -> Optional[np.ndarray]:
     return mask == 1
 
 
-class InstanceMaskTileMerger(Merger):
+class InstanceMaskTileMerger(DefaultMerger):
     def __init__(self, min_intersecting_px: int = 1) -> None:
         self.min_intersecting_px = min_intersecting_px
         self.tile_tracker = InstanceTileTracker()
@@ -162,7 +146,6 @@ class InstanceMaskTileMerger(Merger):
         if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-            receiving_layer.meta = incoming_layer.meta
 
         min_bounds = np.min(
             np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
@@ -178,7 +161,7 @@ class InstanceMaskTileMerger(Merger):
 
         if tuple(size) != receiving_layer.size:
             new_data = incoming_layer.initialize(size)
-            
+
             slices_rec = []
             slices = []
             cmin_diff = []
@@ -193,14 +176,16 @@ class InstanceMaskTileMerger(Merger):
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
                 start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size 
+                stop_receiving = start_receiving + receiving_size
                 slices_rec.append(slice(start_receiving, stop_receiving))
                 cmin_diff.append(start_receiving)
             new_data[tuple(slices_rec)] = receiving_layer.data
-            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff))
+            receiving_layer.domain.coords_min = tuple(
+                np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff)
+            )
         else:
             new_data = receiving_layer.data
-            
+
             slices = []
             for receiving_cmin, incoming_cmin, incoming_size in zip(
                 receiving_layer.coords_min,
@@ -240,8 +225,6 @@ class InstanceMaskTileMerger(Merger):
         receiving_layer.meta = incoming_layer.meta
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
-        receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
-        receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
         self.tile_tracker = InstanceTileTracker()
 
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):

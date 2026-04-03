@@ -1,7 +1,8 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.core.tiling import Domain
 
 
 class Tracks(DataLayer):
@@ -30,13 +31,10 @@ class Tracks(DataLayer):
             **kwargs,
         )
 
-    @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
-            return
-        return np.zeros((1, len(bounds) + 2), dtype=np.float32)
+    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+        """Initialize zero-valued data in a given domain."""
+        if domain is not None:
+            return np.zeros((1, self.ndim + 2), dtype=np.float32)
 
     @property
     def n_objects(self) -> int:
@@ -46,7 +44,8 @@ class Tracks(DataLayer):
             return len(self.data)
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
+        """Data bounds in local coordinates."""
         if self.data is None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data, axis=0)[2:])

@@ -31,7 +31,7 @@ from imaging_server_kit.core.runner import (
     AlgorithmRunner,
     validate_algorithm,
 )
-from imaging_server_kit.types import DATA_TYPES, DataLayer
+from imaging_server_kit.types import DATA_TYPES, DataLayer, layer_factory
 from imaging_server_kit.validation.layer_validator import LayerValidator
 
 TYPE_MAPPINGS: Dict[Any, Type[DataLayer]] = {
@@ -398,7 +398,8 @@ class Algorithm(AlgorithmRunner):
                     float(param_value.max()),
                 ]
             
-            sample_results.create(kind=kind, data=param_value, name=param_name, **kw)
+            layer = layer_factory(kind=kind, data=param_value, name=param_name, **kw)
+            sample_results.create(layer=layer)
             
         return sample_results
 

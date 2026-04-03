@@ -13,7 +13,7 @@ def _extract_meta(obj, n_objects, tile_filter):
     return obj
 
 
-def extract_meta_tile(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> Dict:
+def select_object_meta(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> Dict:
     """Iterates over two levels of the meta dictionary.
     Any numpy array found with length==n_objects is filtered using tile_filter.
     """

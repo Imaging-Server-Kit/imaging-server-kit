@@ -11,7 +11,6 @@ from .core import (
     Algorithm,
     MultiAlgorithm,
     combine,
-    LayerStackBase,
     Results,
     generate_tiles,
     TileMeta,
@@ -97,9 +96,7 @@ def to_napari(
     return viewer
 
 
-def convert(
-    results: LayerStackBase, to: str = "results"
-) -> Union[LayerStackBase, "napari.Viewer"]:
+def convert(results: Results, to: str = "results") -> Union[Results, "napari.Viewer"]:
     """
     Convert a result object into a different representation.
 
@@ -119,7 +116,7 @@ def convert(
         raise ValueError(f"{to} is not supported. Please use {supported_results}")
 
     if to == "results":
-        results_dst = Results()
+        return Results(layers=results.layers)
     elif to == "napari":
         if not NAPARI_INSTALLED:
             print(
@@ -128,22 +125,5 @@ def convert(
             return
         from napari_serverkit import NapariResults
 
-        results_dst = NapariResults()
-
-    for layer in results:
-        results_dst.create(
-            kind=layer.kind,
-            data=layer.data,
-            name=layer.name,
-            meta=layer.meta,
-            tile_meta=layer.tile_meta,
-            domain=layer.domain,
-            merger=layer.merger,
-            serializer=layer.serializer,
-        )
-
-    if to == "napari":
         # For napari, we return the viewer directly
-        return results_dst.viewer
-    else:
-        return results_dst
+        return NapariResults(layers=results.layers).viewer

@@ -3,10 +3,10 @@ from typing import Optional
 import numpy as np
 
 from imaging_server_kit.types._image import Image
-from imaging_server_kit.merge.layer_merger import Merger
+from imaging_server_kit.merge.layer_merger import DefaultMerger
 
 
-class ImageOverrideMerger(Merger):
+class ImageOverrideMerger(DefaultMerger):
     """Merge images using and `override` strategy: last tile overrides existing data in overlapping regions."""
 
     @staticmethod
@@ -17,7 +17,6 @@ class ImageOverrideMerger(Merger):
         if (receiving_layer.data is None) or (receiving_layer.ndim is None):
             receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-            receiving_layer.meta = incoming_layer.meta
 
         min_bounds = np.min(
             np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
@@ -72,14 +71,6 @@ class ImageOverrideMerger(Merger):
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta
 
-    @staticmethod
-    def on_first_merge(receiving_layer: Image, incoming_layer: Image):
-        receiving_layer.meta = incoming_layer.meta
-
-    @staticmethod
-    def on_last_merge(receiving_layer: Image, incoming_layer: Image):
-        pass
-
 
 def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
     """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
@@ -128,7 +119,7 @@ def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
     return overlap_count_arr
 
 
-class ImageTileOverlapMerger(Merger):
+class ImageTileOverlapMerger(DefaultMerger):
     """Merge images while averaging image intensities in overlapping regions."""
 
     @staticmethod
@@ -137,10 +128,8 @@ class ImageTileOverlapMerger(Merger):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            # TODO: we should instead initialize with zeros_like incoming layer
             receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
             receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-            receiving_layer.meta = incoming_layer.meta
 
         _overlap_count_map = overlap_count_map(incoming_layer)
 
@@ -203,15 +192,3 @@ class ImageTileOverlapMerger(Merger):
 
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta
-
-    @staticmethod
-    def on_first_merge(receiving_layer: Image, incoming_layer: Image):
-        # Re-initialize image data on first tile to avoid accumulating data indefinitely on multiple runs
-        # TODO: this is wrong; only the domain of incoming_layer should be reset, no all receiving layer data.
-        receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
-        receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-        receiving_layer.meta = incoming_layer.meta
-
-    @staticmethod
-    def on_last_merge(receiving_layer: Image, incoming_layer: Image):
-        pass

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.types.data_layer import DataLayer
@@ -38,7 +38,8 @@ class Image(DataLayer):
         )
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
+        """Data bounds in local coordinates."""
         if self._data is None:
             return
         if self.meta is None:
@@ -49,6 +50,7 @@ class Image(DataLayer):
             return self._data.shape
 
     def select(self, domain: Domain) -> Image:
+        """Select data in a given domain."""
         if (
             (self.data is None)
             or (domain.coords_max is None)
@@ -56,13 +58,14 @@ class Image(DataLayer):
         ):
             _data = None
         else:
-            # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
             domain_local = domain.copy()
             domain_local.coords_min = tuple(
                 np.array(domain_local.coords_min) - np.array(self.coords_min)
             )
-            # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
-            _data = self.data[domain_local.slices]
+            try:
+                _data = self.data[domain_local.slices]
+            except:
+                raise RuntimeError("Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?")
 
         return Image(
             data=_data,
@@ -72,8 +75,8 @@ class Image(DataLayer):
             domain=domain,
         )
 
-    @staticmethod
-    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+        """Initialize zero-valued data in a given domain."""
         if domain is not None:
             return np.zeros(domain.size, dtype=np.float32)
 
@@ -81,3 +84,14 @@ class Image(DataLayer):
         if self.meta["rgb"] is True:
             domain_size.extend([3])
         return np.zeros(domain_size, dtype=np.float32)
+
+    def reinitialize(self, domain: Domain) -> None:
+        """Remove data in a given domain."""
+        domain_local = domain.copy()
+        domain_local.coords_min = tuple(
+            np.array(domain_local.coords_min) - np.array(self.coords_min)
+        )
+        try:
+            self.data[domain_local.slices] = 0
+        except:
+            raise RuntimeError("Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?")

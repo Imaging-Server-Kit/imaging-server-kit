@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.data_layer import DataLayer
-from imaging_server_kit.types.common import extract_meta_tile
+from imaging_server_kit.types.common import select_object_meta
 
 
 class Vectors(DataLayer):
@@ -16,6 +16,7 @@ class Vectors(DataLayer):
     data: A Numpy array of shape (N, 2, D) where D is the dimensionality (2, 3..).
         data[:, 0, :] represents the coordinates of the origin of the vectors.
         data[:, 1, :] represents the displacement from the origin.
+    dimensionality: list of accepted dimensionalities, for example [2, 3].
     """
 
     kind = "vectors"
@@ -38,7 +39,7 @@ class Vectors(DataLayer):
 
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
-        """Data in global coordinate reference instead of local to the tile."""
+        """Data in global coordinates."""
         if (self.data is not None) and (self.domain is not None):
             if self.domain.coords_min is not None:
                 data_global = self.data.copy()
@@ -56,45 +57,43 @@ class Vectors(DataLayer):
             return len(self.data)
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
+        """Data bounds in local coordinates."""
         if self.data is not None:
             if self.n_objects > 0:
                 return tuple(np.max(self.data[:, 0], axis=0))
 
     def select(self, domain: Domain) -> Vectors:
+        """Select data in a given domain."""
         if self.data is None:
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.initialize_data(domain=self.domain)
+            _data = self.zeros_in(domain=self.domain)
             _meta = self.meta
         else:
-            # Mask of vector coordinates in the tile
-            vector_coords_in_tile = (
+            # Mask of vector coordinates in the domain
+            vector_coords_in_domain = (
                 self.data_global_coords[:, 0] >= domain.coords_min
             ) & (self.data_global_coords[:, 0] < domain.coords_max)
 
-            # All coordinates must be in the tile bounds
-            tile_filter = vector_coords_in_tile.all(axis=1)  # (N,)
+            # All coordinates must be in the domain bounds
+            filt = vector_coords_in_domain.all(axis=1)  # (N,)
 
-            # Select vectors in the tile
-            vectors_tile_data = self.data[tile_filter]
+            selected_vectors = self.data[filt]
 
-            # Select meta of vectors in the tile
-            vectors_tile_meta = extract_meta_tile(
-                self.meta, self.n_objects, tile_filter
-            )
+            selected_meta = select_object_meta(self.meta, self.n_objects, filt)
 
-            if len(vectors_tile_data) > 0:
-                vtd = vectors_tile_data.copy()
+            if len(selected_vectors) > 0:
+                vtd = selected_vectors.copy()
                 for dim in range(self.ndim):
                     vtd[:, 0, dim] = vtd[:, 0, dim] + (
                         self.domain.coords_min[dim] - domain.coords_min[dim]
                     )
-                vectors_tile_data = vtd
+                selected_vectors = vtd
 
-            _data = vectors_tile_data
-            _meta = vectors_tile_meta
+            _data = selected_vectors
+            _meta = selected_meta
 
         return Vectors(
             data=_data,
@@ -104,8 +103,25 @@ class Vectors(DataLayer):
             domain=domain,
         )
 
-    @staticmethod
-    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
-        if domain is None:
+    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+        """Initialize zero-valued data in a given domain."""
+        if domain is not None:
+            return np.zeros((0, 2, domain.ndim), dtype=np.float32)
+
+    def reinitialize(self, domain: Domain) -> None:
+        """Remove data in a given domain."""
+        if self.data is None:
             return
-        return np.zeros((0, 2, domain.ndim), dtype=np.float32)
+
+        if self.n_objects == 0:
+            return
+
+        objects_in_domain = (self.data_global_coords[:, 0] >= domain.coords_min) & (
+            self.data_global_coords[:, 0] < domain.coords_max
+        )
+
+        filt = objects_in_domain.all(axis=1)  # (N,)
+
+        if len(self.data[filt]) > 0:
+            self.data = self.data[~filt]
+            self.meta = select_object_meta(self.meta, len(~filt), ~filt)

@@ -1,4 +1,4 @@
-from typing import Dict, Type
+from typing import Dict, Optional, Type
 from .data_layer import DataLayer
 from ._image import Image
 from ._mask import Mask
@@ -15,6 +15,7 @@ from ._choice import Choice
 from ._notification import Notification
 from ._null import Null
 from ._progress import Progress
+
 
 DATA_TYPES: Dict[str, Type[DataLayer]] = {
     c.kind: c
@@ -36,6 +37,16 @@ DATA_TYPES: Dict[str, Type[DataLayer]] = {
         Progress,
     ]
 }
+
+
+def layer_factory(kind: str, **kwargs) -> DataLayer:
+    """Create a data layer by passing its `kind` and initialization parameters."""
+    cls: Optional[Type[DataLayer]] = DATA_TYPES.get(kind)
+    if cls is None:
+        raise ValueError(f"`{kind}` layers cannot be handled.")
+
+    return cls(**kwargs)
+
 
 __all__ = [
     "DATA_TYPES",

@@ -124,16 +124,16 @@ class DataLayer:
         new_tile_meta = self.tile_meta.copy()
         new_domain = self.domain.copy()
 
-        if self._data_bounds is None:
+        if self.bounds is None:
             new_domain.size = None
             new_domain.coords_min = None
         else:
-            new_domain.size = self._data_bounds
+            new_domain.size = self.bounds
             if new_domain.coords_min is None:
-                new_domain.coords_min = tuple([0] * len(self._data_bounds))
+                new_domain.coords_min = tuple([0] * len(self.bounds))
 
             if new_tile_meta.overlap_px is None:
-                new_tile_meta.overlap_px = tuple([0] * len(self._data_bounds))
+                new_tile_meta.overlap_px = tuple([0] * len(self.bounds))
 
         self._domain = new_domain
         self._tile_meta = new_tile_meta
@@ -203,7 +203,7 @@ class DataLayer:
             return self.data.shape
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
         pass
 
     @property
@@ -245,7 +245,7 @@ class DataLayer:
         for dim, k in enumerate(key):
             if isinstance(k, slice):
                 start = 0 if k.start is None else k.start
-                stop = self._data_bounds[dim] if k.stop is None else k.stop
+                stop = self.bounds[dim] if k.stop is None else k.stop
                 start_global = self.coords_min[dim] + start
                 position.append(start_global)
                 size.append(stop - start)
@@ -257,15 +257,17 @@ class DataLayer:
         if self.ndim is not None:
             if len(size) < self.ndim:
                 for dim in range(len(size), self.ndim):
-                    size.append(self._data_bounds[dim])
+                    size.append(self.bounds[dim])
                     position.append(self.coords_min[dim])
 
         domain = Domain(position=position, size=size)
 
         return self.select(domain=domain)
 
-    @staticmethod
-    def initialize_data(domain: Optional[Domain]) -> Any:
+    def reinitialize(self, domain: Domain) -> None:
+        pass
+
+    def zeros_in(self, domain: Optional[Domain]) -> Any:
         pass
 
 
@@ -275,8 +277,7 @@ class LayerTileGenerator:
         layer: DataLayer, ctx: Optional[TilingContext]
     ) -> Generator[DataLayer, None, None]:
         if ctx is None:
-            tile_domain = Domain()
-            yield layer.select(domain=tile_domain)
+            yield layer.select(domain=Domain())
         else:
             for tile_meta, tile_domain in generate_tiles(
                 domain=layer.domain,
@@ -286,8 +287,5 @@ class LayerTileGenerator:
                 randomize=ctx.randomize,
             ):
                 tile = layer.select(domain=tile_domain)
-
-                # Assign the tile meta from the generator:
                 tile.tile_meta = tile_meta
-
                 yield tile

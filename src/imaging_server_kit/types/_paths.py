@@ -1,7 +1,8 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.core.tiling import Domain
 
 
 class Paths(DataLayer):
@@ -44,7 +45,8 @@ class Paths(DataLayer):
             return len(self.data)
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
+        """Data bounds in local coordinates."""
         if self.data is None:
             return
         if self.n_objects > 0:
@@ -54,10 +56,7 @@ class Paths(DataLayer):
             bounds = np.max(np.asarray(path_bounds), axis=0).tolist()
             return tuple(bounds)
 
-    @staticmethod
-    def initialize_data(
-        bounds: Optional[Union[Tuple, List]],
-    ) -> Optional[np.ndarray]:
-        if bounds is None:
-            return
-        return np.asarray([])
+    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+        """Initialize zero-valued data in a given domain."""
+        if domain is not None:
+            return np.asarray([])

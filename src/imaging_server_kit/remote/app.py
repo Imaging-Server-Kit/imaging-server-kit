@@ -16,7 +16,7 @@ import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
 from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.results import Results
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types import DataLayer, layer_factory
 from imaging_server_kit.remote.results_serializer import ResultsSerializer
 
 
@@ -231,9 +231,11 @@ class AlgorithmApp:
                     ].items():
                         param_type = param_values.get("param_type")
                         if param_type == "image":
-                            params_res.create(
-                                kind="image", data=qupath_image.data, name=param_name
-                            )
+                            param_layer = layer_factory(kind="image", data=qupath_image.data, name=param_name)
+                            params_res.create(layer=param_layer)
+                            # params_res.create(
+                            #     kind="image", data=qupath_image.data, name=param_name
+                            # )
                             break
 
             # Validate the parameters `manually` with Pydantic...

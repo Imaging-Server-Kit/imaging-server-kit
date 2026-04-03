@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import imantics
 import numpy as np
@@ -152,9 +152,8 @@ def features2instance_mask_3d(features, image_shape):
     _, ry, rx = image_shape
     for feature in features:
         feature_xy_coordinates = np.array(feature["geometry"]["coordinates"])
-        feature_xy_coordinates = feature_xy_coordinates[
-            0, :, :
-        ]  # Remove an extra dimension
+        # Remove an extra dimension
+        feature_xy_coordinates = feature_xy_coordinates[0, :, :]
         feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
         feature_z_idx = feature["properties"]["z_idx"]
@@ -192,11 +191,13 @@ class Mask(DataLayer):
         )
 
     @property
-    def _data_bounds(self) -> Optional[Tuple]:
+    def bounds(self) -> Optional[Tuple]:
+        """Data bounds in local coordinates."""
         if isinstance(self.data, np.ndarray):
             return self.data.shape
 
     def select(self, domain: Domain) -> Mask:
+        """Select data in a given domain."""
         if (
             (self.data is None)
             or (domain.coords_max is None)
@@ -206,13 +207,16 @@ class Mask(DataLayer):
         elif (domain.coords_max > np.asarray(self.coords_max)).any():
             _data = None
         else:
-            # TODO: Correct logic? We assume domain is global, and slices go from coords_min to coords_max
             domain_local = domain.copy()
             domain_local.coords_min = tuple(
                 np.array(domain_local.coords_min) - np.array(self.coords_min)
             )
-            # TODO: We should clip domain.slices or use zero-padding or sth before slicing:
-            _data = self.data[domain_local.slices]
+            try:
+                _data = self.data[domain_local.slices]
+            except:
+                raise RuntimeError(
+                    "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
+                )
         return Mask(
             data=_data,
             name=self.name,
@@ -221,10 +225,23 @@ class Mask(DataLayer):
             domain=domain,
         )
 
-    @staticmethod
-    def initialize_data(domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+        """Initialize zero-valued data in a given domain."""
         if domain is not None:
             return np.zeros(domain.size, dtype=np.uint16)
 
     def initialize(self, domain_size: List[int]) -> Optional[np.ndarray]:
         return np.zeros(domain_size, dtype=np.uint16)
+
+    def reinitialize(self, domain: Domain) -> None:
+        """Remove data in a given domain."""
+        domain_local = domain.copy()
+        domain_local.coords_min = tuple(
+            np.array(domain_local.coords_min) - np.array(self.coords_min)
+        )
+        try:
+            self.data[domain_local.slices] = 0
+        except:
+            raise RuntimeError(
+                "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
+            )
