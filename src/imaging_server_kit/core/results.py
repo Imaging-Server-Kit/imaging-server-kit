@@ -68,6 +68,7 @@ class LayerStackBase(ABC):
                     domain=incoming_layer.domain,
                     merger=incoming_layer.merger,
                     serializer=incoming_layer.serializer,
+                    
                     data=None,
                 )
             receiving_layers.append(receiving_layer)
@@ -225,8 +226,9 @@ class Results(LayerStackBase):
         if cls is None:
             raise ValueError(f"{kind} layers cannot be handled.")
 
-        # Instantiate layer
         name = self._resolve_layer_name(kind, name)
+        
+        # Instantiate layer
         layer = cls(name=name, **kwargs)
 
         # Add layer to the stack

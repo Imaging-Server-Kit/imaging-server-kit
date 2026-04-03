@@ -139,7 +139,7 @@ class AlgorithmRunner(ABC):
         delay_sec: Artificial delay (sleep) time between each tile processing.
         randomize: Process tiles in a random order.
         results: An optional layer stack object to collect results into.
-        domain: An optional domain in which to perform the computation.
+        domain: An optional domain in which to restrict the computation.
         """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 
