@@ -1,6 +1,6 @@
 from typing import Any, Dict, Type
 
-from imaging_server_kit.types import DataLayer, DATA_TYPES
+from imaging_server_kit.types import Layer, DATA_TYPES
 from imaging_server_kit.remote.meta_serializer import DefalutMetaSerializer
 from imaging_server_kit.remote.tile_serializer import TileMetaSerializer
 from imaging_server_kit.remote.domain_serializer import DomainSerializer
@@ -27,7 +27,7 @@ LAYER_DATA_SERIALIZERS: Dict[str, Dict[str, Type[Serializer]]] = {
 }
 
 
-def find_layer_serializer(layer: DataLayer) -> Serializer:
+def find_layer_serializer(layer: Layer) -> Serializer:
     if layer.kind in LAYER_DATA_SERIALIZERS:
         lds = LAYER_DATA_SERIALIZERS[layer.kind]
         serializer_cls = lds.get(layer.serializer, DefaultDataSerializer)
@@ -39,7 +39,7 @@ def find_layer_serializer(layer: DataLayer) -> Serializer:
 
 class LayerSerializer(Serializer):
     @staticmethod
-    def serialize(layer: DataLayer, client_origin: str) -> Dict[str, Any]:
+    def serialize(layer: Layer, client_origin: str) -> Dict[str, Any]:
         """Serialize a layer."""
 
         data_serializer = find_layer_serializer(layer)
@@ -50,7 +50,7 @@ class LayerSerializer(Serializer):
 
         tile_serializer = TileMetaSerializer()
         serialized_tile_meta = tile_serializer.serialize(layer, client_origin)
-        
+
         domain_serializer = DomainSerializer()
         serialized_domain = domain_serializer.serialize(layer, client_origin)
 
@@ -66,7 +66,7 @@ class LayerSerializer(Serializer):
         }
 
     @staticmethod
-    def deserialize(serialized_layer: Dict[str, Any], client_origin: str) -> DataLayer:
+    def deserialize(serialized_layer: Dict[str, Any], client_origin: str) -> Layer:
         """Deserialize a layer."""
         kind = serialized_layer["kind"]
         name = serialized_layer["name"]
@@ -77,7 +77,7 @@ class LayerSerializer(Serializer):
         merger = serialized_layer["merger"]
         serializer = serialized_layer["serializer"]
 
-        cls: Type[DataLayer] = DATA_TYPES[kind]
+        cls: Type[Layer] = DATA_TYPES[kind]
         layer_proto = cls(serializer=serializer)
         layer_serializer = find_layer_serializer(layer_proto)
         data = layer_serializer.deserialize(encoded_data, client_origin)
@@ -87,7 +87,7 @@ class LayerSerializer(Serializer):
 
         tile_serializer = TileMetaSerializer()
         tile_meta = tile_serializer.deserialize(encoded_tile_meta, client_origin)
-        
+
         domain_serializer = DomainSerializer()
         domain = domain_serializer.deserialize(encoded_domain, client_origin)
 

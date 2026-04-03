@@ -11,7 +11,7 @@ from .core import (
     Algorithm,
     MultiAlgorithm,
     combine,
-    Results,
+    Stack,
     generate_tiles,
     TileMeta,
     Domain,
@@ -64,7 +64,7 @@ def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]], 
 
 def to_napari(
     algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]] = None,
-    viewer: Optional[Union["napari.Viewer", "napari_serverkit.NapariResults"]] = None,
+    viewer: Optional[Union["napari.Viewer", "napari_serverkit.NapariStack"]] = None,
 ) -> None:
     """
     Convert an algorithm (or algorithm collection) to a dock widget and add it to a Napari viewer.
@@ -96,34 +96,34 @@ def to_napari(
     return viewer
 
 
-def convert(results: Results, to: str = "results") -> Union[Results, "napari.Viewer"]:
+def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
     """
     Convert a result object into a different representation.
 
     Parameters
     ----------
-    results : The result object to convert.
-    to : The target representation to convert to. Supported values: ["results", "napari"]
+    stack : The result object to convert.
+    to : The target representation to convert to. Supported values: ["stack", "napari"]
 
     Returns
     -------
     The converted result object.
-    - If `to == "results"`, a Results() object containing copies of the input layers.
-    - If `to == "napari"` the napari.Viewer associated with the converted results.
+    - If `to == "stack"`, a Stack() object containing copies of the input layers.
+    - If `to == "napari"` the napari.Viewer associated with the converted stack.
     """
-    supported_results = ["results", "napari"]
-    if not to in supported_results:
-        raise ValueError(f"{to} is not supported. Please use {supported_results}")
+    supported = ["stack", "napari"]
+    if not to in supported:
+        raise ValueError(f"{to} is not supported. Please use {supported}")
 
-    if to == "results":
-        return Results(layers=results.layers)
+    if to == "stack":
+        return Stack(layers=stack.layers)
     elif to == "napari":
         if not NAPARI_INSTALLED:
             print(
                 "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
             )
             return
-        from napari_serverkit import NapariResults
+        from napari_serverkit import NapariStack
 
         # For napari, we return the viewer directly
-        return NapariResults(layers=results.layers).viewer
+        return NapariStack(layers=stack.layers).viewer

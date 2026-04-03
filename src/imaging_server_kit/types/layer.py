@@ -5,13 +5,13 @@ import numpy as np
 
 from imaging_server_kit.core.tiling import (
     TileMeta,
-    TilingContext,
+    TilingSpecs,
     generate_tiles,
     Domain,
 )
 
 
-class DataLayer:
+class Layer:
     """
     Data layer container for a particular data type.
 
@@ -223,7 +223,7 @@ class DataLayer:
     def refresh(self):
         pass
 
-    def select(self, domain: Domain) -> DataLayer:
+    def select(self, domain: Domain) -> Layer:
         """Selection based on a domain in *global* coordinates."""
         cls = type(self)
         layer_selection = cls(
@@ -274,17 +274,17 @@ class DataLayer:
 class LayerTileGenerator:
     @staticmethod
     def generate_tiles(
-        layer: DataLayer, ctx: Optional[TilingContext]
-    ) -> Generator[DataLayer, None, None]:
+        layer: Layer, ctx: Optional[TilingSpecs]
+    ) -> Generator[Layer, None, None]:
         if ctx is None:
             yield layer.select(domain=Domain())
         else:
             for tile_meta, tile_domain in generate_tiles(
                 domain=layer.domain,
                 tile_size=ctx.tile_size,
-                overlap=ctx.overlap,
-                delay_sec=ctx.delay_sec,
-                randomize=ctx.randomize,
+                tile_overlap=ctx.tile_overlap,
+                tile_delay=ctx.tile_delay,
+                tile_order_random=ctx.tile_order_random,
             ):
                 tile = layer.select(domain=tile_domain)
                 tile.tile_meta = tile_meta

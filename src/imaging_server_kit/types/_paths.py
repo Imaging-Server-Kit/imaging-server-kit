@@ -1,11 +1,11 @@
 from typing import List, Optional, Tuple
 import numpy as np
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.tiling import Domain
 
 
-class Paths(DataLayer):
+class Paths(Layer):
     """Data layer used to represent 2D and 3D paths.
 
     Parameters

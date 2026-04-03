@@ -1,5 +1,5 @@
-from typing import Dict,Type
-from imaging_server_kit.types import DataLayer
+from typing import Dict, Type
+from imaging_server_kit.types import Layer
 from imaging_server_kit.validation.validator import Validator, DefaultValidator
 from imaging_server_kit.validation._boxes_validator import BoxesValidator
 from imaging_server_kit.validation._image_validator import ImageValidator
@@ -17,7 +17,7 @@ LAYER_VALIDATORS: Dict[str, Dict[str, Type[Validator]]] = {
 }
 
 
-def find_layer_validator(layer: DataLayer) -> Validator:
+def find_layer_validator(layer: Layer) -> Validator:
     if layer.kind in LAYER_VALIDATORS:
         lv = LAYER_VALIDATORS[layer.kind]
         validator_cls = lv.get(layer.validator, DefaultValidator)
@@ -29,10 +29,10 @@ def find_layer_validator(layer: DataLayer) -> Validator:
 
 class LayerValidator:
     @classmethod
-    def validate(cls, v, layer: DataLayer) -> None:
+    def validate(cls, v, layer: Layer) -> None:
         """Validate a layer's internal attributes."""
         if layer.data is None:
             return
-        
+
         validator = find_layer_validator(layer)
         validator.validate(layer)

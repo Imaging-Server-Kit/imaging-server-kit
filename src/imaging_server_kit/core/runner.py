@@ -7,8 +7,8 @@ from imaging_server_kit.core.errors import (
     AlgorithmRuntimeError,
     napari_available,
 )
-from imaging_server_kit.core.results import Results, ResultsTileGenerator
-from imaging_server_kit.core.tiling import TilingContext
+from imaging_server_kit.core.stack import Stack, StackTileGenerator
+from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
 
@@ -49,7 +49,7 @@ class AlgorithmRunner(ABC):
     def get_parameters(self, algorithm: str) -> Dict: ...
 
     @abstractmethod
-    def get_sample(self, algorithm: str, idx: int = 0) -> Results: ...
+    def get_sample(self, algorithm: str, idx: int = 0) -> Stack: ...
 
     @abstractmethod
     def get_n_samples(self, algorithm: str) -> int: ...
@@ -61,27 +61,25 @@ class AlgorithmRunner(ABC):
     def get_signature_params(self, algorithm: str) -> List[str]: ...
 
     @abstractmethod
-    def _stream(
-        self, algorithm, params_res: Results
-    ) -> Generator[Results, None, None]: ...
+    def _stream(self, algorithm, params_res: Stack) -> Generator[Stack, None, None]: ...
 
     def run_generator(
         self,
         algorithm: str,
-        params_res: Results,
-        tiling_ctx: Optional[TilingContext] = None,
+        params_res: Stack,
+        tiling_ctx: Optional[TilingSpecs] = None,
     ):
         tile_progress_needed = tiling_ctx is not None
 
         if tiling_ctx is None:
             tiling_ctx = (
-                TilingContext(tile_size=params_res.coords_max)
+                TilingSpecs(tile_size=params_res.coords_max)
                 if params_res.coords_max
                 else None
             )
 
-        results_tile_gen = ResultsTileGenerator()
-        for params_tile_res in results_tile_gen.generate_tiles(params_res, tiling_ctx):
+        stack_tile_gen = StackTileGenerator()
+        for params_tile_res in stack_tile_gen.generate_tiles(params_res, tiling_ctx):
 
             tm = params_tile_res.tile_meta
             dst_coords_min = params_tile_res.coords_min
@@ -97,7 +95,7 @@ class AlgorithmRunner(ABC):
                         data=tm.tile_idx + 1,
                         max_val=tm.n_tiles,
                     )
-                    result_tile.create(layer=progress_layer)
+                    result_tile.add(progress_layer)
 
                 for l in result_tile:
                     l.tile_meta.tile_idx = tm.tile_idx
@@ -119,14 +117,14 @@ class AlgorithmRunner(ABC):
         *args,
         algorithm: Optional[str] = None,
         tiled: bool = False,
-        tile_size_px: int = 64,
-        overlap_percent: float = 0.0,
-        delay_sec: float = 0.0,
-        randomize: bool = False,
-        results: Union[Results, "napari.Viewer"] = None,  # type: ignore
+        tile_size: int = 64,
+        tile_overlap: float = 0.0,
+        tile_delay: float = 0.0,
+        tile_order_random: bool = False,
+        stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
         domain: Optional[Domain] = None,
         **algo_params,
-    ) -> Union[Results, "napari.Viewer"]:  # type: ignore
+    ) -> Union[Stack, "napari.Viewer"]:  # type: ignore
         """
         Execute an algorithm with a set of parameters.
 
@@ -134,11 +132,11 @@ class AlgorithmRunner(ABC):
         ----------
         algorithm: The algorithm to run (only used with algorithm collections).
         tiled: Set to True for tiled inference.
-        tile_size_px: Tile size in pixels.
-        overlap_percent: Relative overlap between tiles.
-        delay_sec: Artificial delay (sleep) time between each tile processing.
-        randomize: Process tiles in a random order.
-        results: An optional layer stack object to collect results into.
+        tile_size: Tile size in pixels.
+        tile_overlap: Relative overlap between tiles.
+        tile_delay: Extra delay time in seconds between tiles.
+        tile_order_random: Process tiles in a random order.
+        stack: An optional layer stack object to collect results into.
         domain: An optional domain in which to restrict the computation.
         """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
@@ -165,8 +163,8 @@ class AlgorithmRunner(ABC):
             algo_params,
         )
 
-        # Convert the resolved parameters to a Results object
-        params_res = Results()
+        # Convert the resolved parameters to a Stack object
+        params_stack = Stack()
         for name, data in resolved_params.items():
             kw = algo_param_defs[name]
             kind = kw.pop("param_type")
@@ -174,52 +172,51 @@ class AlgorithmRunner(ABC):
                 kw.pop("anyOf")  # added by Pydantic - we don't need it.
 
             param_layer = layer_factory(kind=kind, data=data, name=name, **kw)
-            params_res.create(layer=param_layer)
-            # params_res.create(kind=kind, data=data, name=name, **kw)
+            params_stack.add(param_layer)
 
-        if results is None:
-            results = Results()
+        if stack is None:
+            stack = Stack()
 
         # Handle the special napari case
         special_napari_case = False
         if NAPARI_INSTALLED:
             import napari
-            from napari_serverkit import NapariResults
+            from napari_serverkit import NapariStack
 
-            if isinstance(results, napari.Viewer):
+            if isinstance(stack, napari.Viewer):
                 special_napari_case = True
-                results = NapariResults(viewer=results)  # type: ignore
+                stack = NapariStack(viewer=stack)  # type: ignore
 
         # Construct the tiling context
         if tiled:
-            tiling_ctx = TilingContext(
-                tile_size=tile_size_px,
-                overlap=overlap_percent,
-                randomize=randomize,
-                delay_sec=delay_sec,
+            tiling_ctx = TilingSpecs(
+                tile_size=tile_size,
+                tile_overlap=tile_overlap,
+                tile_order_random=tile_order_random,
+                tile_delay=tile_delay,
             )
         else:
             tiling_ctx = None
 
         # If a domain is passed, restrict the computation to that domain
         if domain:
-            params_res = params_res.select(domain=domain)
+            params_stack = params_stack.select(domain)
 
-        # Run the algorithm and assemble the results
-        for tile_results, reinitialize_domain in self.run_generator(
-            algorithm, params_res, tiling_ctx
+        # Run the algorithm and assemble the stack
+        for stack_tile, reinitialize_domain in self.run_generator(
+            algorithm, params_stack, tiling_ctx
         ):
-            results.merge(tile_results, reinitialize_domain=reinitialize_domain)
+            stack.merge(stack_tile, reinitialize_domain)
 
         # TODO: Instead of calling merge many times, each time increasing the domain,
         # we could do a single merge at the end (with no intermediate updates of the container).
-        # Or, we could call results.merge at a given update frequency (every N tiles).
+        # Or, we could call stack.merge at a given update frequency (every N tiles).
 
         # Remove the progress bar
-        results.delete("Tile progress")
+        stack.delete("Tile progress")
 
-        # Return the results
+        # Return the stack
         if special_napari_case:
-            return results.viewer  # type: ignore
+            return stack.viewer  # type: ignore
         else:
-            return results
+            return stack

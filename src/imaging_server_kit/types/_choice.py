@@ -5,10 +5,10 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
-class Choice(DataLayer):
+class Choice(Layer):
     """Data layer used to represent a choice of `items`. Can be used to represent labels for classification.
 
     The available choices are rendered as a dropdown selector in user interfaces.
@@ -42,6 +42,6 @@ class Choice(DataLayer):
         )
         if items is None:
             items = []
-        
+
         # Special: type defined here because it depends on items...
-        self.type = Literal.__getitem__(tuple(items)) # type: ignore
+        self.type = Literal.__getitem__(tuple(items))  # type: ignore

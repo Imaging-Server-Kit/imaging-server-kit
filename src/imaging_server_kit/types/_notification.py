@@ -1,9 +1,9 @@
 from typing import Optional
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
-class Notification(DataLayer):
+class Notification(Layer):
     """Data layer used to represent a text notification.
 
     Use the `level` parameter to define the notification level (`info`, `warning`, or `error`).

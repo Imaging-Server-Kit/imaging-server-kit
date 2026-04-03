@@ -8,7 +8,7 @@ from geojson import Feature, Polygon
 from skimage.draw import polygon2mask
 
 from imaging_server_kit.core.tiling import Domain
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -163,7 +163,7 @@ def features2instance_mask_3d(features, image_shape):
     return segmentation_mask
 
 
-class Mask(DataLayer):
+class Mask(Layer):
     """Data layer used to represent segmentation masks.
 
     Parameters

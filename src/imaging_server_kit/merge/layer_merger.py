@@ -1,9 +1,9 @@
 from typing import Dict, List, Type
 
-from imaging_server_kit.types import DataLayer, layer_factory
+from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.merge.merger import Merger, DefaultMerger
 from imaging_server_kit.merge._image_merger import (
-    ImageOverrideMerger,
+    # ImageOverrideMerger,
     ImageTileOverlapMerger,
 )
 from imaging_server_kit.merge._mask_merger import (
@@ -14,7 +14,10 @@ from imaging_server_kit.merge._object_merger import ObjectMerger
 
 
 LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
-    "image": {"default": ImageTileOverlapMerger, "override": ImageOverrideMerger},
+    "image": {
+        "default": ImageTileOverlapMerger,
+        #   "override": ImageOverrideMerger
+    },
     "mask": {
         "default": MaskOverrideMerger,
         "instances": InstanceMaskTileMerger,
@@ -25,7 +28,7 @@ LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
 }
 
 
-def find_layer_merger(layer: DataLayer) -> Merger:
+def find_layer_merger(layer: Layer) -> Merger:
     if layer.kind in LAYER_MERGERS:
         lm = LAYER_MERGERS[layer.kind]
         merger_cls = lm.get(layer.merger, DefaultMerger)
@@ -38,7 +41,7 @@ def find_layer_merger(layer: DataLayer) -> Merger:
 class LayerMerger:
     @staticmethod
     def merge(
-        receiving_layer: DataLayer, incoming_layer: DataLayer, merge_data: bool = True
+        receiving_layer: Layer, incoming_layer: Layer, merge_data: bool = True
     ) -> None:
         if incoming_layer.tile_meta.is_first_tile:
             merger = find_layer_merger(receiving_layer)
@@ -54,7 +57,7 @@ class LayerMerger:
             merger.on_last_merge(receiving_layer, incoming_layer)
 
 
-def merge_layers(layers: List[DataLayer]) -> DataLayer:
+def merge_layers(layers: List[Layer]) -> Layer:
     """Merge a list of data layers of the same kind.
     Note: This method differs from layer.merge(other_layer), which is an in-place merge.
     Here, a new layer is created and the data from all `layers` are merged into it.

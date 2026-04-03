@@ -5,10 +5,10 @@ import numpy as np
 
 from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.common import select_object_meta
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
-class Boxes(DataLayer):
+class Boxes(Layer):
     """Data layer used to represent boxes (rectangular bounding boxes).
 
     Parameters

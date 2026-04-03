@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 import numpy as np
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.tiling import Domain
 
 
-class Image(DataLayer):
+class Image(Layer):
     """Data layer used to represent images and image-like data.
 
     Parameters
@@ -65,7 +65,9 @@ class Image(DataLayer):
             try:
                 _data = self.data[domain_local.slices]
             except:
-                raise RuntimeError("Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?")
+                raise RuntimeError(
+                    "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
+                )
 
         return Image(
             data=_data,
@@ -94,4 +96,6 @@ class Image(DataLayer):
         try:
             self.data[domain_local.slices] = 0
         except:
-            raise RuntimeError("Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?")
+            raise RuntimeError(
+                "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
+            )

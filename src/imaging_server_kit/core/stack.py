@@ -5,19 +5,19 @@ from typing import Any, Dict, Generator, List, Optional
 import numpy as np
 
 from imaging_server_kit.merge.layer_merger import LayerMerger
-from imaging_server_kit.types import DataLayer
+from imaging_server_kit.types import Layer
 from imaging_server_kit.core.tiling import (
     TileMeta,
-    TilingContext,
+    TilingSpecs,
     generate_tiles,
     Domain,
 )
 
 
-class Results:
+class Stack:
     """A stack of data layers.
 
-    Access layers by index: `layer = results[0]` or name: `layer = results.read("Layer Name")`.
+    Access layers by index: `layer = stack[0]` or name: `layer = stack.read("Layer Name")`.
 
     Attributes
     ----------
@@ -31,21 +31,22 @@ class Results:
     merge(): Merge another result stack, based on layer names.
         Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
     """
+
     def __init__(
         self,
-        layers: Optional[List[DataLayer]] = None,
+        layers: Optional[List[Layer]] = None,
         tile_meta: Optional[TileMeta] = None,
     ):
-        self._layers: List[DataLayer] = []
+        self._layers: List[Layer] = []
         if layers is not None:
-            for l in layers:
-                self.create(layer=l)
+            for layer in layers:
+                self.add(layer)
 
         tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
         self._tile_meta = tile_meta
 
     def __str__(self):
-        message = f"Results (Layers: {len(self.layers)})"
+        message = f"Stack (Layers: {len(self.layers)})"
         for l in self.layers:
             message += "\n"
             message += l.__str__()
@@ -60,8 +61,8 @@ class Results:
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, key) -> List[DataLayer]:
-        # Results have a `layers` dimension (first dimension)
+    def __getitem__(self, key) -> List[Layer]:
+        # Stacks have a `layers` dimension (first dimension)
         # so we index as [Layer, Dim0, Dim1, .., DimN]
         if not isinstance(key, tuple):
             key = (key,)
@@ -118,7 +119,7 @@ class Results:
         return layer_selection
 
     @property
-    def layers(self) -> List[DataLayer]:
+    def layers(self) -> List[Layer]:
         return self._layers
 
     @property
@@ -165,7 +166,7 @@ class Results:
             # For now, this is not supported (result layers must have ndim=None or all the same ndims).
             return np.max(np.stack(layer_coords_max), axis=0).tolist()
 
-    def create(self, layer: DataLayer) -> DataLayer:
+    def add(self, layer: Layer) -> Layer:
         """Add a new layer to the layer stack.
 
         Parameters
@@ -179,12 +180,12 @@ class Results:
         self.post_create(layer)
         return layer
 
-    def post_create(self, layer: DataLayer):
+    def post_create(self, layer: Layer):
         pass
 
     def merge(
         self,
-        layer_stack: Optional[Results],
+        stack: Optional[Stack],
         reinitialize_domain: Optional[Domain] = None,
     ) -> None:
         """Merge another layer stack.
@@ -202,16 +203,16 @@ class Results:
             Other layers from layer_stack will be added via the create() method.
         reinitialize_domain: Optional domain from which to remove data before merging the incoming stack.
         """
-        if layer_stack is None:
+        if stack is None:
             return
 
         to_merge = []
         receiving_layers = []
-        for incoming_layer in layer_stack:
+        for incoming_layer in stack:
             receiving_layer = self.read(incoming_layer.name)
             to_merge.append(receiving_layer is not None)
             if receiving_layer is None:
-                receiving_layer = self.create(layer=incoming_layer)
+                receiving_layer = self.add(incoming_layer)
             else:
                 if (incoming_layer.tile_meta.is_first_tile) & isinstance(
                     reinitialize_domain, Domain
@@ -222,13 +223,13 @@ class Results:
 
         layer_merger = LayerMerger()
         for receiving_layer, incoming_layer, merge_data in zip(
-            receiving_layers, layer_stack, to_merge
+            receiving_layers, stack, to_merge
         ):
             layer_merger.merge(receiving_layer, incoming_layer, merge_data=merge_data)
 
         self.post_merge(receiving_layers)
 
-    def post_merge(self, receiving_layers: List[DataLayer]):
+    def post_merge(self, receiving_layers: List[Layer]):
         pass
 
     def delete(self, name: str) -> None:
@@ -242,14 +243,14 @@ class Results:
     def post_delete(self, name: str) -> None:
         pass
 
-    def read(self, name: str) -> Optional[DataLayer]:
+    def read(self, name: str) -> Optional[Layer]:
         """Read a layer by name."""
         for layer in self.layers:
             if layer.name == name:
                 return layer
 
-    def select(self, domain: Domain) -> Results:
-        return Results(layers=[l.select(domain=domain.copy()) for l in self.layers])
+    def select(self, domain: Domain) -> Stack:
+        return Stack(layers=[l.select(domain=domain.copy()) for l in self.layers])
 
     def to_params_dict(self) -> Dict[str, Any]:
         """
@@ -261,7 +262,7 @@ class Results:
 
         sample = algo.get_sample(0)
         params = sample.to_params_dict()
-        results = algo.run(**params)
+        stack = algo.run(**params)
         """
         algo_params = {}
         for layer in self.layers:
@@ -284,21 +285,21 @@ class Results:
         return name
 
 
-class ResultsTileGenerator:
+class StackTileGenerator:
     @staticmethod
     def generate_tiles(
-        results: Results, ctx: Optional[TilingContext]
-    ) -> Generator[Results, None, None]:
+        stack: Stack, ctx: Optional[TilingSpecs]
+    ) -> Generator[Stack, None, None]:
         if ctx is None:
-            yield results.select(domain=Domain())
+            yield stack.select(domain=Domain())
         else:
             for tile_meta, tile_domain in generate_tiles(
-                domain=results.domain,
+                domain=stack.domain,
                 tile_size=ctx.tile_size,
-                overlap=ctx.overlap,
-                delay_sec=ctx.delay_sec,
-                randomize=ctx.randomize,
+                tile_overlap=ctx.tile_overlap,
+                tile_delay=ctx.tile_delay,
+                tile_order_random=ctx.tile_order_random,
             ):
-                res_tile = results.select(domain=tile_domain)
-                res_tile.tile_meta = tile_meta
-                yield res_tile
+                stack_tile = stack.select(domain=tile_domain)
+                stack_tile.tile_meta = tile_meta
+                yield stack_tile

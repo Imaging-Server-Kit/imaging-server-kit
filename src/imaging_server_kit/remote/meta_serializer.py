@@ -4,20 +4,22 @@ import base64
 import numpy as np
 from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.remote.encoding import encode_contents, decode_contents
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
 class DefalutMetaSerializer(Serializer):
     @staticmethod
-    def serialize(layer: Optional[DataLayer], client_origin: Optional[str]=None) -> Optional[Dict]:
+    def serialize(
+        layer: Optional[Layer], client_origin: Optional[str] = None
+    ) -> Optional[Dict]:
         if layer is not None:
             if layer.meta is not None:
                 return _serialize_meta(layer.meta)
             else:
                 return {}
-    
+
     @staticmethod
-    def deserialize(serialized_meta: Dict, client_origin: Optional[str]=None) -> Any:
+    def deserialize(serialized_meta: Dict, client_origin: Optional[str] = None) -> Any:
         return _deserialize_meta(serialized_meta)
 
 

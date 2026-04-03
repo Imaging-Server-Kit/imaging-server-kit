@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
-from imaging_server_kit.types import DataLayer
+from imaging_server_kit.types import Layer
 
 
 class Serializer(ABC):
@@ -12,9 +12,10 @@ class Serializer(ABC):
     deserialize():
         Reconstructs an instance from a JSON representation.
     """
+
     @staticmethod
     @abstractmethod
-    def serialize(layer: Optional[DataLayer], client_origin: str) -> Any: ...
+    def serialize(layer: Optional[Layer], client_origin: str) -> Any: ...
 
     @staticmethod
     @abstractmethod
@@ -23,7 +24,7 @@ class Serializer(ABC):
 
 class DefaultDataSerializer(Serializer):
     @staticmethod
-    def serialize(layer: Optional[DataLayer], client_origin: str) -> Any:
+    def serialize(layer: Optional[Layer], client_origin: str) -> Any:
         if layer is not None:
             return layer.data
 

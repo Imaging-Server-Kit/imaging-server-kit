@@ -26,15 +26,15 @@ from pydantic import (
 from imaging_server_kit.core.errors import AlgorithmRuntimeError
 import imaging_server_kit.core._etc as etc
 import imaging_server_kit.types as skt
-from imaging_server_kit.core.results import Results
+from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.core.runner import (
     AlgorithmRunner,
     validate_algorithm,
 )
-from imaging_server_kit.types import DATA_TYPES, DataLayer, layer_factory
+from imaging_server_kit.types import DATA_TYPES, Layer, layer_factory
 from imaging_server_kit.validation.layer_validator import LayerValidator
 
-TYPE_MAPPINGS: Dict[Any, Type[DataLayer]] = {
+TYPE_MAPPINGS: Dict[Any, Type[Layer]] = {
     int: skt.Integer,
     float: skt.Float,
     bool: skt.Bool,
@@ -67,13 +67,13 @@ class Parameters(BaseModel):
 
 def _parse_run_func_signature(
     func: Callable,
-    parameters: Dict[str, DataLayer],
-) -> Dict[str, DataLayer]:
-    """Resolve parameters into {param_name : DataLayer} based on the annotations from the decorator
+    parameters: Dict[str, Layer],
+) -> Dict[str, Layer]:
+    """Resolve parameters into {param_name : Layer} based on the annotations from the decorator
     and the signature of the wrapped Python function."""
 
-    def get_data_layer_type(hinted_type, default, param_name) -> DataLayer:
-        cls: Type[DataLayer] = TYPE_MAPPINGS[hinted_type]
+    def get_layer_type(hinted_type, default, param_name) -> Layer:
+        cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
         if default is _empty:
             return cls(name=param_name)
         else:
@@ -85,12 +85,10 @@ def _parse_run_func_signature(
     sig = signature(func)
 
     for param_name, param in sig.parameters.items():
-        # Skip parameters explicitely defined in `parameters={}` (check that they are DataLayer instances)
+        # Skip parameters explicitely defined in `parameters={}` (check that they are Layer instances)
         if param_name in resolved:
-            if not isinstance(resolved.get(param_name), DataLayer):
-                raise TypeError(
-                    f"Parameter '{param_name}' should be a DataLayer instance."
-                )
+            if not isinstance(resolved.get(param_name), Layer):
+                raise TypeError(f"Parameter '{param_name}' should be a Layer instance.")
             continue
 
         annotation = param.annotation  # Type hints
@@ -102,7 +100,7 @@ def _parse_run_func_signature(
             if default is _empty:
                 # Last resort: is the parameter named unambiguously (variable name == parameter `kind`, for example the variable is named `image`)?
                 if param_name in DATA_TYPES:
-                    cls: Type[DataLayer] = DATA_TYPES[param_name]
+                    cls: Type[Layer] = DATA_TYPES[param_name]
                     resolved[param_name] = cls()  # Initialized with defaults
                 else:
                     raise TypeError(
@@ -110,13 +108,13 @@ def _parse_run_func_signature(
                     )
             else:
                 if isinstance(default, RECOGNIZED_TYPES):
-                    if isinstance(default, DataLayer):
+                    if isinstance(default, Layer):
                         # Case where default is a data layer, for example user has defaulted x=sk.Float(...)
                         resolved[param_name] = default
                     else:
                         # int, float, str, None defaults...
                         default_type = type(default)
-                        resolved[param_name] = get_data_layer_type(
+                        resolved[param_name] = get_layer_type(
                             default_type, default, param_name
                         )
                 else:
@@ -125,9 +123,7 @@ def _parse_run_func_signature(
                     )
         else:
             if annotation in RECOGNIZED_TYPES:
-                resolved[param_name] = get_data_layer_type(
-                    annotation, default, param_name
-                )
+                resolved[param_name] = get_layer_type(annotation, default, param_name)
             else:
                 raise TypeError(
                     f"Could not parse this parameter: '{param_name}'. Reason: Parameter type hint is an unrecognized type."
@@ -141,22 +137,22 @@ def _parse_pydantic_params_schema(
     params_from_decorator: Dict,
 ):
     """Convert the parameters dictionary provided by @algorithm to a Pydantic model."""
-    # Parse the provided parameters dictionary + run function signature to a dict(str: DataLayer)
-    parsed_params: Dict[str, DataLayer] = _parse_run_func_signature(
+    # Parse the provided parameters dictionary + run function signature to a dict(str: Layer)
+    parsed_params: Dict[str, Layer] = _parse_run_func_signature(
         run_algorithm_func, params_from_decorator
     )
 
     # Generate a Pydantic BaseModel
     fields = {}
     validators = {}
-    for param_name, data_layer in parsed_params.items():
+    for param_name, layer in parsed_params.items():
 
-        meta = data_layer.meta
+        meta = layer.meta
         if meta is None:
             meta = {}
 
         layer_field_constraints = {}
-        
+
         if "default" in meta:
             layer_field_constraints["default"] = meta["default"]
         if "min" in meta:
@@ -165,20 +161,20 @@ def _parse_pydantic_params_schema(
             layer_field_constraints["le"] = meta["max"]
 
         field_constraints = {
-            "title": data_layer.name,
+            "title": layer.name,
             "description": meta.get("description"),
-            "json_schema_extra": {"param_type": data_layer.kind} | meta,
+            "json_schema_extra": {"param_type": layer.kind} | meta,
         } | layer_field_constraints
 
         # Resolve the validator function
         layer_validator = LayerValidator()
-        val_func = partial(layer_validator.validate, layer=data_layer)
+        val_func = partial(layer_validator.validate, layer=layer)
 
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"
         )(val_func)
 
-        fields[param_name] = (data_layer.type, Field(**field_constraints))
+        fields[param_name] = (layer.type, Field(**field_constraints))
 
     return create_model(
         "Parameters",
@@ -191,34 +187,32 @@ def _parse_pydantic_params_schema(
 ### Function output parsing ###
 
 
-def _parse_output(payload: Any) -> DataLayer:
-    if isinstance(payload, DataLayer):
+def _parse_output(payload: Any) -> Layer:
+    if isinstance(payload, Layer):
         return payload
-    if isinstance(payload, RECOGNIZED_TYPES):  # Not a datalayer...
-        cls: Type[DataLayer] = TYPE_MAPPINGS[type(payload)]
+    if isinstance(payload, RECOGNIZED_TYPES):  # Not a data layer...
+        cls: Type[Layer] = TYPE_MAPPINGS[type(payload)]
         return cls(data=payload)
     else:
-        raise TypeError(
-            f"Function should return: List[DataLayer]. Got: {type(payload)}"
-        )
+        raise TypeError(f"Function should return: List[Layer]. Got: {type(payload)}")
 
 
-def _parse_payload(payload: Any) -> Union[List[DataLayer], DataLayer]:
+def _parse_payload(payload: Any) -> Union[List[Layer], Layer]:
     if isinstance(payload, (List, Tuple)):  # Multiple returns
         return [_parse_payload(p) for p in payload]  # type: ignore
     else:
         return _parse_output(payload)
 
 
-def _parse_user_func_output(payload: Any) -> Results:
-    """Parse the user's function output to a Results object."""
-    # payload => List[DataLayer]
+def _parse_user_func_output(payload: Any) -> Stack:
+    """Parse the user's function output to a Stack object."""
+    # payload => List[Layer]
     layers = _parse_payload(payload)
     if not isinstance(layers, List):
         layers = [layers]
 
-    # List[DataLayer] => Results
-    return Results(layers=layers)
+    # List[Layer] => Stack
+    return Stack(layers=layers)
 
 
 ### AlgoStream utility ###
@@ -329,11 +323,11 @@ class Algorithm(AlgorithmRunner):
         self._algorithms = algorithms
 
     def __call__(self, *args, **kwargs) -> Any:
-        # Get a Results object
-        results = self.run(*args, **kwargs)
+        # Get a Stack object
+        stack = self.run(*args, **kwargs)
 
         # Only return the data to emulate the wrapped function behavior
-        to_return = [r.data for r in results]
+        to_return = [r.data for r in stack]
         n_returns = len(to_return)
         if n_returns == 0:
             return
@@ -365,7 +359,7 @@ class Algorithm(AlgorithmRunner):
     @validate_algorithm
     def get_sample(
         self, algorithm: Optional[str] = None, idx: int = 0
-    ) -> Optional[Results]:
+    ) -> Optional[Stack]:
         n_samples = self.get_n_samples(algorithm)
         if n_samples == 0:
             return
@@ -383,8 +377,8 @@ class Algorithm(AlgorithmRunner):
             args=(),
             algo_params=self.samples[idx],
         )
-        # Convert the sample to a Results object
-        sample_results = Results()
+        # Convert the sample to a Stack object
+        sample_stack = Stack()
         for param_name, param_value in resolved_params.items():
             kind = algo_params_defs.get(param_name).get("param_type")
             if (kind in ["image", "mask"]) & (not isinstance(param_value, np.ndarray)):
@@ -397,11 +391,11 @@ class Algorithm(AlgorithmRunner):
                     float(param_value.min()),
                     float(param_value.max()),
                 ]
-            
+
             layer = layer_factory(kind=kind, data=param_value, name=param_name, **kw)
-            sample_results.create(layer=layer)
-            
-        return sample_results
+            sample_stack.add(layer)
+
+        return sample_stack
 
     def get_n_samples(self, algorithm: Optional[str] = None) -> int:
         return len(self.samples)
@@ -415,8 +409,8 @@ class Algorithm(AlgorithmRunner):
         return list(signature(self._run_algorithm_func).parameters.keys())
 
     def _stream(
-        self, algorithm: str, params_res: Results
-    ) -> Generator[Results, None, None]:
+        self, algorithm: str, params_res: Stack
+    ) -> Generator[Stack, None, None]:
         """Generator that runs an algorithm using given parameters."""
         algo_params = params_res.to_params_dict()
 

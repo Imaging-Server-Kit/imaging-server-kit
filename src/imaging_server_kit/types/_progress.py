@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 from tqdm import tqdm
 
@@ -13,11 +13,11 @@ from tqdm import tqdm
 PBAR = tqdm()
 
 
-class Progress(DataLayer):
+class Progress(Layer):
     """Data layer used to represent a progress bar.
 
     Usage example:
-    
+
     max_val = 10
     for k in range(max_val):
         yield sk.Progress(k, max_val=max_val)
@@ -33,10 +33,10 @@ class Progress(DataLayer):
         name="Progress",
         description="Progress bar",
         **kwargs,
-    ):        
+    ):
         if data is None:
             data = 0
-        
+
         super().__init__(
             name=name,
             data=data,

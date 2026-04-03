@@ -15,9 +15,9 @@ from pydantic import ValidationError
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
 from imaging_server_kit.core.algorithm import Algorithm
-from imaging_server_kit.core.results import Results
-from imaging_server_kit.types import DataLayer, layer_factory
-from imaging_server_kit.remote.results_serializer import ResultsSerializer
+from imaging_server_kit.core.stack import Stack
+from imaging_server_kit.types import Layer, layer_factory
+from imaging_server_kit.remote.stack_serializer import StackSerializer
 
 
 templates_dir = pathlib.Path(
@@ -164,8 +164,8 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             sample = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
             if sample is not None:
-                results_serializer = ResultsSerializer()
-                return results_serializer.serialize(sample, "Python/Napari")
+                stack_serializer = StackSerializer()
+                return stack_serializer.serialize(sample, "Python/Napari")
 
         @self.app.get(
             "/{algorithm_name}/n_samples",
@@ -214,51 +214,50 @@ class AlgorithmApp:
             # Python/Napari or Java/QuPath
             client_origin = str(request.headers.get("User-Agent"))
 
-            # Reconstruct the algo parameters as a `Results` object
-            results_serializer = ResultsSerializer()
-            params_res = results_serializer.deserialize(encoded_params, client_origin)
+            # Reconstruct the algo parameters as a `Stack` object
+            stack_serializer = StackSerializer()
+            params_stack = stack_serializer.deserialize(encoded_params, client_origin)
 
             # Special case: when request is sent from QuPath, the image is named `qupath-image`
             # and should be assigned to whichever parameter is an image in the algo (we assume)
             # TODO: shouldn't this decision be handled by the QuPath extension?
             if client_origin == "Java/QuPath":
-                qupath_image: Optional[DataLayer] = params_res.read("image-qupath")
+                qupath_image: Optional[Layer] = params_stack.read("image-qupath")
                 if qupath_image is not None:
-                    params_res.delete("image-qupath")
+                    params_stack.delete("image-qupath")
                     # Find the first image parameter in the schema and assume it's what the QuPath image is meant to be
                     for param_name, param_values in algorithm.get_parameters()[
                         "properties"
                     ].items():
                         param_type = param_values.get("param_type")
                         if param_type == "image":
-                            param_layer = layer_factory(kind="image", data=qupath_image.data, name=param_name)
-                            params_res.create(layer=param_layer)
-                            # params_res.create(
-                            #     kind="image", data=qupath_image.data, name=param_name
-                            # )
+                            param_layer = layer_factory(
+                                kind="image", data=qupath_image.data, name=param_name
+                            )
+                            params_stack.add(param_layer)
                             break
 
             # Validate the parameters `manually` with Pydantic...
             try:
-                algorithm.parameters_model(**params_res.to_params_dict())
+                algorithm.parameters_model(**params_stack.to_params_dict())
             except ValidationError as e:
                 raise HTTPException(status_code=422, detail=e.errors())
 
             # Create the algorithm `run` generator
             gen = algorithm.run_generator(
                 algorithm=algorithm_name,
-                params_res=params_res,
+                params_res=params_stack,
             )
 
-            # Will do results.serialize() => msgpack.packrb() to stream the response
-            msgpack_stream = self._stream_msgpack(gen, client_origin)
+            # Will do stack.serialize() => msgpack.packrb() to stream the response
+            stream = self._stream_msgpack(gen, client_origin)
 
             # To check: `content` is a Python generator, where StreamingResponse expects a special ContentStream object..
             # but it iseems to work anyway
-            return StreamingResponse(msgpack_stream, media_type="application/msgpack")
+            return StreamingResponse(stream, media_type="application/msgpack")
 
-    def _stream_msgpack(self, stream_generator: Iterable[Results], client_origin: str):
-        results_serializer = ResultsSerializer()
-        for results in stream_generator:
-            for r in results_serializer.serialize(results, client_origin):
+    def _stream_msgpack(self, stream_generator: Iterable[Stack], client_origin: str):
+        stack_serializer = StackSerializer()
+        for stack in stream_generator:
+            for r in stack_serializer.serialize(stack, client_origin):
                 yield msgpack.packb(r)

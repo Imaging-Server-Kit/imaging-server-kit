@@ -1,5 +1,5 @@
 from typing import Dict, Optional, Type
-from .data_layer import DataLayer
+from .layer import Layer
 from ._image import Image
 from ._mask import Mask
 from ._points import Points
@@ -17,7 +17,7 @@ from ._null import Null
 from ._progress import Progress
 
 
-DATA_TYPES: Dict[str, Type[DataLayer]] = {
+DATA_TYPES: Dict[str, Type[Layer]] = {
     c.kind: c
     for c in [
         Image,
@@ -39,9 +39,9 @@ DATA_TYPES: Dict[str, Type[DataLayer]] = {
 }
 
 
-def layer_factory(kind: str, **kwargs) -> DataLayer:
+def layer_factory(kind: str, **kwargs) -> Layer:
     """Create a data layer by passing its `kind` and initialization parameters."""
-    cls: Optional[Type[DataLayer]] = DATA_TYPES.get(kind)
+    cls: Optional[Type[Layer]] = DATA_TYPES.get(kind)
     if cls is None:
         raise ValueError(f"`{kind}` layers cannot be handled.")
 
@@ -50,7 +50,7 @@ def layer_factory(kind: str, **kwargs) -> DataLayer:
 
 __all__ = [
     "DATA_TYPES",
-    "DataLayer",
+    "Layer",
     "Image",
     "Mask",
     "Points",

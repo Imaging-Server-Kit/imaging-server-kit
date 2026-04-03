@@ -1,6 +1,6 @@
 from typing import Callable, Dict, List, Optional
 
-from imaging_server_kit.core.results import Results
+from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
 
@@ -33,7 +33,7 @@ class MultiAlgorithm(AlgorithmRunner):
         return self.algorithms_dict[algorithm].get_parameters(algorithm)
 
     @validate_algorithm
-    def get_sample(self, algorithm: str, idx: int = 0) -> Optional[Results]:
+    def get_sample(self, algorithm: str, idx: int = 0) -> Optional[Stack]:
         return self.algorithms_dict[algorithm].get_sample(algorithm, idx=idx)
 
     @validate_algorithm
@@ -52,11 +52,10 @@ class MultiAlgorithm(AlgorithmRunner):
     def __call__(self, algorithm: str, *args, **kwargs):
         return self.algorithms_dict[algorithm].__call__(*args, **kwargs)
 
-    def _stream(self, algorithm: str, params_res: Results):
-        for results in self.algorithms_dict[algorithm]._stream(
-            algorithm, params_res
-        ):
-            yield results
+    def _stream(self, algorithm: str, params_res: Stack):
+        for stack in self.algorithms_dict[algorithm]._stream(algorithm, params_res):
+            yield stack
+
 
 def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgorithm:
     """

@@ -1,9 +1,9 @@
 from typing import Optional
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
-class String(DataLayer):
+class String(Layer):
     """Data layer used to represent strings of text."""
 
     kind = "str"

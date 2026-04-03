@@ -266,15 +266,15 @@ def blob_detector_algo(
         points = np.empty((0, 3))
         sigmas = []
         for frame_id, frame in enumerate(image):
-            frame_results = skimage.feature.blob_log(
+            frame_stack = skimage.feature.blob_log(
                 frame,
                 min_sigma=min_sigma,
                 max_sigma=max_sigma,
                 num_sigma=num_sigma,
                 threshold=threshold,
             )
-            frame_points = frame_results[:, :2]  # Shape (N, 2)
-            frame_sigmas = list(frame_results[:, 2])  # Shape (N,)
+            frame_points = frame_stack[:, :2]  # Shape (N, 2)
+            frame_sigmas = list(frame_stack[:, 2])  # Shape (N,)
             sigmas.extend(frame_sigmas)
             frame_points = np.hstack(
                 (np.array([frame_id] * len(frame_points))[..., None], frame_points)
@@ -282,15 +282,15 @@ def blob_detector_algo(
             points = np.vstack((points, frame_points))
         sigmas = np.array(sigmas)
     else:
-        results = skimage.feature.blob_log(
+        stack = skimage.feature.blob_log(
             image,
             min_sigma=min_sigma,
             max_sigma=max_sigma,
             num_sigma=num_sigma,
             threshold=threshold,
         )
-        points = results[:, : image.ndim]
-        sigmas = results[:, image.ndim]
+        points = stack[:, : image.ndim]
+        sigmas = stack[:, image.ndim]
 
     points_params = {
         "opacity": 0.7,

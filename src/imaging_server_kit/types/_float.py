@@ -1,10 +1,10 @@
 from typing import Optional
 import numpy as np
 
-from imaging_server_kit.types.data_layer import DataLayer
+from imaging_server_kit.types.layer import Layer
 
 
-class Float(DataLayer):
+class Float(Layer):
     """Data layer used to represent floating-point (decimal) values."""
 
     kind = "float"

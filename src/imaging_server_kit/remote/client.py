@@ -15,8 +15,8 @@ from imaging_server_kit.core.errors import (
     AlgorithmTimeoutError,
     InvalidAlgorithmParametersError,
 )
-from imaging_server_kit.core.results import Results
-from imaging_server_kit.remote.results_serializer import ResultsSerializer
+from imaging_server_kit.core.stack import Stack
+from imaging_server_kit.remote.stack_serializer import StackSerializer
 
 
 class ServerRequestError(Exception):
@@ -88,19 +88,19 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     @validate_algorithm
-    def get_sample(self, algorithm=None, idx: int = 0) -> Results:
+    def get_sample(self, algorithm=None, idx: int = 0) -> Stack:
         n_samples = self.get_n_samples(algorithm)
         if (idx < 0) | (idx > n_samples - 1):
             raise ValueError(
                 f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!"
             )
         endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
-        serialized_sample_results = self._access_algo_get_endpoint(endpoint)
-        results_serializer = ResultsSerializer()
-        sample_results = results_serializer.deserialize(
-            serialized_sample_results, client_origin="Python/Napari"
+        serialized_sample_stack = self._access_algo_get_endpoint(endpoint)
+        stack_serializer = StackSerializer()
+        sample_stack = stack_serializer.deserialize(
+            serialized_sample_stack, client_origin="Python/Napari"
         )
-        return sample_results
+        return sample_stack
 
     @validate_algorithm
     def get_n_samples(self, algorithm=None) -> int:
@@ -121,14 +121,14 @@ class Client(AlgorithmRunner):
         endpoint = f"{self.server_url}/{algorithm}/signature"
         return self._access_algo_get_endpoint(endpoint)
 
-    def _stream(self, algorithm, params_res: Results):
-        results_serializer = ResultsSerializer()
+    def _stream(self, algorithm, params_res: Stack):
+        stack_serializer = StackSerializer()
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
             try:
                 response = client.post(
                     endpoint,
-                    json=results_serializer.serialize(params_res, "Python/Napari"),
+                    json=stack_serializer.serialize(params_res, "Python/Napari"),
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.token}",
@@ -146,8 +146,10 @@ class Client(AlgorithmRunner):
                     if not chunk:
                         continue
                     unpacker.feed(chunk)
-                    for serialized_results in unpacker:
-                        yield results_serializer.deserialize([serialized_results], "Python/Napari")
+                    for serialized_stack in unpacker:
+                        yield stack_serializer.deserialize(
+                            [serialized_stack], "Python/Napari"
+                        )
             else:
                 self._handle_response_errored(response)
 

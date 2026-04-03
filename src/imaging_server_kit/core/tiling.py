@@ -24,11 +24,11 @@ class TilingError(Exception):
 
 
 @dataclass
-class TilingContext:
+class TilingSpecs:
     tile_size: Union[int, Tuple, List] = 64
-    overlap: Union[float, Tuple, List] = 0.0
-    randomize: bool = False
-    delay_sec: float = 0.0
+    tile_overlap: Union[float, Tuple, List] = 0.0
+    tile_order_random: bool = False
+    tile_delay: float = 0.0
 
 
 class TileMeta:
@@ -144,9 +144,9 @@ def _valid_overlap(
 def generate_tiles(
     domain: Optional[Domain] = None,
     tile_size: Union[int, Tuple, List] = 64,
-    overlap: Union[float, Tuple, List] = 0.0,
-    randomize: bool = False,
-    delay_sec: float = 0.0,
+    tile_overlap: Union[float, Tuple, List] = 0.0,
+    tile_order_random: bool = False,
+    tile_delay: float = 0.0,
 ) -> Generator[Tuple[TileMeta, Domain], None, None]:
     """Generate tile metadata for overlapping N-dimensional tiles over a pixel domain.
 
@@ -158,13 +158,13 @@ def generate_tiles(
         The size of an individual tile, in pixels. If an integer is provided, the same size is used
         for all dimensions. If a tuple or list is provided, it must match the dimensionality of `bounds`.
         Default is 64.
-    overlap : float or tuple or list (optional)
+    tile_overlap : float or tuple or list (optional)
         Relative overlap between adjacent tiles (in the range [0, 1]). If an integer is provided, the same relative
         overlap is used for all dimensions.
         Default is 0.0 (no overlap).
-    randomize : bool, optional
+    tile_order_random : bool, optional
         If True, randomize the order in which tiles are yielded. Default is False.
-    delay_sec : float, optional
+    tile_delay : float, optional
         Time delay in seconds to wait after yielding each tile. Default is 0.0 (no delay).
 
     Yields
@@ -174,12 +174,12 @@ def generate_tiles(
     if domain is None:
         yield (TileMeta(), Domain())
     else:
-        if delay_sec < 0:
-            raise ValueError("Time delay (delay_sec) should be positive.")
+        if tile_delay < 0:
+            raise ValueError("Time delay should be positive.")
 
-        if not _valid_overlap(overlap=overlap, bounds=domain.size):
+        if not _valid_overlap(overlap=tile_overlap, bounds=domain.size):
             raise ValueError(
-                f"Invalid tile overlap: {overlap}. Expected a value or list/tuple in the range [0-1] compatible with the domain size ({domain.size})."
+                f"Invalid tile overlap: {tile_overlap}. Expected a value or list/tuple in the range [0-1] compatible with the domain size ({domain.size})."
             )
 
         if not _valid_tile_size(tile_size=tile_size, bounds=domain.size):
@@ -187,15 +187,15 @@ def generate_tiles(
                 f"Invalid tile size: {tile_size}. Expected a positive integer, or list/tuple of positive integers compatible with the domain size ({domain.size})."
             )
 
-        ctx = TilingContext(
+        ctx = TilingSpecs(
             tile_size=tile_size,
-            overlap=overlap,
-            randomize=randomize,
-            delay_sec=delay_sec,
+            tile_overlap=tile_overlap,
+            tile_order_random=tile_order_random,
+            tile_delay=tile_delay,
         )
 
         for tile_meta, tile_domain in _generate_tile_meta(domain=domain, ctx=ctx):
-            time.sleep(delay_sec)
+            time.sleep(tile_delay)
             yield (tile_meta, tile_domain)
 
 
@@ -243,7 +243,7 @@ def _get_tile_pos_and_size_i(
 
 
 def _generate_tile_meta(
-    domain: Domain, ctx: TilingContext
+    domain: Domain, ctx: TilingSpecs
 ) -> Generator[Tuple[TileMeta, Domain], None, None]:
     """Tiling in N-dimensions."""
     ndim = domain.ndim
@@ -258,12 +258,12 @@ def _generate_tile_meta(
     else:
         tile_shape = [ctx.tile_size] * ndim  # Isotropic tile
 
-    if isinstance(ctx.overlap, (list, tuple)):
-        overlap = ctx.overlap
+    if isinstance(ctx.tile_overlap, (list, tuple)):
+        overlap = ctx.tile_overlap
         if len(overlap) != ndim:
             raise TilingError(bounds=size, provided_shape=overlap)
     else:
-        overlap = [ctx.overlap] * ndim
+        overlap = [ctx.tile_overlap] * ndim
 
     # Overlap in pixels (TODO: we could allow users to pass an overlap in pixels directly)
     overlap_px = [
@@ -283,7 +283,7 @@ def _generate_tile_meta(
     grid = np.meshgrid(*[np.arange(n) for n in n_tiles_ax], indexing="ij")
     tile_coords_idx = np.stack([g.ravel() for g in grid], axis=1)
 
-    if ctx.randomize:
+    if ctx.tile_order_random:
         np.random.shuffle(tile_coords_idx)
 
     n_tiles = len(tile_coords_idx)
