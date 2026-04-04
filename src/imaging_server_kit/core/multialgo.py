@@ -52,8 +52,8 @@ class MultiAlgorithm(AlgorithmRunner):
     def __call__(self, algorithm: str, *args, **kwargs):
         return self.algorithms_dict[algorithm].__call__(*args, **kwargs)
 
-    def _stream(self, algorithm: str, params_res: Stack):
-        for stack in self.algorithms_dict[algorithm]._stream(algorithm, params_res):
+    def _stream(self, algorithm: str, params_stack: Stack):
+        for stack in self.algorithms_dict[algorithm]._stream(algorithm, params_stack):
             yield stack
 
 

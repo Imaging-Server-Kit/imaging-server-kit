@@ -5,6 +5,7 @@ import numpy as np
 
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.tiling import Domain
+from imaging_server_kit.types.common import safe_index_slice
 
 
 class Image(Layer):
@@ -89,12 +90,16 @@ class Image(Layer):
 
     def reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
+        if not isinstance(domain, Domain):
+            return
+        
         domain_local = domain.copy()
         domain_local.coords_min = tuple(
             np.array(domain_local.coords_min) - np.array(self.coords_min)
         )
+        slices_int = tuple(safe_index_slice(s) for s in domain_local.slices)
         try:
-            self.data[domain_local.slices] = 0
+            self.data[slices_int] = 0
         except:
             raise RuntimeError(
                 "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"

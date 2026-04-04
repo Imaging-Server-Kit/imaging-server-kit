@@ -212,8 +212,10 @@ class Stack:
             receiving_layer = self.read(incoming_layer.name)
             to_merge.append(receiving_layer is not None)
             if receiving_layer is None:
+                # We add the incoming layer and do not merge data (itself) into it:
                 receiving_layer = self.add(incoming_layer)
             else:
+                # We always reinitialize the domain on first tile:
                 if (incoming_layer.tile_meta.is_first_tile) & isinstance(
                     reinitialize_domain, Domain
                 ):

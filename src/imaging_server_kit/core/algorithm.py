@@ -409,10 +409,10 @@ class Algorithm(AlgorithmRunner):
         return list(signature(self._run_algorithm_func).parameters.keys())
 
     def _stream(
-        self, algorithm: str, params_res: Stack
+        self, algorithm: str, params_stack: Stack
     ) -> Generator[Stack, None, None]:
         """Generator that runs an algorithm using given parameters."""
-        algo_params = params_res.to_params_dict()
+        algo_params = params_stack.to_params_dict()
 
         # Validate parameters `manually` with Pydantic:
         try:

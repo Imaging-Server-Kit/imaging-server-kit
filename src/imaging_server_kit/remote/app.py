@@ -246,7 +246,7 @@ class AlgorithmApp:
             # Create the algorithm `run` generator
             gen = algorithm.run_generator(
                 algorithm=algorithm_name,
-                params_res=params_stack,
+                params_stack=params_stack,
             )
 
             # Will do stack.serialize() => msgpack.packrb() to stream the response
@@ -258,6 +258,6 @@ class AlgorithmApp:
 
     def _stream_msgpack(self, stream_generator: Iterable[Stack], client_origin: str):
         stack_serializer = StackSerializer()
-        for stack in stream_generator:
+        for stack, reinitialize_domain in stream_generator:
             for r in stack_serializer.serialize(stack, client_origin):
                 yield msgpack.packb(r)

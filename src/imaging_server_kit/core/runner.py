@@ -61,25 +61,27 @@ class AlgorithmRunner(ABC):
     def get_signature_params(self, algorithm: str) -> List[str]: ...
 
     @abstractmethod
-    def _stream(self, algorithm, params_res: Stack) -> Generator[Stack, None, None]: ...
+    def _stream(
+        self, algorithm, params_stack: Stack
+    ) -> Generator[Stack, None, None]: ...
 
     def run_generator(
         self,
         algorithm: str,
-        params_res: Stack,
+        params_stack: Stack,
         tiling_ctx: Optional[TilingSpecs] = None,
     ):
         tile_progress_needed = tiling_ctx is not None
 
         if tiling_ctx is None:
             tiling_ctx = (
-                TilingSpecs(tile_size=params_res.coords_max)
-                if params_res.coords_max
+                TilingSpecs(tile_size=params_stack.coords_max)
+                if params_stack.coords_max
                 else None
             )
 
         stack_tile_gen = StackTileGenerator()
-        for params_tile_res in stack_tile_gen.generate_tiles(params_res, tiling_ctx):
+        for params_tile_res in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
 
             tm = params_tile_res.tile_meta
             dst_coords_min = params_tile_res.coords_min
@@ -107,8 +109,10 @@ class AlgorithmRunner(ABC):
                     if dst_coords_min is not None:
                         l.domain.coords_min = dst_coords_min
 
-                # TODO: we assume that to be correct most of the time
-                reinitialize_domain = params_res.domain
+                # We assume this will be the correct behaviour most of the time:
+                reinitialize_domain = params_stack.domain
+                if reinitialize_domain is None:
+                    reinitialize_domain = result_tile.domain
 
                 yield result_tile, reinitialize_domain
 
@@ -207,10 +211,6 @@ class AlgorithmRunner(ABC):
             algorithm, params_stack, tiling_ctx
         ):
             stack.merge(stack_tile, reinitialize_domain)
-
-        # TODO: Instead of calling merge many times, each time increasing the domain,
-        # we could do a single merge at the end (with no intermediate updates of the container).
-        # Or, we could call stack.merge at a given update frequency (every N tiles).
 
         # Remove the progress bar
         stack.delete("Tile progress")

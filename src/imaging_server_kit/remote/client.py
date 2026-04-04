@@ -121,14 +121,14 @@ class Client(AlgorithmRunner):
         endpoint = f"{self.server_url}/{algorithm}/signature"
         return self._access_algo_get_endpoint(endpoint)
 
-    def _stream(self, algorithm, params_res: Stack):
+    def _stream(self, algorithm, params_stack: Stack):
         stack_serializer = StackSerializer()
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
             try:
                 response = client.post(
                     endpoint,
-                    json=stack_serializer.serialize(params_res, "Python/Napari"),
+                    json=stack_serializer.serialize(params_stack, "Python/Napari"),
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.token}",
