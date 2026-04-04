@@ -23,8 +23,9 @@ class ImageValidator(Validator):
         if len(data.shape) not in meta["dimensionality"]:
             raise ValueError("Image array has the wrong dimensionality.")
 
+        # TODO: if we have a RGB movie, this will wrongly fail:
         if meta["rgb"] is True:
-            if len(data.shape) != 3:
+            if len(data.shape) not in [3, 4]:
                 raise ValueError("Image should be RGB.")
-            if data.shape[2] != 3:
+            if data.shape[-1] != 3:
                 raise ValueError("Image should be RGB.")

@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 
-from imaging_server_kit.merge.layer_merger import Merger, DefaultMerger
+from imaging_server_kit.merge.layer_merger import DefaultMerger
 from imaging_server_kit.types._mask import Mask
 import networkx as nx
 from skimage.util import map_array
@@ -15,9 +15,21 @@ class MaskOverrideMerger(DefaultMerger):
     def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
+        
+        channel_axis = incoming_layer.channel_axis
+        if channel_axis is not None:
+            n_channels = incoming_layer.data.shape[channel_axis] 
 
         if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            receiving_layer.data = receiving_layer.initialize([1] * incoming_layer.ndim)
+            s = incoming_layer.size
+            
+            if channel_axis is not None:
+                s_with_channel = s[:channel_axis] + (n_channels,) + s[channel_axis:]
+            else:
+                s_with_channel = s
+            
+            receiving_layer.data = np.zeros(s_with_channel, dtype=np.uint16)
+            
             receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
 
         min_bounds = np.min(
@@ -30,13 +42,9 @@ class MaskOverrideMerger(DefaultMerger):
             axis=0,
         )
 
-        size = max_bounds - min_bounds
+        size = tuple(max_bounds - min_bounds)
 
-        # If the incoming tile extends the pixel bounds, we create a new Image,
-        # write receiving_layer.data into it, then merge the tile
-        if tuple(size) != receiving_layer.size:
-            new_data = incoming_layer.initialize(size)
-
+        if size != receiving_layer.size:
             slices_rec = []
             slices = []
             cmin_diff = []
@@ -51,13 +59,27 @@ class MaskOverrideMerger(DefaultMerger):
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
                 start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size
+                stop_receiving = start_receiving + receiving_size 
                 slices_rec.append(slice(start_receiving, stop_receiving))
                 cmin_diff.append(start_receiving)
-            new_data[tuple(slices_rec)] = receiving_layer.data
-            receiving_layer.domain.coords_min = tuple(
-                np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff)
-            )
+            cmin_diff = np.array(cmin_diff)
+            slices_rec = tuple(slices_rec)
+            slices = tuple(slices)
+            
+            if channel_axis is not None:
+                size_with_channel = size[:channel_axis] + (n_channels,) + size[channel_axis:]
+                slices_rec_with_channel = slices_rec[:channel_axis] + (slice(None),) + slices_rec[channel_axis:]
+                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+            else:
+                size_with_channel = size
+                slices_rec_with_channel = slices_rec
+                slices_with_channel = slices
+            
+            new_data = np.zeros(size_with_channel, dtype=np.uint16)
+            
+            new_data[slices_rec_with_channel] = receiving_layer.data
+            
+            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - cmin_diff)
         else:
             new_data = receiving_layer.data
 
@@ -67,12 +89,18 @@ class MaskOverrideMerger(DefaultMerger):
                 incoming_layer.coords_min,
                 incoming_layer.size,
             ):
-                diff = incoming_cmin - receiving_cmin
-                start = diff
+                start = incoming_cmin - receiving_cmin
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
+            slices = tuple(slices)
+            
+            if channel_axis is not None:
+                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+            else:
+                slices_with_channel = slices
 
-        new_data[tuple(slices)] = incoming_layer.data
+        # Simply override the data
+        new_data[slices_with_channel] = incoming_layer.data
 
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta
@@ -143,10 +171,22 @@ class InstanceMaskTileMerger(DefaultMerger):
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            receiving_layer.data = incoming_layer.initialize([1] * incoming_layer.ndim)
-            receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
+        channel_axis = incoming_layer.channel_axis
+        if channel_axis is not None:
+            n_channels = incoming_layer.data.shape[channel_axis] 
 
+        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
+            s = incoming_layer.size
+            
+            if channel_axis is not None:
+                s_with_channel = s[:channel_axis] + (n_channels,) + s[channel_axis:]
+            else:
+                s_with_channel = s
+            
+            receiving_layer.data = np.zeros(s_with_channel, dtype=np.uint16)
+            
+            receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
+        
         min_bounds = np.min(
             np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
             axis=0,
@@ -157,11 +197,9 @@ class InstanceMaskTileMerger(DefaultMerger):
             axis=0,
         )
 
-        size = max_bounds - min_bounds
+        size = tuple(max_bounds - min_bounds)
 
-        if tuple(size) != receiving_layer.size:
-            new_data = incoming_layer.initialize(size)
-
+        if size != receiving_layer.size:
             slices_rec = []
             slices = []
             cmin_diff = []
@@ -176,26 +214,45 @@ class InstanceMaskTileMerger(DefaultMerger):
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
                 start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size
+                stop_receiving = start_receiving + receiving_size 
                 slices_rec.append(slice(start_receiving, stop_receiving))
                 cmin_diff.append(start_receiving)
-            new_data[tuple(slices_rec)] = receiving_layer.data
-            receiving_layer.domain.coords_min = tuple(
-                np.array(receiving_layer.domain.coords_min) - np.array(cmin_diff)
-            )
+            cmin_diff = np.array(cmin_diff)
+            slices_rec = tuple(slices_rec)
+            slices = tuple(slices)
+            
+            if channel_axis is not None:
+                size_with_channel = size[:channel_axis] + (n_channels,) + size[channel_axis:]
+                slices_rec_with_channel = slices_rec[:channel_axis] + (slice(None),) + slices_rec[channel_axis:]
+                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+            else:
+                size_with_channel = size
+                slices_rec_with_channel = slices_rec
+                slices_with_channel = slices
+            
+            new_data = np.zeros(size_with_channel, dtype=np.uint16)
+
+            new_data[slices_rec_with_channel] = receiving_layer.data
+            
+            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - cmin_diff)
         else:
             new_data = receiving_layer.data
-
+            
             slices = []
             for receiving_cmin, incoming_cmin, incoming_size in zip(
                 receiving_layer.coords_min,
                 incoming_layer.coords_min,
                 incoming_layer.size,
             ):
-                diff = incoming_cmin - receiving_cmin
-                start = diff
+                start = incoming_cmin - receiving_cmin
                 stop = incoming_size + start
                 slices.append(slice(start, stop))
+            slices = tuple(slices)
+            
+            if channel_axis is not None:
+                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+            else:
+                slices_with_channel = slices
 
         receiving_layer.data = new_data  # Extend the source layer data
 
@@ -219,7 +276,7 @@ class InstanceMaskTileMerger(DefaultMerger):
                     if n_intersecting_px > self.min_intersecting_px:
                         self.tile_tracker.add_edge(src_lab, dst_lab)
 
-        new_data[tuple(slices)] = dst_arr
+        new_data[slices_with_channel] = dst_arr
 
         receiving_layer.data = new_data
         receiving_layer.meta = incoming_layer.meta

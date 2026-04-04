@@ -171,6 +171,10 @@ class Mask(Layer):
     ----------
     data: Numpy arrays, integer type. Integers can represent object classes (e.g. pixel classification) or object instances.
     dimensionality: list of accepted dimensionalities, for example [2, 3].
+    channel_axis: Optional index of the channel axis.
+      - The channel axis does not affect the `bounds`, `ndim`, and `domain` attributes.
+      - The channel axis is set to `2` if rgb is True and there is no time axis.
+      - tile_size along the channel axis defaults to the length of this axis.
     """
 
     kind = "mask"
@@ -181,6 +185,7 @@ class Mask(Layer):
         name: str = "Mask",
         description: str = "Segmentation mask (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
+        channel_axis: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(
@@ -188,14 +193,30 @@ class Mask(Layer):
             description=description,
             data=data,
             dimensionality=dimensionality,
+            channel_axis=channel_axis,
             **kwargs,
         )
 
     @property
+    def channel_axis(self):
+        if self.meta["channel_axis"] is not None:
+            return self.meta["channel_axis"]
+
+    @property
     def bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
-        if isinstance(self.data, np.ndarray):
-            return self.data.shape
+        if self._data is None:
+            return
+
+        if self.meta is None:
+            return
+
+        if self.channel_axis is not None:
+            shape = list(self._data.shape)
+            shape.pop(self.channel_axis)
+            return tuple(shape)
+        else:
+            return self._data.shape
 
     def select(self, domain: Domain) -> Mask:
         """Select data in a given domain."""
@@ -212,12 +233,25 @@ class Mask(Layer):
             domain_local.coords_min = tuple(
                 np.array(domain_local.coords_min) - np.array(self.coords_min)
             )
+            slices_int = tuple(safe_index_slice(s) for s in domain_local.slices)
+
+            # Account for the channel_axis
+            if self.channel_axis is not None:
+                slices_int_with_channel = (
+                    slices_int[: self.channel_axis]
+                    + (slice(None),)
+                    + slices_int[self.channel_axis :]
+                )
+            else:
+                slices_int_with_channel = slices_int
+
             try:
-                _data = self.data[domain_local.slices]
+                _data = self.data[slices_int_with_channel]
             except:
                 raise RuntimeError(
                     "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
                 )
+
         return Mask(
             data=_data,
             name=self.name,
@@ -231,18 +265,29 @@ class Mask(Layer):
         if domain is not None:
             return np.zeros(domain.size, dtype=np.uint16)
 
-    def initialize(self, domain_size: List[int]) -> Optional[np.ndarray]:
-        return np.zeros(domain_size, dtype=np.uint16)
-
     def reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
+        if not isinstance(domain, Domain):
+            return
+
         domain_local = domain.copy()
         domain_local.coords_min = tuple(
             np.array(domain_local.coords_min) - np.array(self.coords_min)
         )
         slices_int = tuple(safe_index_slice(s) for s in domain_local.slices)
+
+        # Account for the channel_axis
+        if self.channel_axis is not None:
+            slices_int_with_channel = (
+                slices_int[: self.channel_axis]
+                + (slice(None),)
+                + slices_int[self.channel_axis :]
+            )
+        else:
+            slices_int_with_channel = slices_int
+
         try:
-            self.data[slices_int] = 0
+            self.data[slices_int_with_channel] = 0
         except:
             raise RuntimeError(
                 "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"

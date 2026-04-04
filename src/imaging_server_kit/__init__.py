@@ -126,4 +126,5 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
         from napari_serverkit import NapariStack
 
         # For napari, we return the viewer directly
-        return NapariStack(layers=stack.layers).viewer
+        napari_stack = NapariStack(layers=stack.layers)
+        return napari_stack.viewer

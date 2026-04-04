@@ -47,7 +47,7 @@ import imaging_server_kit as sk
 def threshold_algo(image, threshold, dark_background):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     thresh_rel = threshold * (image.max() - image.min())
     if dark_background:
         mask = image > thresh_rel
@@ -84,7 +84,7 @@ def threshold_algo(image, threshold, dark_background):
 def auto_threshold(image, method):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     if method == "Otsu":
         mask = image > threshold_otsu(image)
     elif method == "Li":
@@ -125,7 +125,7 @@ def auto_threshold(image, method):
 def gaussian_algo(image, sigma, mode):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     filtered = gaussian(image, sigma=sigma, mode=mode)
     return sk.Image(
         filtered,
@@ -255,7 +255,7 @@ def blob_detector_algo(
 ):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     if invert_image:
         image = -image
 
@@ -368,7 +368,7 @@ def nl_means_denoise(
 ):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     image_range = image.max() - image.min()
     h = h * image_range
 
@@ -396,7 +396,6 @@ def nl_means_denoise(
         "image": sk.Image(
             name="Image",
             description="Input RGB image.",
-            dimensionality=[2, 3],
             rgb=True,
         ),
         "n_segments": sk.Integer(
@@ -416,19 +415,11 @@ def nl_means_denoise(
         ),
     },
 )
-def slic_algo(
-    image,
-    n_segments,
-    compactness,
-):
+def slic_algo(image, n_segments, compactness):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
-    partitioned = slic(
-        image,
-        n_segments=n_segments,
-        compactness=compactness,
-    )
+
+    partitioned = slic(image, n_segments=n_segments, compactness=compactness)
 
     return sk.Mask(partitioned, name="SLIC result")
 
@@ -470,7 +461,7 @@ def notif_stream(time_delay, n_times, level):
 def background_subtract(image, sigma, method):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     blurred = gaussian(image, sigma=sigma, preserve_range=True)
     if method == "subtract":
         corrected = image - blurred
@@ -498,7 +489,7 @@ def background_subtract(image, sigma, method):
 def project(image, method):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     proj_func = {"max": np.max, "min": np.min, "mean": np.mean}
     proj = proj_func[method](image, axis=0, keepdims=True)
     return sk.Image(proj, name="Projection", colormap="viridis")

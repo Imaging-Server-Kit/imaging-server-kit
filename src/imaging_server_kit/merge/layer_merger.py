@@ -2,10 +2,7 @@ from typing import Dict, List, Type
 
 from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.merge.merger import Merger, DefaultMerger
-from imaging_server_kit.merge._image_merger import (
-    # ImageOverrideMerger,
-    ImageTileOverlapMerger,
-)
+from imaging_server_kit.merge._image_merger import ImageTileOverlapMerger
 from imaging_server_kit.merge._mask_merger import (
     InstanceMaskTileMerger,
     MaskOverrideMerger,
@@ -14,10 +11,7 @@ from imaging_server_kit.merge._object_merger import ObjectMerger
 
 
 LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
-    "image": {
-        "default": ImageTileOverlapMerger,
-        #   "override": ImageOverrideMerger
-    },
+    "image": {"default": ImageTileOverlapMerger},
     "mask": {
         "default": MaskOverrideMerger,
         "instances": InstanceMaskTileMerger,
@@ -70,12 +64,13 @@ def merge_layers(layers: List[Layer]) -> Layer:
     first_layer = layers[0]
     kind = first_layer.kind
     name = first_layer.name
+    meta = first_layer.meta
 
     for l in layers[1:]:
         if l.kind != kind:
             raise ValueError("Layers to merge must be of the same kind.")
 
-    merged_layer = layer_factory(kind=kind, name=name)
+    merged_layer = layer_factory(kind=kind, name=name, **meta)
 
     merger = LayerMerger()
     for l in layers:
