@@ -20,3 +20,4 @@ In Python, you can use `help()` on a data layer object to access its detailed do
 | `sk.Tracks`   | Tracking data.                                                                                                                      |
 | `sk.Notification` | A text notification (with levels `info`, `warning`, or `error`).                                                                |
 | `sk.Null`     | Represents `None`, `NaN` or null values.                                                                                            |
+| `sk.Progress` | A progress bar to update.                                                                                                           |

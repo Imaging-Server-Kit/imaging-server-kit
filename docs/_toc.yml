@@ -10,6 +10,5 @@ chapters:
   - file: sections/06_tiled
   - file: sections/07_server
   - file: sections/08_python
-  - file: sections/09_docker
-  - file: sections/10_types
-  - file: sections/11_examples
+  - file: sections/19_layers
+  - file: sections/10_examples
