@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generator, List, Optional
-
-import numpy as np
+from typing import Generator, List, Optional, Tuple, Union
 
 from imaging_server_kit.merge.layer_merger import LayerMerger
 from imaging_server_kit.types import Layer
+from imaging_server_kit.core.domain import Domain, merge_domains
 from imaging_server_kit.core.tiling import (
     TileMeta,
     TilingSpecs,
     generate_tiles,
-    Domain,
 )
 
 
@@ -22,28 +20,38 @@ class Stack:
     Attributes
     ----------
     layers: List of layers in the stack.
+    tile_meta: Tile metadata for the stack.
+    coords_min: Minimum coordinates of the stack, inferred from the layers.
+    coords_max: Maximum coordinates of the stack, inferred from the layers.
+    domain: Domain of the stack, inferred from coords_min and coords_max.
+    size: Size of the stack's domain.
+    ndim: Dimensionality of the stack, inferred from the domain.
+    position: Position of the stack in global pixel space.
 
     Methods
     ----------
-    create(): Create a new layer.
+    add(): Add a layer to the stack.
     read(): Read a layer by name.
     delete(): Delete a layer by name.
-    merge(): Merge another result stack, based on layer names.
+    merge(): Merge another layer stack.
         Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
+    select(): Select stack data in a given domain.
     """
 
     def __init__(
         self,
         layers: Optional[List[Layer]] = None,
         tile_meta: Optional[TileMeta] = None,
+        position: Optional[Tuple] = None,
     ):
         self._layers: List[Layer] = []
         if layers is not None:
             for layer in layers:
                 self.add(layer)
 
-        tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
-        self._tile_meta = tile_meta
+        self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+        
+        self._position = position
 
     def __str__(self):
         message = f"Stack (Layers: {len(self.layers)})"
@@ -99,9 +107,9 @@ class Stack:
                 if len(size) < self.ndim:
                     for dim in range(len(size), self.ndim):
                         position.append(self.coords_min[dim])
-                        size.append(self.coords_max[dim] - self.coords_min[dim])
+                        size.append(self.size[dim])
 
-            domain = Domain(position=position, size=size)
+            domain = Domain(size=size, position=position)
 
             extract = self.select(domain=domain)
         else:
@@ -129,42 +137,45 @@ class Stack:
     @tile_meta.setter
     def tile_meta(self, value: TileMeta):
         self._tile_meta = value
+        
+        # Setting the tile_meta of the stack sets the tile metas of all layers
+        for l in self.layers:
+            l.tile_meta = value
+
+    @property
+    def extent(self) -> Optional[Domain]:
+        return merge_domains(domains=[l.extent for l in self.layers])
 
     @property
     def ndim(self) -> Optional[int]:
-        if self.coords_max is not None:
-            return len(self.coords_max)
+        if self.extent is not None:
+            return self.extent.ndim
 
     @property
-    def domain(self) -> Optional[Domain]:
-        if (self.coords_max is not None) & (self.coords_min is not None):
-            size = tuple(np.array(self.coords_max) - np.array(self.coords_min))
-            return Domain(
-                position=self.coords_min,
-                size=size,
-            )
+    def size(self) -> Optional[Union[Tuple, List]]:
+        if self.extent is not None:
+            return self.extent.size
 
     @property
-    def coords_min(self) -> Optional[List[int]]:
-        layer_coords_min = []
-        for layer in self.layers:
-            if layer.coords_min is not None:
-                layer_coords_min.append(layer.coords_min)
-        if len(layer_coords_min):
-            return np.min(np.stack(layer_coords_min), axis=0).tolist()
+    def coords_min(self) -> Optional[Tuple]:
+        return self.extent.coords_min
 
     @property
-    def coords_max(self) -> Optional[List[int]]:
-        layer_coords_max = []
-        for layer in self.layers:
-            if layer.coords_max is not None:
-                layer_coords_max.append(layer.coords_max)
-        if len(layer_coords_max):
-            # Final domain is the max of all layer bounds
-            # TODO: Should we handle cases where, e.g. 2D and 3D data are both present?
-            # For ex. by casting the lowest dimensionality layers to higher-dim?
-            # For now, this is not supported (result layers must have ndim=None or all the same ndims).
-            return np.max(np.stack(layer_coords_max), axis=0).tolist()
+    def coords_max(self) -> Optional[Tuple]:
+        return self.extent.coords_max
+    
+    @property
+    def position(self) -> Optional[Tuple]:
+        if self._position is not None:
+            return self._position
+
+    @position.setter
+    def position(self, value):
+        self._position = value
+        
+        # Setting the position of the stack sets the positions of all layers
+        for l in self.layers:
+            l.position = value
 
     def add(self, layer: Layer) -> Layer:
         """Add a new layer to the layer stack.
@@ -177,10 +188,13 @@ class Stack:
         if new_name != layer.name:
             layer.name = new_name
         self._layers.append(layer)
-        self.post_create(layer)
+        
+        # Trigger the `post_add` event:
+        self.post_add(layer)
+        
         return layer
 
-    def post_create(self, layer: Layer):
+    def post_add(self, layer: Layer):
         pass
 
     def merge(
@@ -197,11 +211,11 @@ class Stack:
 
         Parameters
         ----------
-        layer_stack: Layer stack to be merged.
+        stack: Layer stack to be merged.
             Layers from this stack of the same kind, with the same name as instance layers (self.layers)
             will update corresponding meta and data attributes.
             Other layers from layer_stack will be added via the create() method.
-        reinitialize_domain: Optional domain from which to remove data before merging the incoming stack.
+        reinitialize_domain: Optional domain to reinitialize before merging the incoming stack.
         """
         if stack is None:
             return
@@ -215,7 +229,7 @@ class Stack:
                 # We add the incoming layer and do not merge data (itself) into it:
                 receiving_layer = self.add(incoming_layer)
             else:
-                # We always reinitialize the domain on first tile:
+                # First tiles always reinitialize the domain:
                 if (incoming_layer.tile_meta.is_first_tile) & isinstance(
                     reinitialize_domain, Domain
                 ):
@@ -252,24 +266,8 @@ class Stack:
                 return layer
 
     def select(self, domain: Domain) -> Stack:
+        """Selet a sub-stack in the given domain."""
         return Stack(layers=[l.select(domain=domain.copy()) for l in self.layers])
-
-    def to_params_dict(self) -> Dict[str, Any]:
-        """
-        Convert a layer stack to a dictionary representation mapping layer.name to layer.data.
-
-        Examples
-        ----------
-        Use it to convert samples to runnable parameters:
-
-        sample = algo.get_sample(0)
-        params = sample.to_params_dict()
-        stack = algo.run(**params)
-        """
-        algo_params = {}
-        for layer in self.layers:
-            algo_params[layer.name] = layer.data
-        return algo_params
 
     def _resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:
         # Make sure layer has a name
@@ -296,7 +294,7 @@ class StackTileGenerator:
             yield stack.select(domain=Domain())
         else:
             for tile_meta, tile_domain in generate_tiles(
-                domain=stack.domain,
+                domain=stack.extent,
                 tile_size=ctx.tile_size,
                 tile_overlap=ctx.tile_overlap,
                 tile_delay=ctx.tile_delay,
@@ -304,4 +302,6 @@ class StackTileGenerator:
             ):
                 stack_tile = stack.select(domain=tile_domain)
                 stack_tile.tile_meta = tile_meta
+                stack_tile.position = tile_domain.coords_min
+                
                 yield stack_tile

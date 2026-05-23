@@ -40,14 +40,16 @@ class Vectors(Layer):
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
         """Data in global coordinates."""
-        if (self.data is not None) and (self.domain is not None):
-            if self.domain.coords_min is not None:
-                data_global = self.data.copy()
-                for dim in range(self.ndim):
-                    data_global[:, 0, dim] = (
-                        data_global[:, 0, dim] + self.domain.coords_min[dim]
-                    )
-                return data_global
+        if self.data is not None:
+            data_global = self.data.copy()
+            data_global[:, 0, :] = data_global[:, 0, :] + self.position
+            return data_global
+    
+    def data_from_coords(self, coords: Tuple) -> Optional[np.ndarray]:
+        if self.data is not None:
+            _data = self.data.copy()
+            _data[:, 0, :] = _data[:, 0, :] + (np.asarray(self.position) - np.asarray(coords))
+            return _data
 
     @property
     def n_objects(self) -> int:
@@ -59,39 +61,43 @@ class Vectors(Layer):
     @property
     def bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
-        if self.data is not None:
-            if self.n_objects > 0:
-                return tuple(np.max(self.data[:, 0], axis=0))
+        if self.data is None:
+            return
+
+        if self.n_objects == 0:
+            return
+        
+        bounds_min = tuple(np.min(self.data[:, 0, :], axis=0))
+        bounds_max = tuple(np.max(self.data[:, 0, :], axis=0))
+
+        return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Vectors:
         """Select data in a given domain."""
-        if self.data is None:
+        if (self.data is None) or (domain.size is None):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.zeros_in(domain=self.domain)
+            _data = self.zeros_in(domain=domain)
             _meta = self.meta
         else:
             # Mask of vector coordinates in the domain
             vector_coords_in_domain = (
-                self.data_global_coords[:, 0] >= domain.coords_min
-            ) & (self.data_global_coords[:, 0] < domain.coords_max)
+                self.data_global_coords[:, 0, :] >= domain.coords_min
+            ) & (self.data_global_coords[:, 0, :] < domain.coords_max)
 
             # All coordinates must be in the domain bounds
             filt = vector_coords_in_domain.all(axis=1)  # (N,)
 
-            selected_vectors = self.data[filt]
+            selected_vectors = self.data_global_coords[filt]
 
             selected_meta = select_object_meta(self.meta, self.n_objects, filt)
 
             if len(selected_vectors) > 0:
                 vtd = selected_vectors.copy()
-                for dim in range(self.ndim):
-                    vtd[:, 0, dim] = vtd[:, 0, dim] + (
-                        self.domain.coords_min[dim] - domain.coords_min[dim]
-                    )
+                vtd[:, 0, :] = vtd[:, 0, :] - domain.coords_min
                 selected_vectors = vtd
-
+                
             _data = selected_vectors
             _meta = selected_meta
 
@@ -100,7 +106,7 @@ class Vectors(Layer):
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta,
-            domain=domain,
+            position=domain.coords_min,
         )
 
     def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
@@ -117,7 +123,7 @@ class Vectors(Layer):
             return
 
         objects_in_domain = (self.data_global_coords[:, 0] >= domain.coords_min) & (
-            self.data_global_coords[:, 0] < domain.coords_max
+            self.data_global_coords[:, 0] <= domain.coords_max
         )
 
         filt = objects_in_domain.all(axis=1)  # (N,)

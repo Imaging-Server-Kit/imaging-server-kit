@@ -239,7 +239,8 @@ class AlgorithmApp:
 
             # Validate the parameters `manually` with Pydantic...
             try:
-                algorithm.parameters_model(**params_stack.to_params_dict())
+                algo_params = {l.name: l.data for l in params_stack.layers}
+                algorithm.parameters_model(**algo_params)
             except ValidationError as e:
                 raise HTTPException(status_code=422, detail=e.errors())
 
@@ -258,6 +259,6 @@ class AlgorithmApp:
 
     def _stream_msgpack(self, stream_generator: Iterable[Stack], client_origin: str):
         stack_serializer = StackSerializer()
-        for stack, reinitialize_domain in stream_generator:
+        for stack in stream_generator:
             for r in stack_serializer.serialize(stack, client_origin):
                 yield msgpack.packb(r)

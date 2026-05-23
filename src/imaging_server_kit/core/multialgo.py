@@ -6,10 +6,17 @@ from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
 
 
 class MultiAlgorithm(AlgorithmRunner):
-    """
-    A class representing a collection of algorithms, implementing the AlgorithmRunner protocol.
-    - It implements the same methods as the Algorithm class.
-    - Passing `algorithm=<algorithm_name>` is needed to identify the algorithm.
+    """A collection of algorithms, usually created via the `sk.combine()` method.
+    
+    Attributes
+    ----------
+    algorithms_dict: A dictionary mapping algorithm names to instances in the collection.
+    algorithms: A list of algorithm names in the collection.
+    
+    Methods
+    ----------
+    This class implements the same methods as the Algorithm class (via AlgorithmRunner), 
+    but methods take an extra argument `algorithm` to identify the algorithm to use.
     """
 
     def __init__(self, algorithms: List[Algorithm], name: str = "algorithms"):
@@ -63,8 +70,8 @@ def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgor
 
     Parameters
     ----------
-    algorithms : A list of algorithm objects, or python functions. If a python function is passed, it is converted to an algorithm on the fly.
-    name : A name for the algorithm collection.
+    algorithms : A list of algorithm objects, or python functions. Python functions are converted to algorithms directly.
+    name : The name of the algorithm collection.
 
     Returns
     -------

@@ -38,6 +38,8 @@ def validate_algorithm(func: Callable) -> Callable:
 
 
 class AlgorithmRunner(ABC):
+    """The algorithm runner base class, parent to sk.Algorithm, sk.MultiAlgorithm and sk.Client."""
+    
     @property  # type: ignore
     @abstractmethod
     def algorithms() -> List[str]: ...
@@ -74,47 +76,33 @@ class AlgorithmRunner(ABC):
         tile_progress_needed = tiling_ctx is not None
 
         if tiling_ctx is None:
+            # We create a single tile for the stack
             tiling_ctx = (
-                TilingSpecs(tile_size=params_stack.coords_max)
-                if params_stack.coords_max
-                else None
+                TilingSpecs(tile_size=params_stack.size)
+                if params_stack.size
+                else None  # Happens with non-spatial inputs
             )
 
         stack_tile_gen = StackTileGenerator()
-        for params_tile_res in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
+        for params_tile in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
 
-            tm = params_tile_res.tile_meta
-            dst_coords_min = params_tile_res.coords_min
-
-            for result_tile in self._stream(algorithm, params_tile_res):
-                result_tile.tile_meta = tm
-
+            for result_tile in self._stream(algorithm, params_tile):
+                
                 if tile_progress_needed:
                     # Create a progress layer at the current step
                     progress_layer = layer_factory(
                         kind="progress",
                         name="Tile progress",
-                        data=tm.tile_idx + 1,
-                        max_val=tm.n_tiles,
+                        data=params_tile.tile_meta.tile_idx + 1,
+                        max_val=params_tile.tile_meta.n_tiles,
                     )
                     result_tile.add(progress_layer)
-
-                for l in result_tile:
-                    l.tile_meta.tile_idx = tm.tile_idx
-                    l.tile_meta.n_tiles = tm.n_tiles
-                    l.tile_meta.first_tile = tm.first_tile
-                    l.tile_meta.last_tile = tm.last_tile
-                    if tm.overlap_px is not None:
-                        l.tile_meta.overlap_px = tm.overlap_px
-                    if dst_coords_min is not None:
-                        l.domain.coords_min = dst_coords_min
-
-                # We assume this will be the correct behaviour most of the time:
-                reinitialize_domain = params_stack.domain
-                if reinitialize_domain is None:
-                    reinitialize_domain = result_tile.domain
-
-                yield result_tile, reinitialize_domain
+                
+                # Result tiles inherit the tile_meta and position of the input
+                result_tile.tile_meta = params_tile.tile_meta
+                result_tile.position = params_tile.position
+                
+                yield result_tile
 
     def run(
         self,
@@ -205,12 +193,20 @@ class AlgorithmRunner(ABC):
         # If a domain is passed, restrict the computation to that domain
         if domain:
             params_stack = params_stack.select(domain)
-
+        
         # Run the algorithm and assemble the stack
-        for stack_tile, reinitialize_domain in self.run_generator(
+        for result_tile in self.run_generator(
             algorithm, params_stack, tiling_ctx
         ):
-            stack.merge(stack_tile, reinitialize_domain)
+            # We assume that reinitializing the parameters domain on first tile
+            # will be the correct behaviour most of the time.
+            if params_stack.extent is None:
+                # If inputs don't have an extent, we clear up the whole output
+                reinitialize_domain = stack.extent
+            else:
+                reinitialize_domain = params_stack.extent
+
+            stack.merge(result_tile, reinitialize_domain)
 
         # Remove the progress bar
         stack.delete("Tile progress")

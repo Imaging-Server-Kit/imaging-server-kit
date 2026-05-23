@@ -247,14 +247,24 @@ def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
 
 
 class Algorithm(AlgorithmRunner):
-    """An algorithm converted from a Python function.
+    """An algorithm defined from a Python function.
+    
+    Notes
+    ----------
+    - Algorithms can be converted to Napari widgets (via napari-serverkit) or FastAPI servers.
+    - Algorithms are associated with a Pydantic Schema that can be used to validate input parameters.
+    - Algorithms can be run tile-by-tile (in most cases).
+    - Algorithms can be run on a subset of the spatial domain defined by their inputs.
+    - Algorithms can provide `samples` (example inputs).
+    - Algorithm metadata can populate an `info` page.
 
     Attributes
     ----------
     name: A name for the algorithm.
+    parameters_model: A JSON schema representation of algorithm parameters.
     samples: A list of sample parameters, mapping parameter names to parameter values.
     algo_info: A dictionary of metadata about the algorithm.
-    parameters_model: A JSON schema representation of algorithm parameters.
+    algorithms: A list containing the algorithm's name.
 
     Methods
     ----------
@@ -327,7 +337,7 @@ class Algorithm(AlgorithmRunner):
         stack = self.run(*args, **kwargs)
 
         # Only return the data to emulate the wrapped function behavior
-        to_return = [r.data for r in stack]
+        to_return = [l.data for l in stack]
         n_returns = len(to_return)
         if n_returns == 0:
             return
@@ -412,7 +422,7 @@ class Algorithm(AlgorithmRunner):
         self, algorithm: str, params_stack: Stack
     ) -> Generator[Stack, None, None]:
         """Generator that runs an algorithm using given parameters."""
-        algo_params = params_stack.to_params_dict()
+        algo_params = {l.name: l.data for l in params_stack.layers}
 
         # Validate parameters `manually` with Pydantic:
         try:

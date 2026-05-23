@@ -1,9 +1,8 @@
 from typing import Any, Dict, Type
 
 from imaging_server_kit.types import Layer, DATA_TYPES
-from imaging_server_kit.remote.meta_serializer import DefalutMetaSerializer
+from imaging_server_kit.remote.meta_serializer import MetaSerializer
 from imaging_server_kit.remote.tile_serializer import TileMetaSerializer
-from imaging_server_kit.remote.domain_serializer import DomainSerializer
 from imaging_server_kit.remote.serializer import Serializer, DefaultDataSerializer
 from imaging_server_kit.remote._image_serializer import ImageDataSerializer
 from imaging_server_kit.remote._mask_serializer import MaskDataSerializer
@@ -15,25 +14,21 @@ from imaging_server_kit.remote._vectors_serializer import VectorsDataSerializer
 from imaging_server_kit.remote._null_serializer import NullDataSerializer
 
 
-LAYER_DATA_SERIALIZERS: Dict[str, Dict[str, Type[Serializer]]] = {
-    "image": {"default": ImageDataSerializer},
-    "mask": {"default": MaskDataSerializer},
-    "points": {"default": PointsDataSerializer},
-    "boxes": {"default": BoxesDataSerializer},
-    "paths": {"default": PathsDataSerializer},
-    "tracks": {"default": TracksDataSerializer},
-    "vectors": {"default": VectorsDataSerializer},
-    "null": {"default": NullDataSerializer},
+LAYER_DATA_SERIALIZERS: Dict[str, Type[Serializer]] = {
+    "image": ImageDataSerializer,
+    "mask": MaskDataSerializer,
+    "points": PointsDataSerializer,
+    "boxes": BoxesDataSerializer,
+    "paths": PathsDataSerializer,
+    "tracks": TracksDataSerializer,
+    "vectors": VectorsDataSerializer,
+    "null": NullDataSerializer,
 }
 
 
-def find_layer_serializer(layer: Layer) -> Serializer:
-    if layer.kind in LAYER_DATA_SERIALIZERS:
-        lds = LAYER_DATA_SERIALIZERS[layer.kind]
-        serializer_cls = lds.get(layer.serializer, DefaultDataSerializer)
-    else:
-        serializer_cls = DefaultDataSerializer
-
+def find_layer_serializer(layer_kind: str) -> Serializer:
+    serializer_cls = LAYER_DATA_SERIALIZERS.get(layer_kind, DefaultDataSerializer)
+    
     return serializer_cls()
 
 
@@ -42,17 +37,14 @@ class LayerSerializer(Serializer):
     def serialize(layer: Layer, client_origin: str) -> Dict[str, Any]:
         """Serialize a layer."""
 
-        data_serializer = find_layer_serializer(layer)
+        data_serializer = find_layer_serializer(layer.kind)
         serialized_data = data_serializer.serialize(layer, client_origin)
 
-        meta_serializer = DefalutMetaSerializer()
+        meta_serializer = MetaSerializer()
         serialized_meta = meta_serializer.serialize(layer, client_origin)
 
         tile_serializer = TileMetaSerializer()
         serialized_tile_meta = tile_serializer.serialize(layer, client_origin)
-
-        domain_serializer = DomainSerializer()
-        serialized_domain = domain_serializer.serialize(layer, client_origin)
 
         return {
             "kind": layer.kind,
@@ -60,9 +52,6 @@ class LayerSerializer(Serializer):
             "name": layer.name,
             "meta": serialized_meta,
             "tile_meta": serialized_tile_meta,
-            "domain": serialized_domain,
-            "merger": layer.merger,
-            "serializer": layer.serializer,
         }
 
     @staticmethod
@@ -73,30 +62,20 @@ class LayerSerializer(Serializer):
         encoded_data = serialized_layer["data"]
         encoded_meta = serialized_layer["meta"]
         encoded_tile_meta = serialized_layer["tile_meta"]
-        encoded_domain = serialized_layer["domain"]
-        merger = serialized_layer["merger"]
-        serializer = serialized_layer["serializer"]
 
         cls: Type[Layer] = DATA_TYPES[kind]
-        layer_proto = cls(serializer=serializer)
-        layer_serializer = find_layer_serializer(layer_proto)
+        layer_serializer = find_layer_serializer(kind)
         data = layer_serializer.deserialize(encoded_data, client_origin)
 
-        meta_serializer = DefalutMetaSerializer()
+        meta_serializer = MetaSerializer()
         meta = meta_serializer.deserialize(encoded_meta, client_origin)
 
         tile_serializer = TileMetaSerializer()
         tile_meta = tile_serializer.deserialize(encoded_tile_meta, client_origin)
-
-        domain_serializer = DomainSerializer()
-        domain = domain_serializer.deserialize(encoded_domain, client_origin)
 
         return cls(
             data=data,
             name=name,
             meta=meta,
             tile_meta=tile_meta,
-            domain=domain,
-            merger=merger,
-            serializer=serializer,
         )

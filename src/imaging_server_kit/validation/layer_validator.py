@@ -8,22 +8,18 @@ from imaging_server_kit.validation._points_validator import PointsValidator
 from imaging_server_kit.validation._vectors_validator import VectorsValidator
 
 
-LAYER_VALIDATORS: Dict[str, Dict[str, Type[Validator]]] = {
-    "image": {"default": ImageValidator},
-    "mask": {"default": MaskValidator},
-    "points": {"default": PointsValidator},
-    "boxes": {"default": BoxesValidator},
-    "vectors": {"default": VectorsValidator},
+LAYER_VALIDATORS: Dict[str, Type[Validator]] = {
+    "image": ImageValidator,
+    "mask": MaskValidator,
+    "points": PointsValidator,
+    "boxes": BoxesValidator,
+    "vectors": VectorsValidator,
 }
 
 
 def find_layer_validator(layer: Layer) -> Validator:
-    if layer.kind in LAYER_VALIDATORS:
-        lv = LAYER_VALIDATORS[layer.kind]
-        validator_cls = lv.get(layer.validator, DefaultValidator)
-    else:
-        validator_cls = DefaultValidator
-
+    validator_cls = LAYER_VALIDATORS.get(layer.kind, DefaultValidator)
+    
     return validator_cls()
 
 

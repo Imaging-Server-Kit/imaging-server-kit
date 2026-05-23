@@ -7,7 +7,7 @@ from imaging_server_kit.remote.encoding import encode_contents, decode_contents
 from imaging_server_kit.types.layer import Layer
 
 
-class DefalutMetaSerializer(Serializer):
+class MetaSerializer(Serializer):
     @staticmethod
     def serialize(
         layer: Optional[Layer], client_origin: Optional[str] = None
@@ -53,7 +53,7 @@ def _deserialize_value(obj: Any) -> Any:
     if isinstance(obj, Dict):
         return {k: _deserialize_value(v) for k, v in obj.items()}
     if isinstance(obj, str) and _is_base64_encoded(obj):
-        # TODO: This is a bit sketchy - we use a try/except on the decoding to figure out
+        # This is a bit sketchy - we use a try/except on the decoding to figure out
         # if the values in meta correspond to numpy arrays (features, etc.)
         try:
             return decode_contents(obj)

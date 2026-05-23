@@ -25,7 +25,7 @@ LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
 def find_layer_merger(layer: Layer) -> Merger:
     if layer.kind in LAYER_MERGERS:
         lm = LAYER_MERGERS[layer.kind]
-        merger_cls = lm.get(layer.merger, DefaultMerger)
+        merger_cls = lm.get(layer.meta["merger"], DefaultMerger)
     else:
         merger_cls = DefaultMerger
 

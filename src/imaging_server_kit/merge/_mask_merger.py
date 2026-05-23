@@ -1,9 +1,12 @@
+import math
 from typing import Optional
 
 import numpy as np
 
 from imaging_server_kit.merge.layer_merger import DefaultMerger
 from imaging_server_kit.types._mask import Mask
+from imaging_server_kit.core.domain import merge_domains
+from imaging_server_kit.merge.common import _get_slices_with_channel
 import networkx as nx
 from skimage.util import map_array
 
@@ -18,91 +21,89 @@ class MaskOverrideMerger(DefaultMerger):
         
         channel_axis = incoming_layer.channel_axis
         if channel_axis is not None:
-            n_channels = incoming_layer.data.shape[channel_axis] 
+            n_channels = incoming_layer.shape[channel_axis] 
 
-        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            s = incoming_layer.size
-            
-            if channel_axis is not None:
-                s_with_channel = s[:channel_axis] + (n_channels,) + s[channel_axis:]
-            else:
-                s_with_channel = s
-            
-            receiving_layer.data = np.zeros(s_with_channel, dtype=np.uint16)
-            
-            receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
+        if (receiving_layer.data is None) or (receiving_layer.position is None):
+            receiving_layer.position = incoming_layer.position
+            receiving_layer.data = incoming_layer.data
+            receiving_layer.meta = incoming_layer.meta
+            return
 
-        min_bounds = np.min(
-            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
-            axis=0,
+        merged_extent = merge_domains(
+            domains=[receiving_layer.extent, incoming_layer.extent]
         )
 
-        max_bounds = np.max(
-            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
-            axis=0,
-        )
+        if merged_extent.size != receiving_layer.size:
+            # Case where the extent has changed
 
-        size = tuple(max_bounds - min_bounds)
-
-        if size != receiving_layer.size:
-            slices_rec = []
-            slices = []
-            cmin_diff = []
-            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
-                receiving_layer.coords_min,
-                incoming_layer.coords_min,
-                incoming_layer.size,
-                receiving_layer.size,
-            ):
-                diff = incoming_cmin - receiving_cmin
-                start = 0 if diff < 0 else diff
-                stop = incoming_size + start
-                slices.append(slice(start, stop))
-                start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size 
-                slices_rec.append(slice(start_receiving, stop_receiving))
-                cmin_diff.append(start_receiving)
-            cmin_diff = np.array(cmin_diff)
-            slices_rec = tuple(slices_rec)
-            slices = tuple(slices)
+            new_position = merged_extent.coords_min
             
+            # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
             if channel_axis is not None:
-                size_with_channel = size[:channel_axis] + (n_channels,) + size[channel_axis:]
-                slices_rec_with_channel = slices_rec[:channel_axis] + (slice(None),) + slices_rec[channel_axis:]
-                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+                size_with_channel = (
+                    merged_extent.size[:channel_axis] + (n_channels,) + merged_extent.size[channel_axis:]
+                )
             else:
-                size_with_channel = size
-                slices_rec_with_channel = slices_rec
-                slices_with_channel = slices
+                size_with_channel = merged_extent.size
             
+            # Initialize new data array
+            size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
             new_data = np.zeros(size_with_channel, dtype=np.uint16)
             
-            new_data[slices_rec_with_channel] = receiving_layer.data
+            # Get the slice indices where to inpaint RECEIVING LAYER
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(receiving_layer.coords_min, new_position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(receiving_layer.coords_max, new_position)
+            ]
             
-            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - cmin_diff)
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+            
+            # Inpaint RECEIVING LAYER
+            new_data[slices_with_channel] = receiving_layer.data
+            
+            # Update position
+            receiving_layer.position = new_position
+            
+            # Get the slice indices where to inpaint INCOMING LAYER
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(incoming_layer.coords_min, new_position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(incoming_layer.coords_max, new_position)
+            ]
+            
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+        
         else:
+            # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
+            
             new_data = receiving_layer.data
 
-            slices = []
-            for receiving_cmin, incoming_cmin, incoming_size in zip(
-                receiving_layer.coords_min,
-                incoming_layer.coords_min,
-                incoming_layer.size,
-            ):
-                start = incoming_cmin - receiving_cmin
-                stop = incoming_size + start
-                slices.append(slice(start, stop))
-            slices = tuple(slices)
-            
-            if channel_axis is not None:
-                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
-            else:
-                slices_with_channel = slices
+            # Get the slice indices where to inpaint incoming_layer
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(incoming_layer.coords_min, receiving_layer.coords_min)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
+            ]
 
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+        
         # Simply override the data
         new_data[slices_with_channel] = incoming_layer.data
 
+        # Update the data of receiving layer
         receiving_layer.data = new_data
+
+        # Meta becomes incoming layer's meta
         receiving_layer.meta = incoming_layer.meta
 
 
@@ -148,17 +149,29 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
 
 def overlap_border_mask(layer: Mask) -> Optional[np.ndarray]:
     """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
-    if (layer.tile_meta.overlap_px is None) or (layer.size is None):
+    
+    # If unspecified, overlap defaults to zero
+    _overlap_px = layer.tile_meta.overlap_px
+    if _overlap_px is None:
+        if layer.bounds is not None:
+            _overlap_px = tuple([0] * len(layer.bounds))
+    
+    if (_overlap_px is None) or (layer.size is None):
         return
+
+    size_int = tuple([math.ceil(v) for v in layer.size])
 
     overlap_slices = tuple(
         [
             slice(pos, max_pos - pos)
-            for pos, max_pos in zip(layer.tile_meta.overlap_px, layer.size)
+            for pos, max_pos in zip(_overlap_px, size_int)
         ]
     )
-    mask = np.ones(layer.size)
+    
+    mask = np.ones(size_int, dtype=np.uint8)
+    
     mask[overlap_slices] = 0
+    
     return mask == 1
 
 
@@ -175,88 +188,85 @@ class InstanceMaskTileMerger(DefaultMerger):
         if channel_axis is not None:
             n_channels = incoming_layer.data.shape[channel_axis] 
 
-        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            s = incoming_layer.size
-            
-            if channel_axis is not None:
-                s_with_channel = s[:channel_axis] + (n_channels,) + s[channel_axis:]
-            else:
-                s_with_channel = s
-            
-            receiving_layer.data = np.zeros(s_with_channel, dtype=np.uint16)
-            
-            receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
+        if (receiving_layer.data is None) or (receiving_layer.position is None):
+            receiving_layer.position = incoming_layer.position
+            receiving_layer.data = incoming_layer.data
+            receiving_layer.meta = incoming_layer.meta
+            return
         
-        min_bounds = np.min(
-            np.stack([receiving_layer.coords_min, incoming_layer.coords_min]),
-            axis=0,
+        merged_extent = merge_domains(
+            domains=[receiving_layer.extent, incoming_layer.extent]
         )
 
-        max_bounds = np.max(
-            np.stack([receiving_layer.coords_max, incoming_layer.coords_max]),
-            axis=0,
-        )
+        if merged_extent.size != receiving_layer.size:
+            # Case where the extent has changed
 
-        size = tuple(max_bounds - min_bounds)
-
-        if size != receiving_layer.size:
-            slices_rec = []
-            slices = []
-            cmin_diff = []
-            for receiving_cmin, incoming_cmin, incoming_size, receiving_size in zip(
-                receiving_layer.coords_min,
-                incoming_layer.coords_min,
-                incoming_layer.size,
-                receiving_layer.size,
-            ):
-                diff = incoming_cmin - receiving_cmin
-                start = 0 if diff < 0 else diff
-                stop = incoming_size + start
-                slices.append(slice(start, stop))
-                start_receiving = -diff if diff < 0 else 0
-                stop_receiving = start_receiving + receiving_size 
-                slices_rec.append(slice(start_receiving, stop_receiving))
-                cmin_diff.append(start_receiving)
-            cmin_diff = np.array(cmin_diff)
-            slices_rec = tuple(slices_rec)
-            slices = tuple(slices)
+            new_position = merged_extent.coords_min
             
+            # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
             if channel_axis is not None:
-                size_with_channel = size[:channel_axis] + (n_channels,) + size[channel_axis:]
-                slices_rec_with_channel = slices_rec[:channel_axis] + (slice(None),) + slices_rec[channel_axis:]
-                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+                size_with_channel = (
+                    merged_extent.size[:channel_axis] + (n_channels,) + merged_extent.size[channel_axis:]
+                )
             else:
-                size_with_channel = size
-                slices_rec_with_channel = slices_rec
-                slices_with_channel = slices
+                size_with_channel = merged_extent.size
             
+            # Initialize new data array
+            size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
             new_data = np.zeros(size_with_channel, dtype=np.uint16)
-
-            new_data[slices_rec_with_channel] = receiving_layer.data
             
-            receiving_layer.domain.coords_min = tuple(np.array(receiving_layer.domain.coords_min) - cmin_diff)
+            # Get the slice indices where to inpaint RECEIVING LAYER
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(receiving_layer.coords_min, new_position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(receiving_layer.coords_max, new_position)
+            ]
+            
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+            
+            # Inpaint RECEIVING LAYER
+            new_data[slices_with_channel] = receiving_layer.data
+            
+            # Update position
+            receiving_layer.position = new_position
+            
+            # Get the slice indices where to inpaint INCOMING LAYER
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(incoming_layer.coords_min, new_position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(incoming_layer.coords_max, new_position)
+            ]
+            
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+        
         else:
+            # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
+            
             new_data = receiving_layer.data
-            
-            slices = []
-            for receiving_cmin, incoming_cmin, incoming_size in zip(
-                receiving_layer.coords_min,
-                incoming_layer.coords_min,
-                incoming_layer.size,
-            ):
-                start = incoming_cmin - receiving_cmin
-                stop = incoming_size + start
-                slices.append(slice(start, stop))
-            slices = tuple(slices)
-            
-            if channel_axis is not None:
-                slices_with_channel = slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
-            else:
-                slices_with_channel = slices
+
+            # Get the slice indices where to inpaint incoming_layer
+            cmin_rounded = [
+                math.floor(v - p)
+                for v, p in zip(incoming_layer.coords_min, receiving_layer.coords_min)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p)
+                for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
+            ]
+
+            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+
 
         receiving_layer.data = new_data  # Extend the source layer data
 
-        src_tile = receiving_layer.select(domain=incoming_layer.domain)
+
+        src_tile = receiving_layer.select(domain=incoming_layer.extent)
         if src_tile.data is None:
             raise ValueError(f"Could not get a mask tile where it was requested.")
 
@@ -277,8 +287,11 @@ class InstanceMaskTileMerger(DefaultMerger):
                         self.tile_tracker.add_edge(src_lab, dst_lab)
 
         new_data[slices_with_channel] = dst_arr
-
+        
+        # Update the data of receiving layer
         receiving_layer.data = new_data
+
+        # Meta becomes incoming layer's meta
         receiving_layer.meta = incoming_layer.meta
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):

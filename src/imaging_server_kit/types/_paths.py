@@ -46,15 +46,17 @@ class Paths(Layer):
 
     @property
     def bounds(self) -> Optional[Tuple]:
-        """Data bounds in local coordinates."""
+        """Data bounds in local coordinates, given the data."""
         if self.data is None:
             return
         if self.n_objects > 0:
             path_bounds = []
             for path in self.data:
                 path_bounds.append(list(np.max(path, axis=0)))
-            bounds = np.max(np.asarray(path_bounds), axis=0).tolist()
-            return tuple(bounds)
+            bounds_min = tuple(np.min(np.asarray(path_bounds), axis=0).tolist())
+            bounds_max = tuple(np.max(np.asarray(path_bounds), axis=0).tolist())
+
+            return (bounds_min, bounds_max)
 
     def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""

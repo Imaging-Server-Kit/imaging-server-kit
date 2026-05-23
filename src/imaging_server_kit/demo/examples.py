@@ -181,6 +181,7 @@ def fibonacci_sphere(N, r, color, size):
         size=size,
         border_color="transparent",
         face_color=color,
+        shading="spherical",
     )
 
 
@@ -501,7 +502,7 @@ def project(image, method):
     description="Conway's game of life.",
     project_url="https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/",
 )
-def conway_algo(max_iter=200, delay=0.1):
+def conway_algo(max_iter=20, delay=0.1):
     min_val = 0
     max_val = 255
 

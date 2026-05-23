@@ -38,14 +38,12 @@ class Boxes(Layer):
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
         """Data in global coordinates."""
-        if (self.data is not None) and (self.domain is not None):
-            if self.domain.coords_min is not None:
-                data_global_coords = self.data.copy()
-                for dim in range(self.ndim):
-                    data_global_coords[:, :, dim] = (
-                        data_global_coords[:, :, dim] + self.domain.coords_min[dim]
-                    )
-                return data_global_coords
+        if self.data is not None:
+            return self.data + self.position
+    
+    def data_from_coords(self, coords: Tuple) -> Optional[np.ndarray]:
+        if self.data is not None:
+            return self.data + (np.asarray(self.position) - np.asarray(coords))
 
     @property
     def n_objects(self) -> int:
@@ -57,17 +55,24 @@ class Boxes(Layer):
     @property
     def bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
-        if self.data is not None:
-            if self.n_objects > 0:
-                return tuple(np.max(np.asarray(self.data).tolist(), axis=(0, 1)))
+        if self.data is None:
+            return
+
+        if self.n_objects == 0:
+            return
+        
+        bounds_min = tuple(np.min(np.asarray(self.data).tolist(), axis=(0, 1)))
+        bounds_max = tuple(np.max(np.asarray(self.data).tolist(), axis=(0, 1)))
+
+        return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Boxes:
         """Select data in a given domain."""
-        if self.data is None:
+        if (self.data is None) or (domain.size is None):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.zeros_in(domain=self.domain)
+            _data = self.zeros_in(domain=domain)
             _meta = self.meta
         else:
             # Mask of box coordinates in the tile
@@ -78,17 +83,12 @@ class Boxes(Layer):
             # All coordinates must be in the tile bounds
             filt = boxes_in_domain.reshape((len(boxes_in_domain), -1)).all(axis=1)
 
-            selected_boxes = self.data[filt]
+            selected_boxes = self.data_global_coords[filt]
 
             selected_meta = select_object_meta(self.meta, self.n_objects, filt)
 
             if len(selected_boxes) > 0:
-                btd = selected_boxes.copy()
-                for dim in range(self.ndim):
-                    btd[:, :, dim] = btd[:, :, dim] + (
-                        self.coords_min[dim] - domain.coords_min[dim]
-                    )
-                selected_boxes = btd
+                selected_boxes = selected_boxes - domain.coords_min
 
             _data = selected_boxes
             _meta = selected_meta
@@ -98,7 +98,7 @@ class Boxes(Layer):
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta,
-            domain=domain,
+            position=domain.coords_min,
         )
 
     def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
@@ -115,7 +115,7 @@ class Boxes(Layer):
             return
 
         objects_in_domain = (self.data_global_coords >= domain.coords_min) & (
-            self.data_global_coords < domain.coords_max
+            self.data_global_coords <= domain.coords_max
         )
 
         filt = objects_in_domain.reshape((len(objects_in_domain), -1)).all(axis=1)

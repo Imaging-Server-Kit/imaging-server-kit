@@ -1,5 +1,8 @@
+"""Custom errors for the Imaging Server Kit."""
+
 import importlib.util
 from typing import Optional
+
 
 class AlgorithmNotFoundError(Exception):
     """Exception raised when a specified algorithm is not found."""

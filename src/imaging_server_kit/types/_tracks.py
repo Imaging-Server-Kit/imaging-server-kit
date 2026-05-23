@@ -45,7 +45,10 @@ class Tracks(Layer):
 
     @property
     def bounds(self) -> Optional[Tuple]:
-        """Data bounds in local coordinates."""
+        """Data bounds in local coordinates, given the data."""
         if self.data is None:
             if self.n_objects > 0:
-                return tuple(np.max(self.data, axis=0)[2:])
+                bounds_min = tuple(np.min(self.data, axis=0)[2:])
+                bounds_max = tuple(np.max(self.data, axis=0)[2:])
+
+                return (bounds_min, bounds_max)

@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Dict, Union
 
 import numpy as np
 
@@ -6,41 +6,29 @@ from imaging_server_kit.merge.layer_merger import DefaultMerger
 from imaging_server_kit.types._points import Points
 from imaging_server_kit.types._vectors import Vectors
 from imaging_server_kit.types._boxes import Boxes
+from imaging_server_kit.core.domain import merge_domains
 
 
-def _merge_meta(obj, meta_obj, n_objects, tile_filter: Optional[np.ndarray]):
-    if isinstance(obj, Dict):
+def _merge_meta(incoming_meta_val, receiving_meta_val, n_objects_incoming):
+    if isinstance(incoming_meta_val, Dict):
         return {
-            k: _merge_meta(v, meta_obj.get(k), n_objects, tile_filter)
-            for k, v in obj.items()
+            k: _merge_meta(v, receiving_meta_val.get(k), n_objects_incoming)
+            for k, v in incoming_meta_val.items()
         }
-    if isinstance(obj, np.ndarray):
-        if len(obj) == n_objects:
-            if len(meta_obj.shape) == 1:
-                if tile_filter:
-                    return np.hstack((obj[~tile_filter], meta_obj))
-                else:
-                    return np.hstack((obj, meta_obj))
+    if isinstance(incoming_meta_val, np.ndarray):
+        if len(incoming_meta_val) == n_objects_incoming:
+            if len(incoming_meta_val.shape) == 1:
+                return np.hstack((receiving_meta_val, incoming_meta_val))
             else:
-                if tile_filter:
-                    return np.vstack((obj[~tile_filter], meta_obj))
-                else:
-                    return np.vstack((obj, meta_obj))
-    return obj
+                return np.vstack((receiving_meta_val, incoming_meta_val))
+
+    return incoming_meta_val
 
 
-def merge_meta_tile(
-    meta: Dict,
-    meta_tile: Dict,
-    n_objects: int,
-    tile_filter: Optional[np.ndarray] = None,
-) -> Dict:
-    """Iterates over two levels of meta.
-    Merge meta from the tile with the existing meta for numpy array fields of length == n_objects.
-    """
+def merge_meta_tile(incoming_meta: Dict, receiving_meta: Dict, n_objects_incoming: int) -> Dict:
     return {
-        k: _merge_meta(v, meta_tile.get(k), n_objects, tile_filter)
-        for k, v in meta.items()
+        k: _merge_meta(incoming_meta_val, receiving_meta.get(k), n_objects_incoming)
+        for k, incoming_meta_val in incoming_meta.items()
     }
 
 
@@ -56,63 +44,30 @@ class ObjectMerger(DefaultMerger):
         if incoming_layer.n_objects == 0:
             return
 
-        if (receiving_layer.data is None) or (receiving_layer.ndim is None):
-            receiving_layer.data = incoming_layer.zeros_in(incoming_layer.domain)
-            receiving_layer.domain.coords_min = incoming_layer.domain.coords_min
-            receiving_layer.domain.size = incoming_layer.domain.size
+        if (receiving_layer.data is None) or (receiving_layer.position is None):
+            receiving_layer.position = incoming_layer.position  # TODO: correct?
+            receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
+            return
 
-        cmin_diff = []
-        cmin_inc = []
-        for receiving_cmin, incoming_cmin in zip(
-            receiving_layer.coords_min, incoming_layer.coords_min
-        ):
-            diff = incoming_cmin - receiving_cmin
-            start_receiving = -diff if diff < 0 else 0
-            start_incoming = 0 if diff < 0 else -diff
-            cmin_diff.append(start_receiving)
-            cmin_inc.append(start_incoming)
-        cmin_diff = np.array(cmin_diff)
-        cmin_inc = np.array(cmin_inc)
-
-        receiving_layer.domain.coords_min = tuple(
-            np.array(receiving_layer.domain.coords_min) - cmin_diff
+        merged_extent = merge_domains(
+            domains=[receiving_layer.extent, incoming_layer.extent]
         )
+        
+        new_position = merged_extent.coords_min
+        
+        new_receiving_layer_data = receiving_layer.data_from_coords(new_position)
 
-        incoming_data = incoming_layer.data.copy()
+        new_incoming_layer_data = incoming_layer.data_from_coords(new_position)
 
-        for dim in range(incoming_layer.ndim):
-            if incoming_layer.kind == "points":
-                incoming_data[:, dim] = incoming_data[:, dim] - cmin_inc[dim]
-            elif incoming_layer.kind == "boxes":
-                incoming_data[:, :, dim] = incoming_data[:, :, dim] - cmin_inc[dim]
-            elif incoming_layer.kind == "vectors":
-                incoming_data[:, 0, dim] = incoming_data[:, 0, dim] - cmin_inc[dim]
-
-        if receiving_layer.n_objects > 0:
-            for dim in range(receiving_layer.ndim):
-                if receiving_layer.kind == "points":
-                    receiving_layer.data[:, dim] = (
-                        receiving_layer.data[:, dim] + cmin_diff[dim]
-                    )
-                elif receiving_layer.kind == "boxes":
-                    receiving_layer.data[:, :, dim] = (
-                        receiving_layer.data[:, :, dim] + cmin_diff[dim]
-                    )
-                elif receiving_layer.kind == "vectors":
-                    receiving_layer.data[:, 0, dim] = (
-                        receiving_layer.data[:, 0, dim] + cmin_diff[dim]
-                    )
-
-            new_data = np.vstack((receiving_layer.data, incoming_data))
-
-            new_meta = merge_meta_tile(
-                receiving_layer.meta, incoming_layer.meta, receiving_layer.n_objects
-            )
-
-        else:
-            new_data = incoming_layer.data
-            new_meta = incoming_layer.meta
+        new_data = np.vstack((new_receiving_layer_data, new_incoming_layer_data))
 
         receiving_layer.data = new_data
+
+        receiving_layer.position = new_position
+
+        new_meta = merge_meta_tile(
+            incoming_layer.meta, receiving_layer.meta, incoming_layer.n_objects
+        )
+
         receiving_layer.meta = new_meta

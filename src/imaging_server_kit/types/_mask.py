@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import List, Optional, Tuple
 
 import imantics
@@ -7,9 +8,8 @@ import numpy as np
 from geojson import Feature, Polygon
 from skimage.draw import polygon2mask
 
-from imaging_server_kit.core.tiling import Domain
 from imaging_server_kit.types.layer import Layer
-from imaging_server_kit.types.common import safe_index_slice
+from imaging_server_kit.core.domain import Domain
 
 
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
@@ -214,39 +214,41 @@ class Mask(Layer):
         if self.channel_axis is not None:
             shape = list(self._data.shape)
             shape.pop(self.channel_axis)
-            return tuple(shape)
+            bounds_min = tuple([0] * len(shape))
+            bounds_max = tuple(shape)
         else:
-            return self._data.shape
+            bounds_min = tuple([0] * len(self._data.shape))
+            bounds_max = tuple(self._data.shape)
+
+        return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Mask:
         """Select data in a given domain."""
-        if (
-            (self.data is None)
-            or (domain.coords_max is None)
-            or (self.coords_max is None)
-        ):
+        if (self.data is None) or (domain.size is None):
             _data = None
         elif (domain.coords_max > np.asarray(self.coords_max)).any():
             _data = None
         else:
-            domain_local = domain.copy()
-            domain_local.coords_min = tuple(
-                np.array(domain_local.coords_min) - np.array(self.coords_min)
+            # Get the slice indices
+            cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
+            cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
+            
+            slices = tuple(
+                [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
             )
-            slices_int = tuple(safe_index_slice(s) for s in domain_local.slices)
 
             # Account for the channel_axis
             if self.channel_axis is not None:
-                slices_int_with_channel = (
-                    slices_int[: self.channel_axis]
+                slices_with_channel = (
+                    slices[: self.channel_axis]
                     + (slice(None),)
-                    + slices_int[self.channel_axis :]
+                    + slices[self.channel_axis :]
                 )
             else:
-                slices_int_with_channel = slices_int
+                slices_with_channel = slices
 
             try:
-                _data = self.data[slices_int_with_channel]
+                _data = self.data[slices_with_channel]
             except:
                 raise RuntimeError(
                     "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
@@ -257,37 +259,37 @@ class Mask(Layer):
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
-            domain=domain,
+            position=domain.coords_min,
         )
 
     def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
-            return np.zeros(domain.size, dtype=np.uint16)
+            if domain.size is not None:
+                return np.zeros(domain.size, dtype=np.uint16)
 
     def reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
-        if not isinstance(domain, Domain):
-            return
-
-        domain_local = domain.copy()
-        domain_local.coords_min = tuple(
-            np.array(domain_local.coords_min) - np.array(self.coords_min)
+        # Get the slice indices
+        cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
+        cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
+        
+        slices = tuple(
+            [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
         )
-        slices_int = tuple(safe_index_slice(s) for s in domain_local.slices)
-
+        
         # Account for the channel_axis
         if self.channel_axis is not None:
-            slices_int_with_channel = (
-                slices_int[: self.channel_axis]
+            slices_with_channel = (
+                slices[: self.channel_axis]
                 + (slice(None),)
-                + slices_int[self.channel_axis :]
+                + slices[self.channel_axis :]
             )
         else:
-            slices_int_with_channel = slices_int
+            slices_with_channel = slices
 
         try:
-            self.data[slices_int_with_channel] = 0
+            self.data[slices_with_channel] = 0
         except:
             raise RuntimeError(
                 "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"

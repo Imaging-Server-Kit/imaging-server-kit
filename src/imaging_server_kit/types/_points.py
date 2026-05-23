@@ -38,14 +38,13 @@ class Points(Layer):
     @property
     def data_global_coords(self) -> Optional[np.ndarray]:
         """Data in global coordinates."""
-        if (self.data is not None) and (self.domain is not None):
-            if self.domain.coords_min is not None:
-                data_global = self.data.copy()
-                for dim in range(self.ndim):
-                    data_global[:, dim] = (
-                        data_global[:, dim] + self.domain.coords_min[dim]
-                    )
-                return data_global
+        if self.data is not None:
+            return self.data + self.position
+        
+    def data_from_coords(self, coords: Tuple) -> Optional[np.ndarray]:
+        """Data viewed from the given origin coordinates."""
+        if self.data is not None:
+            return self.data + (np.asarray(self.position) - np.asarray(coords))
 
     @property
     def n_objects(self) -> int:
@@ -57,17 +56,24 @@ class Points(Layer):
     @property
     def bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
-        if self.data is not None:
-            if self.n_objects > 0:
-                return tuple(np.max(self.data, axis=0).tolist())
+        if self.data is None:
+            return
+
+        if self.n_objects == 0:
+            return
+        
+        bounds_min = tuple(np.min(self.data, axis=0).tolist())
+        bounds_max = tuple(np.max(self.data, axis=0).tolist())
+
+        return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Points:
         """Select data in a given domain."""
-        if self.data is None:
+        if (self.data is None) or (domain.size is None):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.zeros_in(domain=self.domain)
+            _data = self.zeros_in(domain=domain)
             _meta = self.meta
         else:
             # Select points via global coordinates
@@ -78,18 +84,13 @@ class Points(Layer):
             # All coordinates must be in the tile bounds
             filt = points_in_domain.all(axis=1)  # (N,)
 
-            selected_points = self.data[filt]
+            selected_points = self.data_global_coords[filt]
 
             selected_meta = select_object_meta(self.meta, self.n_objects, filt)
 
             if len(selected_points) > 0:
-                # Adjust the data so that the origin is zero at the origin of `domain`
-                ptd = selected_points.copy()
-                for dim in range(self.ndim):
-                    ptd[:, dim] = ptd[:, dim] + (
-                        self.domain.coords_min[dim] - domain.coords_min[dim]
-                    )
-                selected_points = ptd
+                # Return the points in coordinates local to the selection domain
+                selected_points = selected_points - domain.coords_min
 
             _data = selected_points
             _meta = selected_meta
@@ -99,7 +100,7 @@ class Points(Layer):
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta,
-            domain=domain,
+            position=domain.coords_min,
         )
 
     def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
@@ -116,7 +117,7 @@ class Points(Layer):
             return
 
         objects_in_domain = (self.data_global_coords >= domain.coords_min) & (
-            self.data_global_coords < domain.coords_max
+            self.data_global_coords <= domain.coords_max
         )
 
         filt = objects_in_domain.all(axis=1)  # (N,)

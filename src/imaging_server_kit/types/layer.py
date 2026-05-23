@@ -3,32 +3,48 @@ from __future__ import annotations
 from typing import Any, Dict, Generator, Optional, Tuple, Union
 import numpy as np
 
+from imaging_server_kit.core.domain import Domain
+
 from imaging_server_kit.core.tiling import (
     TileMeta,
     TilingSpecs,
     generate_tiles,
-    Domain,
 )
 
 
 class Layer:
     """
-    Data layer container for a particular data type.
+    A layer corresponding to a particular kind of data.
 
     Attributes
     ----------
-    data : None
-        Data in the layer.
-    name : str
-        The name of the layer.
-    description : str
-        A short description of the layer.
-    meta : dict
-        Metadata about the layer.
-    type : Any
-        The type of data stored in the layer.
-    kind : str
-        A short string identifying the layer type.
+    data : Data in the layer.
+    name : The name of the layer.
+    meta : Metadata about the layer.
+    merger: Merger strategy for the layer.
+    description: Description of the layer.
+    tile_meta : Tile metadata of the layer.
+    position: Position of the layer.
+    
+    type : The type of data stored in the layer.
+    kind : A short string identifying the layer type.
+    
+    extent : Extent (as a `domain`) of the layer.
+    
+    ndim : Dimensionality of the layer data.
+    size : Size of the extent of the layer.
+    coords_min : Minimum coordinates of the data (in world coordinates); given by the layer's extent.
+    coords_max : Maximum coordinates of the data (in world coordinates); given by the layer's extent.
+    shape : Data shape if it is an array-type.
+    bounds : Size of the smallest spatial domain containing the data; should be implemented by subclasses.
+    merger_instance : Merger instance associated with the layer.    
+    
+    Methods
+    ----------
+    select() : Select data in the layer at the specified domain.
+    refresh() : Refresh the layer's state.
+    reiniitalize() : Reinitialize the specified domain in the layer; meant to be implemented by subclasses.
+    zeros_in() : Provide zero-valued data in the specified domain; meant to be implemented by subclasses.
     """
 
     kind: str = ""
@@ -39,13 +55,10 @@ class Layer:
         name: str = "",
         data: Any = None,
         meta: Optional[Dict] = None,
-        tile_meta: Optional[TileMeta] = None,
-        domain: Optional[Domain] = None,
-        translate: Optional[Tuple] = None,
+        position: Optional[Tuple] = None,
+        tile_meta: Optional[TileMeta] =  None,
         description: str = "",
         merger: str = "default",
-        serializer: str = "default",
-        validator: str = "default",
         **meta_kwargs,
     ):
         self._name = name
@@ -53,8 +66,10 @@ class Layer:
         # Prepare the meta attribute
         if meta is None:
             meta = {}
-        else:
-            meta["description"] = meta.get("description", description)
+        
+        meta["description"] = meta.get("description", description)
+        meta["merger"] = meta.get("merger", merger)
+        meta["position"] = meta.get("position", position)
 
         # Convert dimensionality=None to the default 6-dims
         if "dimensionality" in meta_kwargs:
@@ -86,28 +101,13 @@ class Layer:
         self._data = data
 
         # Prepare the tile meta
-        tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
-        self._tile_meta = tile_meta
-
-        # Assign a domain
-        domain = Domain() if domain is None else domain.copy()
-        if isinstance(translate, Tuple):
-            domain.coords_min = translate
-        self._domain = domain
-
-        self._sync()
+        self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
+        
+        # Set the position attribute
+        self._position = meta["position"]
 
         # Merger
-        self.merger = merger  # Merger `type`
-        self.merger_instance = None  # Merger() object
-
-        # Data serializer
-        self.serializer = serializer
-        self.serializer_instance = None
-
-        # Validator
-        self.validator = validator
-        self.validator_instance = None
+        self.merger_instance = None
 
         # Run validation (`post-init`)
         if self.data is not None:
@@ -119,25 +119,6 @@ class Layer:
             v = find_layer_validator(self)
             v.validate(self)
 
-    def _sync(self):
-        """Adjusts the domain to match new data set in the layer."""
-        new_tile_meta = self.tile_meta.copy()
-        new_domain = self.domain.copy()
-
-        if self.bounds is None:
-            new_domain.size = None
-            new_domain.coords_min = None
-        else:
-            new_domain.size = self.bounds
-            if new_domain.coords_min is None:
-                new_domain.coords_min = tuple([0] * len(self.bounds))
-
-            if new_tile_meta.overlap_px is None:
-                new_tile_meta.overlap_px = tuple([0] * len(self.bounds))
-
-        self._domain = new_domain
-        self._tile_meta = new_tile_meta
-
     @property
     def data(self) -> Any:
         return self._data
@@ -145,7 +126,7 @@ class Layer:
     @data.setter
     def data(self, value: Any):
         self._data = value
-        self._sync()
+        # self._sync()
         self.refresh()
 
     @property
@@ -174,28 +155,55 @@ class Layer:
         self._tile_meta = value
 
     @property
-    def domain(self) -> Domain:
-        return self._domain
+    def position(self) -> Optional[Tuple]:
+        if self._position is not None:
+            return self._position
+        else:
+            if self.bounds is None:
+                return
+            else:
+                return tuple([0] * len(self.bounds[0]))
+
+    @position.setter
+    def position(self, value):
+        self._position = value
+        self.refresh()  # Maybe needed (to check)
+        
+    @property
+    def extent(self) -> Optional[Domain]:
+        """Extent of the layer in global coordinates, as function of the data and position."""
+        if self.bounds is None:
+            return
+
+        if self.position is None:
+            return
+        
+        _coords_min, _coords_max = self.bounds
+        _size = tuple([_max - _min for _max, _min in zip(_coords_max, _coords_min)])
+        
+        _position = tuple([_cmin + _pos for _cmin, _pos in zip(_coords_min, self.position)])
+        
+        return Domain(size=_size, position=_position)
 
     @property
     def ndim(self) -> Optional[int]:
-        if self.domain is not None:
-            return self.domain.ndim
+        if self.extent is not None:
+            return self.extent.ndim
 
     @property
     def size(self) -> Optional[Tuple]:
-        if self.domain is not None:
-            return self.domain.size
+        if self.extent is not None:
+            return self.extent.size
 
     @property
     def coords_min(self) -> Optional[Tuple]:
-        if self.domain is not None:
-            return self.domain.coords_min
+        if self.extent is not None:
+            return self.extent.coords_min
 
     @property
     def coords_max(self) -> Optional[Tuple]:
-        if self.domain is not None:
-            return self.domain.coords_max
+        if self.extent is not None:
+            return self.extent.coords_max
 
     @property
     def shape(self) -> Optional[Tuple]:
@@ -204,7 +212,7 @@ class Layer:
 
     @property
     def bounds(self) -> Optional[Tuple]:
-        pass
+        return None
 
     @property
     def merger_instance(self):
@@ -231,10 +239,10 @@ class Layer:
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
-            domain=domain,
+            position=domain.coords_min,  # Set the position to the domain's coords_min        
         )
         return layer_selection
-
+    
     def __getitem__(self, key):
         """Selection based on a domain in *local* coordinates."""
         if not isinstance(key, tuple):
@@ -245,7 +253,7 @@ class Layer:
         for dim, k in enumerate(key):
             if isinstance(k, slice):
                 start = 0 if k.start is None else k.start
-                stop = self.bounds[dim] if k.stop is None else k.stop
+                stop = self.size[dim] if k.stop is None else k.stop
                 start_global = self.coords_min[dim] + start
                 position.append(start_global)
                 size.append(stop - start)
@@ -257,7 +265,7 @@ class Layer:
         if self.ndim is not None:
             if len(size) < self.ndim:
                 for dim in range(len(size), self.ndim):
-                    size.append(self.bounds[dim])
+                    size.append(self.size[dim])
                     position.append(self.coords_min[dim])
 
         domain = Domain(position=position, size=size)
@@ -280,7 +288,7 @@ class LayerTileGenerator:
             yield layer.select(domain=Domain())
         else:
             for tile_meta, tile_domain in generate_tiles(
-                domain=layer.domain,
+                domain=layer.extent,
                 tile_size=ctx.tile_size,
                 tile_overlap=ctx.tile_overlap,
                 tile_delay=ctx.tile_delay,

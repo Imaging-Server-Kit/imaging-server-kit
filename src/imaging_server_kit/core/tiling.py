@@ -32,6 +32,24 @@ class TilingSpecs:
 
 
 class TileMeta:
+    """Tile metadata.
+    
+    Attributes
+    ----------
+    tile_idx: Index of the tile in the series.
+    n_tiles: Number of tiles in the series.
+    overlap_px: Tile overlap in pixels.
+    first_tile: Whether the tile is first along any given axis.
+    last_tile: Whether the tile is last along any given axis.
+    is_first_tile: Whether the tile is first in the series.
+    is_last_tile: Wheter the tile is last in the series.
+
+    Methods
+    ----------
+    serialize(): Convert the tile metadata to a dictionary format.
+    copy(): Copy the tile metadata.    
+    """
+    
     def __init__(
         self,
         tile_idx: Optional[int] = None,
@@ -169,7 +187,8 @@ def generate_tiles(
 
     Yields
     ------
-    A dictionary `tile_info` that contains metadata about the generated tile, including its position, size, and index in the tile series.
+    tile_meta: The metadata of the generated tile.
+    tile_domain: The domain corresponding to the generated tile.
     """
     if domain is None:
         yield (TileMeta(), Domain())
@@ -265,7 +284,6 @@ def _generate_tile_meta(
     else:
         overlap = [ctx.tile_overlap] * ndim
 
-    # Overlap in pixels (TODO: we could allow users to pass an overlap in pixels directly)
     overlap_px = [
         np.round(overlap[axis] * tile_shape[axis], decimals=0).astype(int)
         for axis in range(ndim)
