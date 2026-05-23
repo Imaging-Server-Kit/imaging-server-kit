@@ -29,7 +29,7 @@ def test_sk_gaussian():
     image = sample[0].data
 
     stack = sk_gaussian.run(
-        image=image, tiled=True, tile_size=256, tile_overlap=0.1, tile_order_random=True
+        image=image, tiled=True, tile_size=256, tile_overlap=0.1, tile_randomize=True
     )
 
     blurred = stack[0].data
@@ -64,6 +64,7 @@ def test_sk_tiled_rgb():
 def to_rgb(image: sk.Image):
     return sk.Image(gray2rgb(image), rgb=True)
 
+
 def test_convert_to_rgb():
     image = skimage.data.coins()
     rgb_out = to_rgb.run(image=image, tiled=True, tile_overlap=0.1)
@@ -75,6 +76,7 @@ def test_convert_to_rgb():
 @sk.algorithm(parameters={"image": sk.Image(rgb=True)})
 def to_gray(image: sk.Image):
     return sk.Image(rgb2gray(image))
+
 
 def test_convert_to_gray():
     image = skimage.data.astronaut()
