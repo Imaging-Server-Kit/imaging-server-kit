@@ -27,13 +27,13 @@ class TilingError(Exception):
 class TilingSpecs:
     tile_size: Union[int, Tuple, List] = 64
     tile_overlap: Union[float, Tuple, List] = 0.0
-    tile_order_random: bool = False
+    tile_randomize: bool = False
     tile_delay: float = 0.0
 
 
 class TileMeta:
     """Tile metadata.
-    
+
     Attributes
     ----------
     tile_idx: Index of the tile in the series.
@@ -47,9 +47,9 @@ class TileMeta:
     Methods
     ----------
     serialize(): Convert the tile metadata to a dictionary format.
-    copy(): Copy the tile metadata.    
+    copy(): Copy the tile metadata.
     """
-    
+
     def __init__(
         self,
         tile_idx: Optional[int] = None,
@@ -163,7 +163,7 @@ def generate_tiles(
     domain: Optional[Domain] = None,
     tile_size: Union[int, Tuple, List] = 64,
     tile_overlap: Union[float, Tuple, List] = 0.0,
-    tile_order_random: bool = False,
+    tile_randomize: bool = False,
     tile_delay: float = 0.0,
 ) -> Generator[Tuple[TileMeta, Domain], None, None]:
     """Generate tile metadata for overlapping N-dimensional tiles over a pixel domain.
@@ -180,7 +180,7 @@ def generate_tiles(
         Relative overlap between adjacent tiles (in the range [0, 1]). If an integer is provided, the same relative
         overlap is used for all dimensions.
         Default is 0.0 (no overlap).
-    tile_order_random : bool, optional
+    tile_randomize : bool, optional
         If True, randomize the order in which tiles are yielded. Default is False.
     tile_delay : float, optional
         Time delay in seconds to wait after yielding each tile. Default is 0.0 (no delay).
@@ -209,7 +209,7 @@ def generate_tiles(
         ctx = TilingSpecs(
             tile_size=tile_size,
             tile_overlap=tile_overlap,
-            tile_order_random=tile_order_random,
+            tile_randomize=tile_randomize,
             tile_delay=tile_delay,
         )
 
@@ -301,7 +301,7 @@ def _generate_tile_meta(
     grid = np.meshgrid(*[np.arange(n) for n in n_tiles_ax], indexing="ij")
     tile_coords_idx = np.stack([g.ravel() for g in grid], axis=1)
 
-    if ctx.tile_order_random:
+    if ctx.tile_randomize:
         np.random.shuffle(tile_coords_idx)
 
     n_tiles = len(tile_coords_idx)

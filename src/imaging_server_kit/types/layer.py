@@ -25,20 +25,17 @@ class Layer:
     description: Description of the layer.
     tile_meta : Tile metadata of the layer.
     position: Position of the layer.
-    
     type : The type of data stored in the layer.
     kind : A short string identifying the layer type.
-    
     extent : Extent (as a `domain`) of the layer.
-    
     ndim : Dimensionality of the layer data.
     size : Size of the extent of the layer.
     coords_min : Minimum coordinates of the data (in world coordinates); given by the layer's extent.
     coords_max : Maximum coordinates of the data (in world coordinates); given by the layer's extent.
     shape : Data shape if it is an array-type.
     bounds : Size of the smallest spatial domain containing the data; should be implemented by subclasses.
-    merger_instance : Merger instance associated with the layer.    
-    
+    merger_instance : Merger instance associated with the layer.
+
     Methods
     ----------
     select() : Select data in the layer at the specified domain.
@@ -56,7 +53,7 @@ class Layer:
         data: Any = None,
         meta: Optional[Dict] = None,
         position: Optional[Tuple] = None,
-        tile_meta: Optional[TileMeta] =  None,
+        tile_meta: Optional[TileMeta] = None,
         description: str = "",
         merger: str = "default",
         **meta_kwargs,
@@ -66,7 +63,7 @@ class Layer:
         # Prepare the meta attribute
         if meta is None:
             meta = {}
-        
+
         meta["description"] = meta.get("description", description)
         meta["merger"] = meta.get("merger", merger)
         meta["position"] = meta.get("position", position)
@@ -102,7 +99,7 @@ class Layer:
 
         # Prepare the tile meta
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
-        
+
         # Set the position attribute
         self._position = meta["position"]
 
@@ -168,7 +165,7 @@ class Layer:
     def position(self, value):
         self._position = value
         self.refresh()  # Maybe needed (to check)
-        
+
     @property
     def extent(self) -> Optional[Domain]:
         """Extent of the layer in global coordinates, as function of the data and position."""
@@ -177,12 +174,14 @@ class Layer:
 
         if self.position is None:
             return
-        
+
         _coords_min, _coords_max = self.bounds
         _size = tuple([_max - _min for _max, _min in zip(_coords_max, _coords_min)])
-        
-        _position = tuple([_cmin + _pos for _cmin, _pos in zip(_coords_min, self.position)])
-        
+
+        _position = tuple(
+            [_cmin + _pos for _cmin, _pos in zip(_coords_min, self.position)]
+        )
+
         return Domain(size=_size, position=_position)
 
     @property
@@ -239,10 +238,10 @@ class Layer:
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
-            position=domain.coords_min,  # Set the position to the domain's coords_min        
+            position=domain.coords_min,  # Set the position to the domain's coords_min
         )
         return layer_selection
-    
+
     def __getitem__(self, key):
         """Selection based on a domain in *local* coordinates."""
         if not isinstance(key, tuple):
@@ -292,7 +291,7 @@ class LayerTileGenerator:
                 tile_size=ctx.tile_size,
                 tile_overlap=ctx.tile_overlap,
                 tile_delay=ctx.tile_delay,
-                tile_order_random=ctx.tile_order_random,
+                tile_randomize=ctx.tile_randomize,
             ):
                 tile = layer.select(domain=tile_domain)
                 tile.tile_meta = tile_meta

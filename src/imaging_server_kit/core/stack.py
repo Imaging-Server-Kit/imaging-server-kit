@@ -50,7 +50,7 @@ class Stack:
                 self.add(layer)
 
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
-        
+
         self._position = position
 
     def __str__(self):
@@ -137,7 +137,7 @@ class Stack:
     @tile_meta.setter
     def tile_meta(self, value: TileMeta):
         self._tile_meta = value
-        
+
         # Setting the tile_meta of the stack sets the tile metas of all layers
         for l in self.layers:
             l.tile_meta = value
@@ -163,7 +163,7 @@ class Stack:
     @property
     def coords_max(self) -> Optional[Tuple]:
         return self.extent.coords_max
-    
+
     @property
     def position(self) -> Optional[Tuple]:
         if self._position is not None:
@@ -172,7 +172,7 @@ class Stack:
     @position.setter
     def position(self, value):
         self._position = value
-        
+
         # Setting the position of the stack sets the positions of all layers
         for l in self.layers:
             l.position = value
@@ -188,10 +188,10 @@ class Stack:
         if new_name != layer.name:
             layer.name = new_name
         self._layers.append(layer)
-        
+
         # Trigger the `post_add` event:
         self.post_add(layer)
-        
+
         return layer
 
     def post_add(self, layer: Layer):
@@ -298,10 +298,10 @@ class StackTileGenerator:
                 tile_size=ctx.tile_size,
                 tile_overlap=ctx.tile_overlap,
                 tile_delay=ctx.tile_delay,
-                tile_order_random=ctx.tile_order_random,
+                tile_randomize=ctx.tile_randomize,
             ):
                 stack_tile = stack.select(domain=tile_domain)
                 stack_tile.tile_meta = tile_meta
                 stack_tile.position = tile_domain.coords_min
-                
+
                 yield stack_tile

@@ -12,7 +12,6 @@ from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
 
-
 NAPARI_INSTALLED = napari_available()
 
 
@@ -39,7 +38,7 @@ def validate_algorithm(func: Callable) -> Callable:
 
 class AlgorithmRunner(ABC):
     """The algorithm runner base class, parent to sk.Algorithm, sk.MultiAlgorithm and sk.Client."""
-    
+
     @property  # type: ignore
     @abstractmethod
     def algorithms() -> List[str]: ...
@@ -87,7 +86,7 @@ class AlgorithmRunner(ABC):
         for params_tile in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
 
             for result_tile in self._stream(algorithm, params_tile):
-                
+
                 if tile_progress_needed:
                     # Create a progress layer at the current step
                     progress_layer = layer_factory(
@@ -97,11 +96,11 @@ class AlgorithmRunner(ABC):
                         max_val=params_tile.tile_meta.n_tiles,
                     )
                     result_tile.add(progress_layer)
-                
+
                 # Result tiles inherit the tile_meta and position of the input
                 result_tile.tile_meta = params_tile.tile_meta
                 result_tile.position = params_tile.position
-                
+
                 yield result_tile
 
     def run(
@@ -112,7 +111,7 @@ class AlgorithmRunner(ABC):
         tile_size: int = 64,
         tile_overlap: float = 0.0,
         tile_delay: float = 0.0,
-        tile_order_random: bool = False,
+        tile_randomize: bool = False,
         stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
         domain: Optional[Domain] = None,
         **algo_params,
@@ -127,7 +126,7 @@ class AlgorithmRunner(ABC):
         tile_size: Tile size in pixels.
         tile_overlap: Relative overlap between tiles.
         tile_delay: Extra delay time in seconds between tiles.
-        tile_order_random: Process tiles in a random order.
+        tile_randomize: Process tiles in a random order.
         stack: An optional layer stack object to collect results into.
         domain: An optional domain in which to restrict the computation.
         """
@@ -184,7 +183,7 @@ class AlgorithmRunner(ABC):
             tiling_ctx = TilingSpecs(
                 tile_size=tile_size,
                 tile_overlap=tile_overlap,
-                tile_order_random=tile_order_random,
+                tile_randomize=tile_randomize,
                 tile_delay=tile_delay,
             )
         else:
@@ -193,11 +192,9 @@ class AlgorithmRunner(ABC):
         # If a domain is passed, restrict the computation to that domain
         if domain:
             params_stack = params_stack.select(domain)
-        
+
         # Run the algorithm and assemble the stack
-        for result_tile in self.run_generator(
-            algorithm, params_stack, tiling_ctx
-        ):
+        for result_tile in self.run_generator(algorithm, params_stack, tiling_ctx):
             # We assume that reinitializing the parameters domain on first tile
             # will be the correct behaviour most of the time.
             if params_stack.extent is None:
