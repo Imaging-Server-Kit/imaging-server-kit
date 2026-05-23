@@ -1,5 +1,6 @@
 import imaging_server_kit as sk
 from skimage.filters import gaussian
+from skimage.color import gray2rgb, rgb2gray
 import skimage.data
 import numpy as np
 
@@ -50,11 +51,36 @@ def sk_tiled_rgb(image):
 
 
 def test_sk_tiled_rgb():
-    sample = sk_tiled_rgb.get_sample().to_params_dict()
-    image = sample.get("image")
-    stack = sk_tiled_rgb.run(**sample, tiled=True)
+    sample = sk_tiled_rgb.get_sample()
+    image = sample.read("image").data
+    sample_params = {l.name: l.data for l in sample.layers}
+    stack = sk_tiled_rgb.run(**sample_params, tiled=True)
     mask = stack[0].data
     assert mask.shape == tuple([image.shape[0], image.shape[1]])
+
+
+# Convert gray to RGB
+@sk.algorithm(parameters={"image": sk.Image(rgb=False)})
+def to_rgb(image: sk.Image):
+    return sk.Image(gray2rgb(image), rgb=True)
+
+def test_convert_to_rgb():
+    image = skimage.data.coins()
+    rgb_out = to_rgb.run(image=image, tiled=True, tile_overlap=0.1)
+    assert len(rgb_out[0].shape) == 3
+    assert rgb_out[0].shape == (image.shape[0], image.shape[1], 3)
+
+
+# Convert RGB to gray
+@sk.algorithm(parameters={"image": sk.Image(rgb=True)})
+def to_gray(image: sk.Image):
+    return sk.Image(rgb2gray(image))
+
+def test_convert_to_gray():
+    image = skimage.data.astronaut()
+    gray_out = to_gray.run(image=image, tiled=True, tile_overlap=0.1)
+    assert len(gray_out[0].shape) == 2
+    assert gray_out[0].shape == (image.shape[0], image.shape[1])
 
 
 ### Tiled points
@@ -249,7 +275,7 @@ def test_select_indexing_stack():
 def test_merge_images():
     img1 = sk.Image(np.ones((20, 20)))
     _sum1 = img1.data.sum()
-    img2 = sk.Image(np.ones((20, 20)), translate=(30, 30))
+    img2 = sk.Image(np.ones((20, 20)), position=(30, 30))
     _sum2 = img2.data.sum()
 
     merger = sk.LayerMerger()
@@ -299,15 +325,13 @@ def test_merge_stack():
     vct1 = sk.Vectors(vectors1)
     box1 = sk.Boxes(boxes1)
 
-    tx = rx
-    ty = ry
-    translate = (tx, ty)
+    position = (rx, ry)
 
-    img2 = sk.Image(image2, translate=translate)
-    msk2 = sk.Mask(mask2, translate=translate)
-    pts2 = sk.Points(points2, translate=translate)
-    vct2 = sk.Vectors(vectors2, translate=translate)
-    box2 = sk.Boxes(boxes2, translate=translate)
+    img2 = sk.Image(image2, position=position)
+    msk2 = sk.Mask(mask2, position=position)
+    pts2 = sk.Points(points2, position=position)
+    vct2 = sk.Vectors(vectors2, position=position)
+    box2 = sk.Boxes(boxes2, position=position)
 
     stack1 = sk.Stack([img1, msk1, pts1, vct1, box1])
     stack2 = sk.Stack([img2, msk2, pts2, vct2, box2])
