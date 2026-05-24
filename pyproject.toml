@@ -31,7 +31,6 @@ dependencies = [
     "scikit-image[optional]",  # To imread samples and run demo examples
     "jinja2",  # To template the info endpoint
     "PyYAML",  # To load the metadata yaml file
-    "cookiecutter",  # To start from a template
     "opencv-contrib-python-headless",  # We need this instead of opencv-python to be able to run servers in docker.
     "imantics",  # To convert masks to features for QuPath. Comes with opencv-python.
     "geojson",  # To convert masks and points to features for QuPath 

@@ -1,13 +1,4 @@
-from pathlib import Path
 import argparse
-
-
-def cmd_new(args):
-    from cookiecutter.main import cookiecutter
-
-    output_dir = str(Path(args.output_dir).resolve())
-    template_dir = str(Path(__file__).parent.resolve() / "template")
-    cookiecutter(template=template_dir, output_dir=output_dir)
 
 
 def cmd_demo_napari(args):
@@ -37,13 +28,6 @@ def cmd_demo_serve(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Imaging Server Kit CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # serverkit new <output_dir>
-    p_new = subparsers.add_parser(
-        "new", help="Generate a new project structure for an algorithm project."
-    )
-    p_new.add_argument("output_dir", help="Output directory.")
-    p_new.set_defaults(func=cmd_new)
 
     # serverkit demo <subcommand>
     p_demo = subparsers.add_parser("demo", help="Run demo algorithms.")
