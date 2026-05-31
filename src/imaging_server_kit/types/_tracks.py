@@ -31,7 +31,7 @@ class Tracks(Layer):
             **kwargs,
         )
 
-    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             return np.zeros((1, self.ndim + 2), dtype=np.float32)
@@ -44,7 +44,7 @@ class Tracks(Layer):
             return len(self.data)
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates, given the data."""
         if self.data is None:
             if self.n_objects > 0:

@@ -13,11 +13,11 @@ def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
     """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
     if (layer.size is None) or (layer.ndim is None):
         return
-    
+
     # If unspecified, overlap defaults to zero
     _overlap_px = layer.tile_meta.overlap_px
     if _overlap_px is None:
-        if layer.bounds is not None:
+        if layer._bounds is not None:
             _overlap_px = tuple([0] * layer.ndim)
 
     per_axis = []
@@ -75,8 +75,8 @@ class ImageTileOverlapMerger(DefaultMerger):
 
         channel_axis = incoming_layer.channel_axis
         if channel_axis is not None:
-            n_channels = incoming_layer.shape[channel_axis]   
-    
+            n_channels = incoming_layer.shape[channel_axis]
+
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
             receiving_layer.data = incoming_layer.data
@@ -86,24 +86,26 @@ class ImageTileOverlapMerger(DefaultMerger):
         merged_extent = merge_domains(
             domains=[receiving_layer.extent, incoming_layer.extent]
         )
-        
+
         if merged_extent.size != receiving_layer.size:
             # Case where the extent has changed
 
             new_position = merged_extent.coords_min
-            
+
             # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
             if channel_axis is not None:
                 size_with_channel = (
-                    merged_extent.size[:channel_axis] + (n_channels,) + merged_extent.size[channel_axis:]
+                    merged_extent.size[:channel_axis]
+                    + (n_channels,)
+                    + merged_extent.size[channel_axis:]
                 )
             else:
                 size_with_channel = merged_extent.size
-            
+
             # Initialize new data array
             size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
             new_data = np.zeros(size_with_channel, dtype=np.float32)
-            
+
             # Get the slice indices where to inpaint RECEIVING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -113,15 +115,17 @@ class ImageTileOverlapMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(receiving_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-            
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
             # Inpaint RECEIVING LAYER
             new_data[slices_with_channel] = receiving_layer.data
-            
+
             # Update position
             receiving_layer.position = new_position
-            
+
             # Get the slice indices where to inpaint INCOMING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -131,9 +135,11 @@ class ImageTileOverlapMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(incoming_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-        
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
         else:
             # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
 
@@ -149,7 +155,9 @@ class ImageTileOverlapMerger(DefaultMerger):
                 for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
             ]
 
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
 
         _overlap_count_map = overlap_count_map(incoming_layer)
 
@@ -163,4 +171,3 @@ class ImageTileOverlapMerger(DefaultMerger):
 
         # Meta becomes incoming layer's meta
         receiving_layer.meta = incoming_layer.meta
-

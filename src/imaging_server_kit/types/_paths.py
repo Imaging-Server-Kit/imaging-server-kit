@@ -45,7 +45,7 @@ class Paths(Layer):
             return len(self.data)
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates, given the data."""
         if self.data is None:
             return
@@ -58,7 +58,7 @@ class Paths(Layer):
 
             return (bounds_min, bounds_max)
 
-    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             return np.asarray([])

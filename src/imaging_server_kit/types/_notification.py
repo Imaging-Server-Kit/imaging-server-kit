@@ -39,5 +39,5 @@ class Notification(Layer):
         level = self.meta.get("level", "info")
         return f"{self.name} ({level}): {self.data}"
 
-    def refresh(self):
+    def _refresh(self):
         print(self)

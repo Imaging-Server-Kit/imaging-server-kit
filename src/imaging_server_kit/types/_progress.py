@@ -6,7 +6,6 @@ from imaging_server_kit.types.layer import Layer
 
 from tqdm import tqdm
 
-
 # We use a global progress bar instead of one attached to the instance
 # so that it doesnt re-print itself line-by-line in the terminal.
 # However, this means we can only control a single progress bar.
@@ -49,7 +48,7 @@ class Progress(Layer):
         max_val = self.meta.get("max_val", 1)
         return f"Progress (current: {self.data}/{max_val})"
 
-    def refresh(self):
+    def _refresh(self):
         max_val = self.meta.get("max_val", 1)
         # Only print the progress bar if there is more than 1 step.
         if (max_val > 1) & (self.data is not None):

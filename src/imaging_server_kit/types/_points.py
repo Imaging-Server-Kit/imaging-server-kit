@@ -40,7 +40,7 @@ class Points(Layer):
         """Data in global coordinates."""
         if self.data is not None:
             return self.data + self.position
-        
+
     def data_from_coords(self, coords: Tuple) -> Optional[np.ndarray]:
         """Data viewed from the given origin coordinates."""
         if self.data is not None:
@@ -54,14 +54,14 @@ class Points(Layer):
             return len(self.data)
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
         if self.data is None:
             return
 
         if self.n_objects == 0:
             return
-        
+
         bounds_min = tuple(np.min(self.data, axis=0).tolist())
         bounds_max = tuple(np.max(self.data, axis=0).tolist())
 
@@ -73,7 +73,7 @@ class Points(Layer):
             _data = self.data
             _meta = self.meta
         if self.n_objects == 0:
-            _data = self.zeros_in(domain=domain)
+            _data = self._zeros_in(domain=domain)
             _meta = self.meta
         else:
             # Select points via global coordinates
@@ -103,12 +103,12 @@ class Points(Layer):
             position=domain.coords_min,
         )
 
-    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             return np.zeros((0, domain.ndim), dtype=np.float32)
 
-    def reinitialize(self, domain: Domain) -> None:
+    def _reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
         if self.data is None:
             return

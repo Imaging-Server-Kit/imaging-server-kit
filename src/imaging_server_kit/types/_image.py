@@ -59,7 +59,7 @@ class Image(Layer):
             return self.meta["channel_axis"]
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
         if self._data is None:
             return
@@ -123,13 +123,13 @@ class Image(Layer):
             position=domain.coords_min,
         )
 
-    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             if domain.size is not None:
                 return np.zeros(domain.size, dtype=np.float32)
 
-    def reinitialize(self, domain: Domain) -> None:
+    def _reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
         # Get the slice indices
         cmin_rounded = [

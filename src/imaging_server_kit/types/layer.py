@@ -33,15 +33,10 @@ class Layer:
     coords_min : Minimum coordinates of the data (in world coordinates); given by the layer's extent.
     coords_max : Maximum coordinates of the data (in world coordinates); given by the layer's extent.
     shape : Data shape if it is an array-type.
-    bounds : Size of the smallest spatial domain containing the data; should be implemented by subclasses.
-    merger_instance : Merger instance associated with the layer.
 
     Methods
     ----------
     select() : Select data in the layer at the specified domain.
-    refresh() : Refresh the layer's state.
-    reiniitalize() : Reinitialize the specified domain in the layer; meant to be implemented by subclasses.
-    zeros_in() : Provide zero-valued data in the specified domain; meant to be implemented by subclasses.
     """
 
     kind: str = ""
@@ -104,7 +99,7 @@ class Layer:
         self._position = meta["position"]
 
         # Merger
-        self.merger_instance = None
+        self._merger_instance = None
 
         # Run validation (`post-init`)
         if self.data is not None:
@@ -123,8 +118,7 @@ class Layer:
     @data.setter
     def data(self, value: Any):
         self._data = value
-        # self._sync()
-        self.refresh()
+        self._refresh()
 
     @property
     def name(self) -> str:
@@ -141,7 +135,7 @@ class Layer:
     @meta.setter
     def meta(self, value: Optional[Dict]):
         self._meta = value
-        self.refresh()
+        self._refresh()
 
     @property
     def tile_meta(self) -> TileMeta:
@@ -156,26 +150,26 @@ class Layer:
         if self._position is not None:
             return self._position
         else:
-            if self.bounds is None:
+            if self._bounds is None:
                 return
             else:
-                return tuple([0] * len(self.bounds[0]))
+                return tuple([0] * len(self._bounds[0]))
 
     @position.setter
     def position(self, value):
         self._position = value
-        self.refresh()  # Maybe needed (to check)
+        self._refresh()
 
     @property
     def extent(self) -> Optional[Domain]:
         """Extent of the layer in global coordinates, as function of the data and position."""
-        if self.bounds is None:
+        if self._bounds is None:
             return
 
         if self.position is None:
             return
 
-        _coords_min, _coords_max = self.bounds
+        _coords_min, _coords_max = self._bounds
         _size = tuple([_max - _min for _max, _min in zip(_coords_max, _coords_min)])
 
         _position = tuple(
@@ -210,15 +204,15 @@ class Layer:
             return self.data.shape
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         return None
 
     @property
-    def merger_instance(self):
+    def _merger_instance(self):
         return self._merger
 
-    @merger_instance.setter
-    def merger_instance(self, value):
+    @_merger_instance.setter
+    def _merger_instance(self, value):
         self._merger = value
 
     def __str__(self) -> str:
@@ -227,7 +221,8 @@ class Layer:
     def __repr__(self):
         return self.__str__()
 
-    def refresh(self):
+    def _refresh(self):
+        """Refresh the layer's state."""
         pass
 
     def select(self, domain: Domain) -> Layer:
@@ -271,10 +266,12 @@ class Layer:
 
         return self.select(domain=domain)
 
-    def reinitialize(self, domain: Domain) -> None:
+    def _reinitialize(self, domain: Domain) -> None:
+        """Reinitialize the specified domain in the layer; meant to be implemented by subclasses."""
         pass
 
-    def zeros_in(self, domain: Optional[Domain]) -> Any:
+    def _zeros_in(self, domain: Optional[Domain]) -> Any:
+        """Provide zero-valued data in the specified domain; meant to be implemented by subclasses."""
         pass
 
 

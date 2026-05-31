@@ -18,10 +18,10 @@ class MaskOverrideMerger(DefaultMerger):
     def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
-        
+
         channel_axis = incoming_layer.channel_axis
         if channel_axis is not None:
-            n_channels = incoming_layer.shape[channel_axis] 
+            n_channels = incoming_layer.shape[channel_axis]
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
@@ -37,19 +37,21 @@ class MaskOverrideMerger(DefaultMerger):
             # Case where the extent has changed
 
             new_position = merged_extent.coords_min
-            
+
             # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
             if channel_axis is not None:
                 size_with_channel = (
-                    merged_extent.size[:channel_axis] + (n_channels,) + merged_extent.size[channel_axis:]
+                    merged_extent.size[:channel_axis]
+                    + (n_channels,)
+                    + merged_extent.size[channel_axis:]
                 )
             else:
                 size_with_channel = merged_extent.size
-            
+
             # Initialize new data array
             size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
             new_data = np.zeros(size_with_channel, dtype=np.uint16)
-            
+
             # Get the slice indices where to inpaint RECEIVING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -59,15 +61,17 @@ class MaskOverrideMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(receiving_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-            
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
             # Inpaint RECEIVING LAYER
             new_data[slices_with_channel] = receiving_layer.data
-            
+
             # Update position
             receiving_layer.position = new_position
-            
+
             # Get the slice indices where to inpaint INCOMING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -77,12 +81,14 @@ class MaskOverrideMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(incoming_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-        
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
         else:
             # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
-            
+
             new_data = receiving_layer.data
 
             # Get the slice indices where to inpaint incoming_layer
@@ -95,8 +101,10 @@ class MaskOverrideMerger(DefaultMerger):
                 for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
             ]
 
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-        
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
         # Simply override the data
         new_data[slices_with_channel] = incoming_layer.data
 
@@ -149,29 +157,26 @@ def unique_positive(labels: np.ndarray) -> np.ndarray:
 
 def overlap_border_mask(layer: Mask) -> Optional[np.ndarray]:
     """Returns a boolean array selecting the rectangular region overalpping with other tiles."""
-    
+
     # If unspecified, overlap defaults to zero
     _overlap_px = layer.tile_meta.overlap_px
     if _overlap_px is None:
-        if layer.bounds is not None:
-            _overlap_px = tuple([0] * len(layer.bounds))
-    
+        if layer._bounds is not None:
+            _overlap_px = tuple([0] * len(layer._bounds))
+
     if (_overlap_px is None) or (layer.size is None):
         return
 
     size_int = tuple([math.ceil(v) for v in layer.size])
 
     overlap_slices = tuple(
-        [
-            slice(pos, max_pos - pos)
-            for pos, max_pos in zip(_overlap_px, size_int)
-        ]
+        [slice(pos, max_pos - pos) for pos, max_pos in zip(_overlap_px, size_int)]
     )
-    
+
     mask = np.ones(size_int, dtype=np.uint8)
-    
+
     mask[overlap_slices] = 0
-    
+
     return mask == 1
 
 
@@ -186,14 +191,14 @@ class InstanceMaskTileMerger(DefaultMerger):
 
         channel_axis = incoming_layer.channel_axis
         if channel_axis is not None:
-            n_channels = incoming_layer.data.shape[channel_axis] 
+            n_channels = incoming_layer.data.shape[channel_axis]
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
             receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
             return
-        
+
         merged_extent = merge_domains(
             domains=[receiving_layer.extent, incoming_layer.extent]
         )
@@ -202,19 +207,21 @@ class InstanceMaskTileMerger(DefaultMerger):
             # Case where the extent has changed
 
             new_position = merged_extent.coords_min
-            
+
             # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
             if channel_axis is not None:
                 size_with_channel = (
-                    merged_extent.size[:channel_axis] + (n_channels,) + merged_extent.size[channel_axis:]
+                    merged_extent.size[:channel_axis]
+                    + (n_channels,)
+                    + merged_extent.size[channel_axis:]
                 )
             else:
                 size_with_channel = merged_extent.size
-            
+
             # Initialize new data array
             size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
             new_data = np.zeros(size_with_channel, dtype=np.uint16)
-            
+
             # Get the slice indices where to inpaint RECEIVING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -224,15 +231,17 @@ class InstanceMaskTileMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(receiving_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-            
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
             # Inpaint RECEIVING LAYER
             new_data[slices_with_channel] = receiving_layer.data
-            
+
             # Update position
             receiving_layer.position = new_position
-            
+
             # Get the slice indices where to inpaint INCOMING LAYER
             cmin_rounded = [
                 math.floor(v - p)
@@ -242,12 +251,14 @@ class InstanceMaskTileMerger(DefaultMerger):
                 math.ceil(v - p)
                 for v, p in zip(incoming_layer.coords_max, new_position)
             ]
-            
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-        
+
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
+
         else:
             # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
-            
+
             new_data = receiving_layer.data
 
             # Get the slice indices where to inpaint incoming_layer
@@ -260,11 +271,11 @@ class InstanceMaskTileMerger(DefaultMerger):
                 for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
             ]
 
-            slices_with_channel = _get_slices_with_channel(cmin_rounded, cmax_rounded, channel_axis)
-
+            slices_with_channel = _get_slices_with_channel(
+                cmin_rounded, cmax_rounded, channel_axis
+            )
 
         receiving_layer.data = new_data  # Extend the source layer data
-
 
         src_tile = receiving_layer.select(domain=incoming_layer.extent)
         if src_tile.data is None:
@@ -287,7 +298,7 @@ class InstanceMaskTileMerger(DefaultMerger):
                         self.tile_tracker.add_edge(src_lab, dst_lab)
 
         new_data[slices_with_channel] = dst_arr
-        
+
         # Update the data of receiving layer
         receiving_layer.data = new_data
 

@@ -203,7 +203,7 @@ class Mask(Layer):
             return self.meta["channel_axis"]
 
     @property
-    def bounds(self) -> Optional[Tuple]:
+    def _bounds(self) -> Optional[Tuple]:
         """Data bounds in local coordinates."""
         if self._data is None:
             return
@@ -230,9 +230,13 @@ class Mask(Layer):
             _data = None
         else:
             # Get the slice indices
-            cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
-            cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
-            
+            cmin_rounded = [
+                math.floor(v - p) for v, p in zip(domain.coords_min, self.position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)
+            ]
+
             slices = tuple(
                 [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
             )
@@ -262,22 +266,26 @@ class Mask(Layer):
             position=domain.coords_min,
         )
 
-    def zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
+    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             if domain.size is not None:
                 return np.zeros(domain.size, dtype=np.uint16)
 
-    def reinitialize(self, domain: Domain) -> None:
+    def _reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
         # Get the slice indices
-        cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
-        cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
-        
+        cmin_rounded = [
+            math.floor(v - p) for v, p in zip(domain.coords_min, self.position)
+        ]
+        cmax_rounded = [
+            math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)
+        ]
+
         slices = tuple(
             [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
         )
-        
+
         # Account for the channel_axis
         if self.channel_axis is not None:
             slices_with_channel = (

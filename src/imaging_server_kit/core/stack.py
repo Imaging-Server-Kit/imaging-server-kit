@@ -51,7 +51,7 @@ class Stack:
 
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
 
-        self._position = position#self._resolve_stack_position(position)
+        self._position = position  # self._resolve_stack_position(position)
 
     def __str__(self):
         message = f"Stack (Layers: {len(self.layers)})"
@@ -168,13 +168,12 @@ class Stack:
     def position(self) -> Optional[Tuple]:
         if self._position is not None:
             return self._position
-        
+
         # If any of the layers has a position set, we set the stack's position to zero
         for l in self.layers:
             if l.position is not None:
                 ndim = len(l.position)
                 return tuple([0] * ndim)
-        
 
     @position.setter
     def position(self, value: Optional[Tuple]):
@@ -200,12 +199,12 @@ class Stack:
             layer.name = new_name
         self._layers.append(layer)
 
-        # Trigger the `post_add` event:
-        self.post_add(layer)
+        self._post_add(layer)
 
         return layer
 
-    def post_add(self, layer: Layer):
+    def _post_add(self, layer: Layer):
+        """Event triggered after a layer is added to the stack."""
         pass
 
     def merge(
@@ -230,7 +229,7 @@ class Stack:
         """
         if stack is None:
             return
-        
+
         to_merge = []
         receiving_layers = []
         for incoming_layer in stack:
@@ -244,7 +243,7 @@ class Stack:
                 if (incoming_layer.tile_meta.is_first_tile) & isinstance(
                     reinitialize_domain, Domain
                 ):
-                    receiving_layer.reinitialize(reinitialize_domain)
+                    receiving_layer._reinitialize(reinitialize_domain)
 
             receiving_layers.append(receiving_layer)
 
@@ -254,9 +253,10 @@ class Stack:
         ):
             layer_merger.merge(receiving_layer, incoming_layer, merge_data=merge_data)
 
-        self.post_merge(receiving_layers)
+        self._post_merge(receiving_layers)
 
-    def post_merge(self, receiving_layers: List[Layer]):
+    def _post_merge(self, receiving_layers: List[Layer]):
+        """Event triggered after a layer is merged into the stack."""
         pass
 
     def delete(self, name: str) -> None:
@@ -265,9 +265,10 @@ class Stack:
             if layer.name == name:
                 self._layers.pop(idx)
 
-        self.post_delete(name)
+        self._post_delete(name)
 
-    def post_delete(self, name: str) -> None:
+    def _post_delete(self, name: str) -> None:
+        """Event triggered after a layer is removed from the stack."""
         pass
 
     def read(self, name: str) -> Optional[Layer]:
@@ -278,7 +279,7 @@ class Stack:
 
     def select(self, domain: Domain) -> Stack:
         """Selet a sub-stack in the given domain."""
-        return Stack(layers=[l.select(domain=domain.copy()) for l in self.layers])
+        return Stack(layers=[l.select(domain=domain._copy()) for l in self.layers])
 
     def _resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:
         # Make sure layer has a name
@@ -293,7 +294,7 @@ class Stack:
             name = f"{original_name}-{name_idx:02d}"
             name_idx += 1
 
-        return name      
+        return name
 
 
 class StackTileGenerator:

@@ -9,7 +9,6 @@ from imaging_server_kit.merge._mask_merger import (
 )
 from imaging_server_kit.merge._object_merger import ObjectMerger
 
-
 LAYER_MERGERS: Dict[str, Dict[str, Type[Merger]]] = {
     "image": {"default": ImageTileOverlapMerger},
     "mask": {
@@ -39,10 +38,10 @@ class LayerMerger:
     ) -> None:
         if incoming_layer.tile_meta.is_first_tile:
             merger = find_layer_merger(receiving_layer)
-            receiving_layer.merger_instance = merger
+            receiving_layer._merger_instance = merger
             merger.on_first_merge(receiving_layer, incoming_layer)
         else:
-            merger = receiving_layer.merger_instance
+            merger = receiving_layer._merger_instance
 
         if merge_data:
             merger.merge(receiving_layer, incoming_layer)
