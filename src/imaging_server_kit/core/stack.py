@@ -19,23 +19,24 @@ class Stack:
 
     Attributes
     ----------
-    layers: List of layers in the stack.
-    tile_meta: Tile metadata for the stack.
-    coords_min: Minimum coordinates of the stack, inferred from the layers.
-    coords_max: Maximum coordinates of the stack, inferred from the layers.
-    domain: Domain of the stack, inferred from coords_min and coords_max.
-    size: Size of the stack's domain.
+    layers: Layers in the stack.
     ndim: Dimensionality of the stack, inferred from the domain.
     position: Position of the stack in global pixel space.
+    extent: Extent of the stack expressed as a Domain object.
+    size: Size of the extent of the stack.
+    coords_min: Minimum (World) coordinates of the stack.
+    coords_max: Maximum (World) coordinates of the stack.
+    tile_meta: Metadata about the stack's position and role in a tile set.
 
     Methods
     ----------
+    select(): Select a subset of the stack at a given spatial domain.
     add(): Add a layer to the stack.
     read(): Read a layer by name.
     delete(): Delete a layer by name.
-    merge(): Merge another layer stack.
-        Layers of the same kind, with the same name will be updated (meta and data). Other layers will be added to the stack.
-    select(): Select stack data in a given domain.
+    merge(): Merge another stack. 
+        Incoming layers with the same kind and name as existing layers will update the later.
+        Other layers will be added to the stack.
     """
 
     def __init__(

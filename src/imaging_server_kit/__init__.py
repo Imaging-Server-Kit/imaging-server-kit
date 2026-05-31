@@ -20,6 +20,7 @@ from .core import (
 from .remote import Client, serve
 
 from .types import (
+    Layer,
     Image,
     Mask,
     Paths,

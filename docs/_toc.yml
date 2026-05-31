@@ -10,5 +10,5 @@ chapters:
   - file: sections/06_tiled
   - file: sections/07_server
   - file: sections/08_python
-  - file: sections/19_layers
+  - file: sections/09_layers
   - file: sections/10_examples

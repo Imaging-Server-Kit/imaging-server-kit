@@ -13,30 +13,29 @@ from imaging_server_kit.core.tiling import (
 
 
 class Layer:
-    """
-    A layer corresponding to a particular kind of data.
+    """A layer corresponding to a particular kind of data.
 
     Attributes
     ----------
     data : Data in the layer.
-    name : The name of the layer.
+    name : Name of the layer.
     meta : Metadata about the layer.
-    merger: Merger strategy for the layer.
-    description: Description of the layer.
-    tile_meta : Tile metadata of the layer.
-    position: Position of the layer.
-    type : The type of data stored in the layer.
-    kind : A short string identifying the layer type.
-    extent : Extent (as a `domain`) of the layer.
     ndim : Dimensionality of the layer data.
+    kind : A short string identifying the layer type.
+    type : Type of data stored in the layer.
+    shape : Data shape if it is array-like.
+    description: Description of the layer.
+    position: Position of the layer in World coordinates.
+    extent : Extent of the layer expressed as a Domain object.
     size : Size of the extent of the layer.
-    coords_min : Minimum coordinates of the data (in world coordinates); given by the layer's extent.
-    coords_max : Maximum coordinates of the data (in world coordinates); given by the layer's extent.
-    shape : Data shape if it is an array-type.
+    coords_min : Minimum (World) coordinates of the data.
+    coords_max : Maximum (World) coordinates of the data.
+    merger: Identifies a merging strategy for the layer (only used with segmentation masks).
+    tile_meta : Metadata about the layer's position and role in a tile set.
 
     Methods
     ----------
-    select() : Select data in the layer at the specified domain.
+    select() : Select a subset of data in the layer at a given spatial domain.
     """
 
     kind: str = ""
