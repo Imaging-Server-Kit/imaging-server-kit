@@ -51,7 +51,7 @@ class Stack:
 
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
 
-        self._position = position
+        self._position = position#self._resolve_stack_position(position)
 
     def __str__(self):
         message = f"Stack (Layers: {len(self.layers)})"
@@ -168,14 +168,25 @@ class Stack:
     def position(self) -> Optional[Tuple]:
         if self._position is not None:
             return self._position
+        
+        # If any of the layers has a position set, we set the stack's position to zero
+        for l in self.layers:
+            if l.position is not None:
+                ndim = len(l.position)
+                return tuple([0] * ndim)
+        
 
     @position.setter
-    def position(self, value):
+    def position(self, value: Optional[Tuple]):
         self._position = value
 
-        # Setting the position of the stack sets the positions of all layers
-        for l in self.layers:
-            l.position = value
+        # Setting the position of the stack can set or offset the positions of the layers
+        if value is not None:
+            for l in self.layers:
+                if l.position is None:
+                    l.position = value
+                else:
+                    l.position = tuple([p + q for p, q in zip(l.position, value)])
 
     def add(self, layer: Layer) -> Layer:
         """Add a new layer to the layer stack.
@@ -219,7 +230,7 @@ class Stack:
         """
         if stack is None:
             return
-
+        
         to_merge = []
         receiving_layers = []
         for incoming_layer in stack:
@@ -229,7 +240,7 @@ class Stack:
                 # We add the incoming layer and do not merge data (itself) into it:
                 receiving_layer = self.add(incoming_layer)
             else:
-                # First tiles always reinitialize the domain:
+                # First tiles reinitialize the domain:
                 if (incoming_layer.tile_meta.is_first_tile) & isinstance(
                     reinitialize_domain, Domain
                 ):
@@ -282,7 +293,7 @@ class Stack:
             name = f"{original_name}-{name_idx:02d}"
             name_idx += 1
 
-        return name
+        return name      
 
 
 class StackTileGenerator:

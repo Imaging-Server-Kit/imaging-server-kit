@@ -99,7 +99,12 @@ class AlgorithmRunner(ABC):
 
                 # Result tiles inherit the tile_meta and position of the input
                 result_tile.tile_meta = params_tile.tile_meta
-                result_tile.position = params_tile.position
+                
+                # New position can be offset by the position of the parameters tile
+                if (result_tile.position is not None) and (params_tile.position is not None):
+                    result_tile.position = tuple([p + q for p, q in zip(params_tile.position, result_tile.position)])
+                else:
+                    result_tile.position = params_tile.position
 
                 yield result_tile
 
@@ -202,7 +207,7 @@ class AlgorithmRunner(ABC):
                 reinitialize_domain = stack.extent
             else:
                 reinitialize_domain = params_stack.extent
-
+            
             stack.merge(result_tile, reinitialize_domain)
 
         # Remove the progress bar

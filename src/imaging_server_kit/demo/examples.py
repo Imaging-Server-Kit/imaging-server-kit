@@ -53,6 +53,7 @@ def threshold_algo(image, threshold, dark_background):
         mask = image > thresh_rel
     else:
         mask = image <= thresh_rel
+    
     return sk.Mask(mask, name="Binarized image")
 
 
@@ -89,6 +90,7 @@ def auto_threshold(image, method):
         mask = image > threshold_otsu(image)
     elif method == "Li":
         mask = image > threshold_li(image)
+    
     return sk.Mask(mask, name="Binary mask (auto)")
 
 
@@ -127,6 +129,7 @@ def gaussian_algo(image, sigma, mode):
         return sk.Notification("An image is required!", level="warning")
 
     filtered = gaussian(image, sigma=sigma, mode=mode)
+    
     return sk.Image(
         filtered,
         name=f"Filtered image (Gaussian)",

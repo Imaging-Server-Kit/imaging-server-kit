@@ -87,9 +87,13 @@ class Image(Layer):
             _data = None
         else:
             # Get the slice indices
-            cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
-            cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
-            
+            cmin_rounded = [
+                math.floor(v - p) for v, p in zip(domain.coords_min, self.position)
+            ]
+            cmax_rounded = [
+                math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)
+            ]
+
             slices = tuple(
                 [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
             )
@@ -128,9 +132,17 @@ class Image(Layer):
     def reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
         # Get the slice indices
-        cmin_rounded = [math.floor(v - p) for v, p in zip(domain.coords_min, self.position)]
-        cmax_rounded = [math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)]
-        
+        cmin_rounded = [
+            math.floor(max(vmin, pmin) - pmin)
+            for vmin, pmin in zip(domain.coords_min, self.coords_min)
+        ]
+        cmax_rounded = [
+            math.ceil(min(vmax, pmax) - max(vmin, pmin))
+            for vmin, vmax, pmin, pmax in zip(
+                domain.coords_min, domain.coords_max, self.coords_min, self.coords_max
+            )
+        ]
+
         slices = tuple(
             [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
         )
@@ -146,6 +158,7 @@ class Image(Layer):
             slices_with_channel = slices
 
         try:
+            self.data = self.data.copy()  # TODO: Somehow, we need this..
             self.data[slices_with_channel] = 0
         except:
             raise RuntimeError(

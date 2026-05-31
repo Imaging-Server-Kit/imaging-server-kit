@@ -86,7 +86,7 @@ class ImageTileOverlapMerger(DefaultMerger):
         merged_extent = merge_domains(
             domains=[receiving_layer.extent, incoming_layer.extent]
         )
-
+        
         if merged_extent.size != receiving_layer.size:
             # Case where the extent has changed
 
@@ -136,8 +136,8 @@ class ImageTileOverlapMerger(DefaultMerger):
         
         else:
             # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
-            
-            new_data = receiving_layer.data
+
+            new_data = receiving_layer.data.astype(np.float32)
 
             # Get the slice indices where to inpaint incoming_layer
             cmin_rounded = [
