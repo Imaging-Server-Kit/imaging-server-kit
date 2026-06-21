@@ -42,6 +42,9 @@ class LayerMerger:
             merger.on_first_merge(receiving_layer, incoming_layer)
         else:
             merger = receiving_layer._merger_instance
+            if merger is None:
+                # Make sure to have at least a DefaultMerger instance:
+                merger = find_layer_merger(receiving_layer)
 
         if merge_data:
             merger.merge(receiving_layer, incoming_layer)
