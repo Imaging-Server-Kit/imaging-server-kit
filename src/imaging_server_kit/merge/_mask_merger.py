@@ -309,5 +309,10 @@ class InstanceMaskTileMerger(DefaultMerger):
         self.tile_tracker = InstanceTileTracker()
 
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):
+        if incoming_layer.tile_meta.is_first_tile:
+            # We need at least one merge call, otherwise we end up erasing the objects.
+            # So, when `merge_data` is false in layer_merger, we still manually trigger it here.
+            self.merge(receiving_layer, incoming_layer)
+            
         receiving_layer.data = self.tile_tracker.resolve(receiving_layer.data)
         self.tile_tracker = InstanceTileTracker()
