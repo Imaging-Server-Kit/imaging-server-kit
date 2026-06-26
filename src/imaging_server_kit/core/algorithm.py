@@ -287,7 +287,7 @@ class Algorithm(AlgorithmRunner):
         project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
         metadata_file: str = "metadata.yaml",
         samples: Optional[List[Dict[str, Any]]] = None,
-        tileable: bool = True,
+        tileable: bool = False,
     ):
         # Initialize mutables
         if tags is None:
@@ -453,7 +453,7 @@ def algorithm(
     project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
     metadata_file: str = "metadata.yaml",
     samples: Optional[List[Dict[str, Any]]] = None,
-    tileable: bool = True,
+    tileable: bool = False,
 ) -> Union[Algorithm, Callable]:
     """Convert a Python function into an algorithm instance (sk.Algorithm).
 
@@ -467,7 +467,7 @@ def algorithm(
     project_url: A link to a related, or the original project (gets displayed on the algo doc page).
     metadata_file: A path to a metadata.yaml file with algorithm metadata.
     samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimag.io.imread`.
-    tileable: Whether to allow running the algorithm tile-by-tile. Can be set to False to explicitely disable that functionality.
+    tileable: Whether to allow running the algorithm tile-by-tile.
 
     Returns
     -------

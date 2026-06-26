@@ -460,7 +460,6 @@ def notif_stream(time_delay, n_times, level):
         ),
     },
     samples=[{"image": skimage.data.coins(), "sigma": 10}],
-    tileable=False,
 )
 def background_subtract(image, sigma, method):
     if image is None:

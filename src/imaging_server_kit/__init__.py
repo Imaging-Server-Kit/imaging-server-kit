@@ -40,6 +40,8 @@ from .types import (
 
 from .merge import merge_layers, LayerMerger
 
+from .demo import multi_algo_tools as tools
+
 from .core.errors import napari_available
 
 NAPARI_INSTALLED = napari_available()
