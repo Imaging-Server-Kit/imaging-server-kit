@@ -19,6 +19,7 @@ import numpy as np
         ),
     },
     samples=[{"image": skimage.data.camera()}],
+    tileable=True,
 )
 def sk_gaussian(image, sigma, mode):
     return gaussian(image, sigma=sigma, preserve_range=True, mode=mode)
@@ -44,6 +45,7 @@ from skimage.segmentation import slic
 @sk.algorithm(
     parameters={"image": sk.Image(rgb=True)},
     samples=[{"image": skimage.data.astronaut()}],
+    tileable=True,
 )
 def sk_tiled_rgb(image):
     mask = slic(image)
@@ -60,7 +62,10 @@ def test_sk_tiled_rgb():
 
 
 # Convert gray to RGB
-@sk.algorithm(parameters={"image": sk.Image(rgb=False)})
+@sk.algorithm(
+    parameters={"image": sk.Image(rgb=False)},
+    tileable=True,
+)
 def to_rgb(image: sk.Image):
     return sk.Image(gray2rgb(image), rgb=True)
 
@@ -73,7 +78,10 @@ def test_convert_to_rgb():
 
 
 # Convert RGB to gray
-@sk.algorithm(parameters={"image": sk.Image(rgb=True)})
+@sk.algorithm(
+    parameters={"image": sk.Image(rgb=True)},
+    tileable=True,
+)
 def to_gray(image: sk.Image):
     return sk.Image(rgb2gray(image))
 
@@ -86,14 +94,14 @@ def test_convert_to_gray():
 
 
 ### Tiled points
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_points(image):
     rx, ry = image.shape
     points = np.array([np.linspace(1, rx - 1, 10), np.linspace(1, ry - 1, 10)]).T
     return sk.Points(points)
 
 
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_points_input(image, points):
     new_points = points.copy()
     new_points = new_points[:, ::-1]
@@ -112,7 +120,7 @@ def test_sk_tiled_points():
 
 
 ### Tiled vectors
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_vectors(image):
     rx, ry = image.shape
     vector_origins = np.array(
@@ -125,7 +133,7 @@ def sk_tiled_vectors(image):
     return sk.Vectors(vectors)
 
 
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_vectors_input(image, vectors):
     new_vectors = vectors.copy()
     new_vectors = new_vectors[:, :, ::-1]
@@ -144,7 +152,7 @@ def test_sk_tiled_vectors():
 
 
 ### Tiled boxes
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_boxes(image):
     rx, ry = image.shape
     box_top_left = np.array(
@@ -167,7 +175,7 @@ def sk_tiled_boxes(image):
     return sk.Boxes(boxes)
 
 
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_tiled_boxes_input(image, boxes):
     new_boxes = boxes.copy()
     new_boxes = new_boxes[:, :, ::-1]
@@ -186,7 +194,7 @@ def test_sk_tiled_boxes():
 
 
 ### Tiled streaming
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def sk_streamed_tiling(image):
     for _ in range(3):
         yield sk.Image(np.random.random(image.shape), name="Random")
@@ -222,7 +230,7 @@ def test_sk_tiled_max_proj():
 from skimage.morphology import label
 
 
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def label_algo(mask):
     labelled = label(mask)
     return sk.Mask(labelled, merger="instances")

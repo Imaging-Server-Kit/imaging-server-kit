@@ -488,6 +488,7 @@ def background_subtract(image, sigma, method):
         ),
     },
     samples=[{"image": skimage.data.brain()}],
+    tileable=True,
 )
 def project(image, method):
     if image is None:
