@@ -315,6 +315,8 @@ class StackTileGenerator:
             ):
                 stack_tile = stack.select(domain=tile_domain)
                 stack_tile.tile_meta = tile_meta
+                
+                # We assign the tile position to the stack as well
                 stack_tile.position = tile_domain.coords_min
 
                 yield stack_tile

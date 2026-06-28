@@ -258,13 +258,16 @@ class Mask(Layer):
                     "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
                 )
 
-        return Mask(
+        mask_selection = Mask(
             data=_data,
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
-            position=domain.coords_min,
         )
+        
+        mask_selection.position = domain.coords_min
+        
+        return mask_selection
 
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""

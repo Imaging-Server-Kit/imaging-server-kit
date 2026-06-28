@@ -157,6 +157,7 @@ class Layer:
     @position.setter
     def position(self, value):
         self._position = value
+        self.meta["position"] = value
         self._refresh()
 
     @property
@@ -232,8 +233,9 @@ class Layer:
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
-            position=domain.coords_min,  # Set the position to the domain's coords_min
         )
+        # Set the position to the domain's coords_min
+        layer_selection.position = domain.coords_min
         return layer_selection
 
     def __getitem__(self, key):
@@ -291,4 +293,5 @@ class LayerTileGenerator:
             ):
                 tile = layer.select(domain=tile_domain)
                 tile.tile_meta = tile_meta
+                
                 yield tile

@@ -103,14 +103,17 @@ class Vectors(Layer):
             _data = selected_vectors
             _meta = selected_meta
 
-        return Vectors(
+        vectors_selection = Vectors(
             data=_data,
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta,
-            position=domain.coords_min,
         )
-
+        
+        vectors_selection.position = domain.coords_min
+        
+        return vectors_selection
+        
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:

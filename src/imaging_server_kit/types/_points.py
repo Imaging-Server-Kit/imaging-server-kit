@@ -95,13 +95,16 @@ class Points(Layer):
             _data = selected_points
             _meta = selected_meta
 
-        return Points(
+        points_selection = Points(
             data=_data,
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta,
-            position=domain.coords_min,
         )
+        
+        points_selection.position = domain.coords_min
+        
+        return points_selection
 
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
