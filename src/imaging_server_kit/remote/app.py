@@ -259,6 +259,6 @@ class AlgorithmApp:
 
     def _stream_msgpack(self, stream_generator: Iterable[Stack], client_origin: str):
         stack_serializer = StackSerializer()
-        for stack in stream_generator:
-            for r in stack_serializer.serialize(stack, client_origin):
+        for result_tile, params_tile in stream_generator:
+            for r in stack_serializer.serialize(result_tile, client_origin):
                 yield msgpack.packb(r)

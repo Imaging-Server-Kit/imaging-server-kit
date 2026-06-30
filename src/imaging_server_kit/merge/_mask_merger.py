@@ -111,8 +111,10 @@ class MaskOverrideMerger(DefaultMerger):
         # Update the data of receiving layer
         receiving_layer.data = new_data
 
-        # Meta becomes incoming layer's meta
-        receiving_layer.meta = incoming_layer.meta
+        # Meta becomes incoming layer's meta (except from position)
+        for k, v in incoming_layer.meta.items():
+            if k != "position":
+                receiving_layer.meta[k] = v
 
 
 class InstanceTileTracker:
@@ -302,8 +304,10 @@ class InstanceMaskTileMerger(DefaultMerger):
         # Update the data of receiving layer
         receiving_layer.data = new_data
 
-        # Meta becomes incoming layer's meta
-        receiving_layer.meta = incoming_layer.meta
+        # Meta becomes incoming layer's meta (except from position)
+        for k, v in incoming_layer.meta.items():
+            if k != "position":
+                receiving_layer.meta[k] = v
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
         self.tile_tracker = InstanceTileTracker()

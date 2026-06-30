@@ -25,10 +25,13 @@ def _merge_meta(incoming_meta_val, receiving_meta_val, n_objects_incoming):
     return incoming_meta_val
 
 
-def merge_meta_tile(incoming_meta: Dict, receiving_meta: Dict, n_objects_incoming: int) -> Dict:
+def merge_meta_tile(
+    incoming_meta: Dict, receiving_meta: Dict, n_objects_incoming: int
+) -> Dict:
     return {
         k: _merge_meta(incoming_meta_val, receiving_meta.get(k), n_objects_incoming)
         for k, incoming_meta_val in incoming_meta.items()
+        if k != "position"  # Except from position
     }
 
 
@@ -53,9 +56,9 @@ class ObjectMerger(DefaultMerger):
         merged_extent = merge_domains(
             domains=[receiving_layer.extent, incoming_layer.extent]
         )
-        
+
         new_position = merged_extent.coords_min
-        
+
         new_receiving_layer_data = receiving_layer.data_from_coords(new_position)
 
         new_incoming_layer_data = incoming_layer.data_from_coords(new_position)

@@ -84,11 +84,9 @@ class AlgorithmRunner(ABC):
 
         stack_tile_gen = StackTileGenerator()
         for params_tile in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
-
             for result_tile in self._stream(algorithm, params_tile):
-
+                # Create a progress layer at the current step
                 if tile_progress_needed:
-                    # Create a progress layer at the current step
                     progress_layer = layer_factory(
                         kind="progress",
                         name="Tile progress",
@@ -97,16 +95,10 @@ class AlgorithmRunner(ABC):
                     )
                     result_tile.add(progress_layer)
 
-                # Result tiles inherit the tile_meta and position of the input
+                # The result tile inherits the tile_meta of the parameters tile
                 result_tile.tile_meta = params_tile.tile_meta
-                
-                # New position can be offset by the position of the parameters tile
-                if (result_tile.position is not None) and (params_tile.position is not None):
-                    result_tile.position = tuple([p + q for p, q in zip(params_tile.position, result_tile.position)])
-                else:
-                    result_tile.position = params_tile.position
 
-                yield result_tile
+                yield result_tile, params_tile
 
     def run(
         self,
@@ -199,16 +191,30 @@ class AlgorithmRunner(ABC):
             params_stack = params_stack.select(domain)
 
         # Run the algorithm and assemble the stack
-        for result_tile in self.run_generator(algorithm, params_stack, tiling_ctx):
+        for result_tile, params_tile in self.run_generator(
+            algorithm, params_stack, tiling_ctx
+        ):
+            # If the parameters tile and result tile both have a position, 
+            # the result tile's position is offset by that of the parameters tile
+            if (result_tile.position is not None) and (
+                params_tile.position is not None
+            ):
+                result_tile.position = tuple(
+                    [p + q for p, q in zip(params_tile.position, result_tile.position)]
+                )
+            else:
+                result_tile.position = params_tile.position
+
             # We assume that reinitializing the parameters domain on first tile
             # will be the correct behaviour most of the time.
             if params_stack.extent is None:
                 # If inputs don't have an extent, we clear up the whole output
-                reinitialize_domain = stack.extent
+                domain_to_erase = stack.extent
             else:
-                reinitialize_domain = params_stack.extent
-            
-            stack.merge(result_tile, reinitialize_domain)
+                domain_to_erase = params_stack.extent
+
+            # Merge the result tile into the stack
+            stack.merge(result_tile, domain_to_erase)
 
         # Remove the progress bar
         stack.delete("Tile progress")

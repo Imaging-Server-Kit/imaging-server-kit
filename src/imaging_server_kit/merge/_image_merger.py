@@ -169,5 +169,7 @@ class ImageTileOverlapMerger(DefaultMerger):
         # Update the data of receiving layer
         receiving_layer.data = new_data
 
-        # Meta becomes incoming layer's meta
-        receiving_layer.meta = incoming_layer.meta
+        # Meta becomes incoming layer's meta (except from position; we don't want to move the receiving layer)
+        for k, v in incoming_layer.meta.items():
+            if k != "position":
+                receiving_layer.meta[k] = v
