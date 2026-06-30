@@ -310,7 +310,7 @@ class Algorithm(AlgorithmRunner):
         self.samples = samples
 
         # Tileability
-        self.tileable = tileable
+        self._tileable = tileable
 
         # Resolve the Pydantic parameters model
         self.parameters_model = _parse_pydantic_params_schema(
@@ -331,6 +331,14 @@ class Algorithm(AlgorithmRunner):
     @algorithms.setter
     def algorithms(self, algorithms: Iterable[str]):
         self._algorithms = algorithms
+    
+    @property
+    def tileable(self) -> bool:
+        return self._tileable
+
+    @tileable.setter
+    def tileable(self, tileable: bool):
+        self._tileable = tileable
 
     def __call__(self, *args, **kwargs) -> Any:
         # Get a Stack object
