@@ -162,8 +162,9 @@ class Image(Layer):
             slices_with_channel = slices
 
         try:
-            self.data = self.data.copy()  # TODO: Somehow, we need this..
-            self.data[slices_with_channel] = 0
+            new_data = self.data.copy()
+            new_data[slices_with_channel] = 0
+            self.data = new_data
         except:
             raise RuntimeError(
                 "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
