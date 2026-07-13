@@ -3,7 +3,7 @@ name = "imaging-server-kit"
 dynamic = ["version"]
 description = "Convert image processing functions to GUIs, FastAPI servers, and more."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Mallory Wittwer", email = "mallory.wittwer@epfl.ch" }]
 
@@ -14,12 +14,11 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
