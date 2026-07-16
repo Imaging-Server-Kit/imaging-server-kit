@@ -3,37 +3,37 @@ import argparse
 
 def cmd_demo_napari(args):
     from imaging_server_kit.core.errors import napari_available
-    
+
     if not napari_available():
         print(
             "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
         )
         return
-    
+
     import imaging_server_kit as sk
-    from imaging_server_kit.demo import multi_algo_examples
+    from imaging_server_kit.demo import multi_algo_demos
     import napari
 
-    sk.to_napari(multi_algo_examples)
+    sk.to_napari(multi_algo_demos)
     napari.run()
 
 
 def cmd_demo_serve(args):
     import imaging_server_kit as sk
-    from imaging_server_kit.demo import multi_algo_examples
+    from imaging_server_kit.demo import multi_algo_demos
 
-    sk.serve(multi_algo_examples)
-    
+    sk.serve(multi_algo_demos)
+
 
 def cmd_tools_napari(args):
     from imaging_server_kit.core.errors import napari_available
-    
+
     if not napari_available():
         print(
             "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
         )
         return
-    
+
     import imaging_server_kit as sk
     from imaging_server_kit.demo import multi_algo_tools
     import napari
@@ -64,7 +64,7 @@ def main(argv=None):
     # serverkit demo serve
     p_demo_serve = demo_sub.add_parser("serve", help="Start the server demo")
     p_demo_serve.set_defaults(func=cmd_demo_serve)
-    
+
     # serverkit tools <subcommand>
     p_tools = subparsers.add_parser("tools", help="Run tool algorithms.")
     tools_sub = p_tools.add_subparsers(dest="tools_command", required=True)

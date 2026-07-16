@@ -41,6 +41,7 @@ from .types import (
 from .merge import merge_layers, LayerMerger
 
 from .demo import multi_algo_tools as tools
+from .demo import multi_algo_demos as demos
 
 from .core.errors import napari_available
 
