@@ -43,9 +43,13 @@ from .merge import merge_layers, LayerMerger
 from .demo import multi_algo_tools as tools
 from .demo import multi_algo_demos as demos
 
-from .core.errors import napari_available
+from .core.errors import napari_available, qubalab_available
 
 NAPARI_INSTALLED = napari_available()
+
+
+if qubalab_available():
+    from .qupath import run_in_qupath_annotations
 
 
 def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]], viewer):

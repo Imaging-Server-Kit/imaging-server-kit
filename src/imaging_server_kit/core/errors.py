@@ -90,3 +90,8 @@ def napari_available():
     """Check if napari-serverkit is installed."""
     spec = importlib.util.find_spec("napari_serverkit")
     return spec is not None
+
+def qubalab_available():
+    """Check if qubalab is installed."""
+    spec = importlib.util.find_spec("qubalab")
+    return spec is not None

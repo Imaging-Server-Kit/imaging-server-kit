@@ -43,9 +43,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+qupath = ["qubalab"]
 docs = ["jupyter-book<2.0", "jupytext"]
 test = ["pytest"]
-all = ["imaging-server-kit[docs,test]"]
+all = ["imaging-server-kit[docs,test,qupath]"]
 
 [project.scripts]
 serverkit = "imaging_server_kit.cli:main"
