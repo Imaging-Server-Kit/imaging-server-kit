@@ -13,7 +13,7 @@ class Notification(Layer):
     """
 
     kind = "notification"
-    type = str
+    type = Optional[str]
 
     def __init__(
         self,

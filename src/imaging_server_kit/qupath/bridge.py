@@ -213,7 +213,6 @@ def run_in_qupath_annotations(
                 mask_detections = _mask2detections(layer)
                 detections.extend(mask_detections)
             elif isinstance(layer, sk.Boxes):
-                print("We're converting boxes!")
                 box_detections = _boxes2detections(layer)
                 detections.extend(box_detections)
 

@@ -57,7 +57,7 @@ class Layer:
         # Prepare the meta attribute
         if meta is None:
             meta = {}
-
+        
         meta["description"] = meta.get("description", description)
         meta["merger"] = meta.get("merger", merger)
         meta["position"] = meta.get("position", position)
@@ -228,11 +228,15 @@ class Layer:
     def select(self, domain: Domain) -> Layer:
         """Selection based on a domain in *global* coordinates."""
         cls = type(self)
+        required = True
+        if self.meta:
+            required=self.meta.get("required", True)
         layer_selection = cls(
             data=self.data,
             name=self.name,
             meta=self.meta,
             tile_meta=self.tile_meta,
+            required=required
         )
         # Set the position to the domain's coords_min
         layer_selection.position = domain.coords_min
@@ -293,5 +297,5 @@ class LayerTileGenerator:
             ):
                 tile = layer.select(domain=tile_domain)
                 tile.tile_meta = tile_meta
-                
+
                 yield tile

@@ -8,7 +8,7 @@ class Integer(Layer):
     """Data layer used to represent integer values."""
 
     kind = "int"
-    type = int
+    type = Optional[int]
 
     def __init__(
         self,

@@ -18,7 +18,7 @@ class Choice(Layer):
     """
 
     kind = "choice"
-    type = str
+    type = Optional[str]
 
     def __init__(
         self,

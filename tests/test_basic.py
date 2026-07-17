@@ -157,7 +157,7 @@ def int_required_false(val=sk.Integer(required=False)):
 
 def test_required_int_false():
     stack = int_required_false.run()
-    assert stack[0].data is None
+    assert stack[0].data is True
 
 
 # Setting required=True and passing no data sets the data to 0 (default integer)
@@ -165,6 +165,6 @@ def test_required_int_false():
 def int_required_true(val=sk.Integer(required=True)):
     return sk.Bool(val is None)
 
-def test_required_int_false():
+def test_required_int_true():
     stack = int_required_true.run()
     assert stack[0].data == 0

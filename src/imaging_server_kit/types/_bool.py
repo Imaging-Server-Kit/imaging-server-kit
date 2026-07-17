@@ -7,7 +7,7 @@ class Bool(Layer):
     """Data layer used to represent boolean values."""
 
     kind = "bool"
-    type = bool
+    type = Optional[bool]
 
     def __init__(
         self,

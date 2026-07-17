@@ -8,7 +8,7 @@ class Float(Layer):
     """Data layer used to represent floating-point (decimal) values."""
 
     kind = "float"
-    type = float
+    type = Optional[float]
 
     def __init__(
         self,

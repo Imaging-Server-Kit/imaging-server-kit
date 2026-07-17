@@ -7,7 +7,7 @@ class String(Layer):
     """Data layer used to represent strings of text."""
 
     kind = "str"
-    type = str
+    type = Optional[str]
 
     def __init__(
         self,

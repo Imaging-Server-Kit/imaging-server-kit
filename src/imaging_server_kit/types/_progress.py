@@ -23,7 +23,7 @@ class Progress(Layer):
     """
 
     kind = "progress"
-    type = int
+    type = Optional[int]
 
     def __init__(
         self,
