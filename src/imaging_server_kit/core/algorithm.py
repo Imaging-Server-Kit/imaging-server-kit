@@ -448,7 +448,7 @@ class Algorithm(AlgorithmRunner):
             try:
                 payload = self._run_algorithm_func(**algo_params)
             except Exception as e:
-                raise AlgorithmRuntimeError(algorithm, e)
+                raise AlgorithmRuntimeError(algorithm=algorithm, error=e)
             yield _parse_user_func_output(payload)
 
 

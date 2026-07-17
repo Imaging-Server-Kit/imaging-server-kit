@@ -132,7 +132,7 @@ class AlgorithmRunner(ABC):
         # Raise if tileable is set to False and the algo is attempted to be run in tiles
         if tiled and not self.is_tileable(algorithm):
             raise AlgorithmRuntimeError(
-                algorithm,
+                algorithm=algorithm,
                 message="Algorithm cannot be run in tiled mode.",
             )
 
