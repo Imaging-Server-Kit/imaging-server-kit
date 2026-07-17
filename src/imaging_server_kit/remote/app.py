@@ -89,9 +89,9 @@ class AlgorithmApp:
         async def home(request: Request):
             if len(self.algorithms) > 1:
                 return templates.TemplateResponse(
-                    "index.html",
-                    {
-                        "request": request,
+                    request=request,
+                    name="index.html",
+                    context={
                         "algorithms": self.algorithms,
                     },
                 )
@@ -133,9 +133,9 @@ class AlgorithmApp:
             algo_params_schema = algorithm.get_parameters(algorithm_name)
             algo_params = etc.parse_algo_params_schema(algo_params_schema)
             return templates.TemplateResponse(
-                "info.html",
-                {
-                    "request": request,
+                request=request,
+                name="info.html",
+                context={
                     "algo_info": algo_info,
                     "algo_params": algo_params,
                 },
