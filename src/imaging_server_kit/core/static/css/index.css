@@ -24,9 +24,7 @@ a {
 .card-product {
     border-radius: 5px;
     overflow: hidden;
-    /* height: 80px; */
     background: white;
-    /* box-shadow: 0 0 15px rgba(0,0,0,0.2); */
     display: flex;
     align-items: center;
 }
@@ -35,13 +33,26 @@ a {
     font-size: 16px;
     font-weight: bold;
     margin: 0;
+    margin-bottom: 5px;
 }
 
 .card-product .card-product-infos {
     padding: 16px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .card-product:hover {
     background-color: #f4f4f4;
 }
-  
+
+.keyword {
+    border-radius: 2px;
+    font-size: 14px;
+    background-color: #f4f4f4;
+    padding: 2px 4px;
+}

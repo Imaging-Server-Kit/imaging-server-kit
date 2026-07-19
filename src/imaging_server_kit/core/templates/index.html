@@ -12,11 +12,16 @@
 <body>
     <div class="container">
         <h1>Available algorithms</h1>
-        {% for algorithm in algorithms %}
+        {% for algorithm, algo_info in algorithms_and_infos %}
         <a href="/{{ algorithm }}/info">
             <div class="card-product">
                 <div class="card-product-infos">
                     <h2>{{ algorithm }}</h2>
+                    <div>
+                        {% for tag in algo_info.tags %}
+                        <span class="keyword">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </a>

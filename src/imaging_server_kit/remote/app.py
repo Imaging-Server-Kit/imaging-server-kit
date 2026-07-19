@@ -88,11 +88,15 @@ class AlgorithmApp:
         )
         async def home(request: Request):
             if len(self.algorithms) > 1:
+                algo_infos = []
+                for algo in self.algorithms:
+                    algo_infos.append(self.algorithms_dict[algo].algo_info)
+                
                 return templates.TemplateResponse(
                     request=request,
                     name="index.html",
                     context={
-                        "algorithms": self.algorithms,
+                        "algorithms_and_infos": zip(self.algorithms, algo_infos),
                     },
                 )
             elif len(self.algorithms) == 1:

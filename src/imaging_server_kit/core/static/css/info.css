@@ -35,56 +35,6 @@ a:hover {
     padding: 2px 4px;
 }
 
-/* .card-category {
-    flex-direction: column;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 18px;
-    border-radius: 5px;
-}
-
-.card-category i {
-    font-size: 36px;
-    padding-top: 20px;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-gap: 16px;
-}
-
-@media (min-width: 100px) and (max-width: 575px) {
-    .cards {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (min-width: 576px) {
-    .cards {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (min-width: 768px) {
-    .cards {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (min-width: 992px) {
-    .cards {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (min-width: 1200px) {
-    .cards {
-        grid-template-columns: 1fr 1fr;
-    }
-} */
-
 table {
     width: 100%;                 /* Make the table span the full width of its container */
     border-collapse: collapse;   /* Remove gaps between table cells */
