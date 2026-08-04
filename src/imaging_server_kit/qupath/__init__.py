@@ -1,1 +1,0 @@
-from imaging_server_kit.qupath.bridge import run_in_qupath_annotations
