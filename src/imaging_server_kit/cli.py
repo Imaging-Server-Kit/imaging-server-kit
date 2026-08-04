@@ -2,51 +2,82 @@ import argparse
 
 
 def cmd_demo_napari(args):
-    from imaging_server_kit.core.errors import napari_available
+    from imaging_server_kit.core.check_install import napari_available
 
     if not napari_available():
         print(
-            "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
+            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
         )
         return
 
-    import imaging_server_kit as sk
+    from imaging_server_kit.gui import to_napari
     from imaging_server_kit.demo import multi_algo_demos
     import napari
 
-    sk.to_napari(multi_algo_demos)
+    to_napari(multi_algo_demos)
     napari.run()
 
 
 def cmd_demo_serve(args):
-    import imaging_server_kit as sk
+    from imaging_server_kit.core.check_install import remote_available
+    
+    if not remote_available():
+        print(
+            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
+        )
+        return
+    
     from imaging_server_kit.demo import multi_algo_demos
+    from imaging_server_kit.remote import serve
 
-    sk.serve(multi_algo_demos)
+    serve(multi_algo_demos)
 
 
 def cmd_tools_napari(args):
-    from imaging_server_kit.core.errors import napari_available
+    from imaging_server_kit.core.check_install import napari_available
 
     if not napari_available():
         print(
-            "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
+            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
         )
         return
 
-    import imaging_server_kit as sk
     from imaging_server_kit.demo import multi_algo_tools
+    from imaging_server_kit.gui.napari_serverkit import to_napari
     import napari
 
-    sk.to_napari(multi_algo_tools)
+    to_napari(multi_algo_tools)
     napari.run()
 
 
 def cmd_tools_serve(args):
-    import imaging_server_kit as sk
+    from imaging_server_kit.core.check_install import remote_available
+        
+    if not remote_available():
+        print(
+            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
+        )
+        return
+        
     from imaging_server_kit.demo import multi_algo_tools
+    from imaging_server_kit.remote import serve
 
-    sk.serve(multi_algo_tools)
+    serve(multi_algo_tools)
+
+
+def cmd_qupath(args):
+    from imaging_server_kit.core.check_install import qupath_available
+    
+    if not qupath_available():
+        print(
+            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
+        )
+        return
+    
+    from imaging_server_kit.remote import Client
+    from imaging_server_kit.gui.qupath_serverkit import to_qupath
+
+    to_qupath(runner=Client())
 
 
 def main(argv=None):
@@ -76,6 +107,10 @@ def main(argv=None):
     # serverkit tools serve
     p_tools_serve = tools_sub.add_parser("serve", help="Start the server tools")
     p_tools_serve.set_defaults(func=cmd_tools_serve)
+    
+    # serverkit qupath
+    qp_parser = subparsers.add_parser("qupath", help="Connect to QuPath.")
+    qp_parser.set_defaults(func=cmd_qupath)
 
     args = parser.parse_args(argv)
     return args.func(args)
