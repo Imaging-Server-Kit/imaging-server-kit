@@ -18,30 +18,36 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
 dependencies = [
     "numpy",
-    "tifffile",  # To encode/decode.
-    "tqdm",  # For progress bars.
-    "pydantic>=2.0",  # For schema validation.
-    "scikit-image[optional]",  # To imread samples and run demo examples.
-    "jinja2",  # To template the info endpoint.
-    "PyYAML",  # To load the metadata yaml file.
-    "imantics",  # To convert masks to features. Comes with opencv-python.
-    "opencv-contrib-python-headless",  # To be able to run servers in docker.
-    "geojson",  # To convert masks and points to features.
+    "tifffile",               # To encode/decode.
+    "tqdm",                   # For progress bars.
+    "pydantic>=2.0",          # For schema validation.
+    "scikit-image[optional]", # To imread samples and run demo examples.
+    "jinja2",                 # To template the info endpoint.
+    "PyYAML",                 # To load the metadata yaml file.
+    "imantics",               # To convert masks to features. Comes with opencv-python.
+    "geojson",                # To convert masks and points to features.
+    # FastAPI and related:
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "msgpack",
+    "networkx",
+    # Napari:
+    "qtpy",
+    "napari[all]>=0.4.16",
+    "napari-toolkit",
 ]
 
 [project.optional-dependencies]
-remote = ["fastapi", "uvicorn[standard]", "python-multipart", "msgpack", "networkx"]
-napari = ["qtpy", "napari[all]>=0.4.16", "napari-toolkit"]
-qupath = ["qtpy", "qubalab"]
-all = ["imaging-server-kit[remote,napari,qupath]"]
+qupath = ["qubalab>=0.2.0"]  # Restricts Python version to be 3.11 -> 3.13...
 docs = ["jupyter-book<2.0", "jupytext"]
-test = ["pytest"]
+test = ["pytest", "coverage"]
+all = ["imaging-server-kit[docs,test]"]
 
 [project.scripts]
 serverkit = "imaging_server_kit.cli:main"

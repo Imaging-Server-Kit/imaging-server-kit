@@ -11,7 +11,6 @@ from imaging_server_kit.remote import Client
 
 from .napari_algo_widget import NapariAlgorithmWidget
 from .napari_http_widget import NapariHttpWidget
-from .napari_stack import NapariStack
 
 
 def to_qwidget(

@@ -42,24 +42,6 @@ from .merge import merge_layers, LayerMerger
 from .demo import multi_algo_tools as tools
 from .demo import multi_algo_demos as demos
 
-from .core.check_install import napari_available, qupath_available, remote_available
-
-REMOTE_AVAILABLE = remote_available()
-NAPARI_AVAILABLE = napari_available()
-QUPATH_AVAILABLE = qupath_available()
-
-if REMOTE_AVAILABLE:
-    from .remote import Client, serve
-    pass
-
-if NAPARI_AVAILABLE:
-    from .gui.napari_serverkit import to_qwidget, to_napari
-    pass
-
-if QUPATH_AVAILABLE:
-    from .gui.qupath_serverkit import to_qupath
-    pass
-
 
 def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
     """
@@ -82,14 +64,8 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
 
     if to == "stack":
         return Stack(layers=stack.layers)
-    elif to == "napari":
-        if not NAPARI_AVAILABLE:
-            print(
-                "To convert results to `napari`, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
-            )
-            return
-        
-        from imaging_server_kit.gui.napari_serverkit import NapariStack
+    elif to == "napari":        
+        from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
         # For napari, we return the viewer directly
         napari_stack = NapariStack(layers=stack.layers)

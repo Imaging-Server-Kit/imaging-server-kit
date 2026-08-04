@@ -1,19 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Generator, List, Optional, Union
+import napari
 
 import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
 )
-from imaging_server_kit.core.check_install import napari_available
 from imaging_server_kit.core.stack import Stack, StackTileGenerator
 from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
-
-
-NAPARI_INSTALLED = napari_available()
+from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
 
 def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) -> str:
@@ -172,13 +170,9 @@ class AlgorithmRunner(ABC):
 
         # Handle the special napari case
         special_napari_case = False
-        if NAPARI_INSTALLED:
-            import napari
-            from imaging_server_kit.gui.napari_serverkit import NapariStack
-
-            if isinstance(stack, napari.Viewer):
-                special_napari_case = True
-                stack = NapariStack(viewer=stack)  # type: ignore
+        if isinstance(stack, napari.Viewer):
+            special_napari_case = True
+            stack = NapariStack(viewer=stack)  # type: ignore
 
         # Construct the tiling context
         if tiled:

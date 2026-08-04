@@ -2,14 +2,6 @@ import argparse
 
 
 def cmd_demo_napari(args):
-    from imaging_server_kit.core.check_install import napari_available
-
-    if not napari_available():
-        print(
-            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
-        )
-        return
-
     from imaging_server_kit.gui import to_napari
     from imaging_server_kit.demo import multi_algo_demos
     import napari
@@ -19,14 +11,6 @@ def cmd_demo_napari(args):
 
 
 def cmd_demo_serve(args):
-    from imaging_server_kit.core.check_install import remote_available
-    
-    if not remote_available():
-        print(
-            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
-        )
-        return
-    
     from imaging_server_kit.demo import multi_algo_demos
     from imaging_server_kit.remote import serve
 
@@ -34,14 +18,6 @@ def cmd_demo_serve(args):
 
 
 def cmd_tools_napari(args):
-    from imaging_server_kit.core.check_install import napari_available
-
-    if not napari_available():
-        print(
-            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
-        )
-        return
-
     from imaging_server_kit.demo import multi_algo_tools
     from imaging_server_kit.gui.napari_serverkit import to_napari
     import napari
@@ -51,14 +27,6 @@ def cmd_tools_napari(args):
 
 
 def cmd_tools_serve(args):
-    from imaging_server_kit.core.check_install import remote_available
-        
-    if not remote_available():
-        print(
-            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
-        )
-        return
-        
     from imaging_server_kit.demo import multi_algo_tools
     from imaging_server_kit.remote import serve
 
@@ -66,16 +34,16 @@ def cmd_tools_serve(args):
 
 
 def cmd_qupath(args):
-    from imaging_server_kit.core.check_install import qupath_available
-    
-    if not qupath_available():
-        print(
-            "To use this method, install the Imaging Server Kit package with `pip install imaging-server-kit[all]`."
-        )
-        return
-    
     from imaging_server_kit.remote import Client
-    from imaging_server_kit.gui.qupath_serverkit import to_qupath
+    
+    try:
+        from imaging_server_kit.gui.qupath_serverkit import to_qupath
+    except ImportError as e:
+        raise ImportError(
+            "This feature requires the Imaging Server Kit `qupath` optional dependencies.\n"
+            "Install them with:\n"
+            "    pip install imaging-server-kit[qupath]"
+        ) from e
 
     to_qupath(runner=Client())
 
