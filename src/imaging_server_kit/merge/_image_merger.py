@@ -111,6 +111,7 @@ class ImageTileOverlapMerger(DefaultMerger):
                 math.floor(v - p)
                 for v, p in zip(receiving_layer.coords_min, new_position)
             ]
+            
             cmax_rounded = [
                 math.ceil(v - p)
                 for v, p in zip(receiving_layer.coords_max, new_position)
@@ -131,6 +132,7 @@ class ImageTileOverlapMerger(DefaultMerger):
                 math.floor(v - p)
                 for v, p in zip(incoming_layer.coords_min, new_position)
             ]
+            
             cmax_rounded = [
                 math.ceil(v - p)
                 for v, p in zip(incoming_layer.coords_max, new_position)
@@ -150,6 +152,7 @@ class ImageTileOverlapMerger(DefaultMerger):
                 math.floor(v - p)
                 for v, p in zip(incoming_layer.coords_min, receiving_layer.coords_min)
             ]
+            
             cmax_rounded = [
                 math.ceil(v - p)
                 for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)

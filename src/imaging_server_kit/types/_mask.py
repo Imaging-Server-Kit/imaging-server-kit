@@ -226,23 +226,42 @@ class Mask(Layer):
         """Select data in a given domain."""
         if (self.data is None) or (domain.size is None):
             _data = None
-        elif (domain.coords_max > np.asarray(self.coords_max)).any():
+        
+        # Get the slice indices
+        cmin = [
+            max([domain_cmin, this_cmin])
+            for domain_cmin, this_cmin in zip(domain.coords_min, self.extent.coords_min)
+        ]
+
+        cmax = [
+            min([domain_cmax, this_cmax])
+            for domain_cmax, this_cmax in zip(domain.coords_max, self.extent.coords_max)
+        ]
+
+        csize = np.asarray([c1 - c0 for c1, c0 in zip(cmax, cmin)])
+
+        if np.any(csize <= 0):
+            # No intersection
             _data = None
         else:
-            # Get the slice indices
-            cmin_rounded = [
-                math.floor(v - p) for v, p in zip(domain.coords_min, self.position)
-            ]
-            cmax_rounded = [
-                math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)
-            ]
-
-            slices = tuple(
-                [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
-            )
-
+            cmin_rounded = [math.floor(x) for x in cmin]
+            
+            slices = []
+            for cmin_i, size_i, shape_i, this_cmin in zip(
+                cmin_rounded,
+                csize,
+                self.shape,
+                self.extent.coords_min,
+            ):
+                # Make sure not to overflow..
+                size_i = min(size_i, shape_i)
+                s0 = int(cmin_i - this_cmin)
+                s1 = s0 + int(size_i)
+                slices.append(slice(s0, s1))
+            slices = tuple(slices)
+    
             # Account for the channel_axis
-            if self.channel_axis is not None:
+            if self.channel_axis:
                 slices_with_channel = (
                     slices[: self.channel_axis]
                     + (slice(None),)
@@ -251,13 +270,10 @@ class Mask(Layer):
             else:
                 slices_with_channel = slices
 
-            try:
-                _data = self.data[slices_with_channel]
-            except:
-                raise RuntimeError(
-                    "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
-                )
-
+            # Select the data via indexing
+            _data = self.data[slices_with_channel]
+        
+        # Create a new layer
         mask_selection = Mask(
             data=_data,
             name=self.name,
@@ -265,7 +281,7 @@ class Mask(Layer):
             tile_meta=self.tile_meta,
         )
         
-        mask_selection.position = domain.coords_min
+        mask_selection.position = cmin_rounded
         
         return mask_selection
 
@@ -278,19 +294,40 @@ class Mask(Layer):
     def _reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
         # Get the slice indices
-        cmin_rounded = [
-            math.floor(v - p) for v, p in zip(domain.coords_min, self.position)
-        ]
-        cmax_rounded = [
-            math.ceil(v - p) for v, p in zip(domain.coords_max, self.position)
+        cmin = [
+            max([domain_cmin, this_cmin])
+            for domain_cmin, this_cmin in zip(domain.coords_min, self.extent.coords_min)
         ]
 
-        slices = tuple(
-            [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
-        )
+        cmax = [
+            min([domain_cmax, this_cmax])
+            for domain_cmax, this_cmax in zip(domain.coords_max, self.extent.coords_max)
+        ]
+
+        csize = np.asarray([c1 - c0 for c1, c0 in zip(cmax, cmin)])
+
+        if np.any(csize <= 0):
+            # No intersection
+            return
+
+        cmin_rounded = [math.floor(x) for x in cmin]
+
+        slices = []
+        for cmin_i, size_i, shape_i, this_cmin in zip(
+            cmin_rounded,
+            csize,
+            self.shape,
+            self.extent.coords_min,
+        ):
+            # Make sure not to overflow..
+            size_i = min(size_i, shape_i)
+            s0 = int(cmin_i - this_cmin)
+            s1 = s0 + int(size_i)
+            slices.append(slice(s0, s1))
+        slices = tuple(slices)
 
         # Account for the channel_axis
-        if self.channel_axis is not None:
+        if self.channel_axis:
             slices_with_channel = (
                 slices[: self.channel_axis]
                 + (slice(None),)
@@ -299,11 +336,6 @@ class Mask(Layer):
         else:
             slices_with_channel = slices
 
-        try:
-            new_data = self.data.copy()
-            new_data[slices_with_channel] = 0
-            self.data = new_data
-        except:
-            raise RuntimeError(
-                "Data re-initialization in the provided domain failed. Did you pass a domain range outside of the object's domain?"
-            )
+        new_data = self.data.copy()
+        new_data[slices_with_channel] = 0
+        self.data = new_data
