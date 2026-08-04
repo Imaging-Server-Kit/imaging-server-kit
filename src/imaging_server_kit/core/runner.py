@@ -5,12 +5,13 @@ import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
-    napari_available,
 )
+from imaging_server_kit.core.check_install import napari_available
 from imaging_server_kit.core.stack import Stack, StackTileGenerator
 from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
+
 
 NAPARI_INSTALLED = napari_available()
 
@@ -38,6 +39,10 @@ def validate_algorithm(func: Callable) -> Callable:
 
 class AlgorithmRunner(ABC):
     """The algorithm runner base class, parent to sk.Algorithm, sk.MultiAlgorithm and sk.Client."""
+
+    @property  # type: ignore
+    @abstractmethod
+    def name() -> str: ...
 
     @property  # type: ignore
     @abstractmethod
@@ -169,7 +174,7 @@ class AlgorithmRunner(ABC):
         special_napari_case = False
         if NAPARI_INSTALLED:
             import napari
-            from napari_serverkit import NapariStack
+            from imaging_server_kit.gui.napari_serverkit import NapariStack
 
             if isinstance(stack, napari.Viewer):
                 special_napari_case = True
@@ -189,12 +194,12 @@ class AlgorithmRunner(ABC):
         # If a domain is passed, restrict the computation to that domain
         if domain:
             params_stack = params_stack.select(domain)
-
+        
         # Run the algorithm and assemble the stack
         for result_tile, params_tile in self.run_generator(
             algorithm, params_stack, tiling_ctx
         ):
-            # If the parameters tile and result tile both have a position, 
+            # If the parameters tile and result tile both have a position,
             # the result tile's position is offset by that of the parameters tile
             if (result_tile.position is not None) and (
                 params_tile.position is not None

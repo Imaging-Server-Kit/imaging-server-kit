@@ -96,6 +96,7 @@ class Domain:
         new_coords_min = tuple(
             [min(a, b) for a, b in zip(self.coords_min, domain.coords_min)]
         )
+        
         new_coords_max = tuple(
             [max(a, b) for a, b in zip(self.coords_max, domain.coords_max)]
         )
