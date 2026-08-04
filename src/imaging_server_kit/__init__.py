@@ -1,4 +1,4 @@
-from typing import Optional, Union, Callable
+from typing import Union
 from ._version import version as __version__
 
 try:
@@ -16,8 +16,7 @@ from .core import (
     TileMeta,
     Domain,
 )
-
-from .remote import Client, serve
+from .core.runner import AlgorithmRunner
 
 from .types import (
     Layer,
@@ -43,65 +42,23 @@ from .merge import merge_layers, LayerMerger
 from .demo import multi_algo_tools as tools
 from .demo import multi_algo_demos as demos
 
-from .core.errors import napari_available, qubalab_available
+from .core.check_install import napari_available, qupath_available, remote_available
 
-NAPARI_INSTALLED = napari_available()
+REMOTE_AVAILABLE = remote_available()
+NAPARI_AVAILABLE = napari_available()
+QUPATH_AVAILABLE = qupath_available()
 
+if REMOTE_AVAILABLE:
+    from .remote import Client, serve
+    pass
 
-if qubalab_available():
-    from .qupath import run_in_qupath_annotations
+if NAPARI_AVAILABLE:
+    from .gui.napari_serverkit import to_qwidget, to_napari
+    pass
 
-
-def to_qwidget(algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]], viewer):
-    """Convert an algorithm to a QWidget. Used when packaging a Napari plugin."""
-    if not NAPARI_INSTALLED:
-        print(
-            "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
-        )
-        return
-
-    from napari_serverkit import AlgorithmWidget
-
-    if algorithm is not None:
-        if not isinstance(algorithm, (Algorithm, MultiAlgorithm)):
-            # Assuming the user has passed a "raw" Python function, we attempt to convert it to an Algorithm:
-            algorithm = Algorithm(algorithm)
-
-    return AlgorithmWidget(viewer=viewer, algorithm=algorithm)
-
-
-def to_napari(
-    algorithm: Optional[Union[Algorithm, MultiAlgorithm, Callable]] = None,
-    viewer: Optional[Union["napari.Viewer", "napari_serverkit.NapariStack"]] = None,
-) -> None:
-    """
-    Convert an algorithm (or algorithm collection) to a dock widget and add it to a Napari viewer.
-
-    Parameters
-    ----------
-    algorithm : The algorithm object to add to Napari as a dock widget.
-    viewer : An existing Napari viewer to add the dock widget to. If none is passed, a new Napari viewer is created.
-    """
-    if not NAPARI_INSTALLED:
-        print(
-            "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
-        )
-        return
-
-    import napari
-    from napari_serverkit import add_as_widget
-
-    if viewer is None:
-        viewer = napari.Viewer()
-
-    if algorithm is not None:
-        if not isinstance(algorithm, (Algorithm, MultiAlgorithm)):
-            # Assuming the user has passed a "raw" Python function, we attempt to convert it to an Algorithm:
-            algorithm = Algorithm(algorithm)
-
-        add_as_widget(viewer, algorithm)
-
-    return viewer
+if QUPATH_AVAILABLE:
+    from .gui.qupath_serverkit import to_qupath
+    pass
 
 
 def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
@@ -126,12 +83,13 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
     if to == "stack":
         return Stack(layers=stack.layers)
     elif to == "napari":
-        if not NAPARI_INSTALLED:
+        if not NAPARI_AVAILABLE:
             print(
-                "To use this method, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
+                "To convert results to `napari`, install the Imaging Server Kit Napari plugin with `pip install napari-serverkit`."
             )
             return
-        from napari_serverkit import NapariStack
+        
+        from imaging_server_kit.gui.napari_serverkit import NapariStack
 
         # For napari, we return the viewer directly
         napari_stack = NapariStack(layers=stack.layers)
