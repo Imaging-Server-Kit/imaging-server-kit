@@ -49,12 +49,17 @@ class Client(AlgorithmRunner):
     get_parameters(): Get the algorithm parameters schema.
     """
 
-    def __init__(self, server_url: Optional[str] = None) -> None:
+    def __init__(self, server_url: Optional[str] = None, name: str="client") -> None:
         self.server_url = server_url
         self._algorithms = []
         if server_url:
             self.connect(server_url)
         self.token = None
+        self._name = name
+    
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def algorithms(self) -> Iterable[str]:
@@ -141,11 +146,17 @@ class Client(AlgorithmRunner):
                 raise ServerRequestError(endpoint, e)
 
             if response.status_code == 200:
-                unpacker = msgpack.Unpacker(raw=False)
+                unpacker = msgpack.Unpacker(
+                    raw=False,
+                    max_buffer_size=0,  # TODO: Unlimited input size! Implies trusted input.
+                )
+                
                 for chunk in response.iter_content(chunk_size=8192):
                     if not chunk:
                         continue
+                    
                     unpacker.feed(chunk)
+                    
                     for serialized_stack in unpacker:
                         yield stack_serializer.deserialize(
                             [serialized_stack], "Python/Napari"

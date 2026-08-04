@@ -21,7 +21,11 @@ class MultiAlgorithm(AlgorithmRunner):
 
     def __init__(self, algorithms: List[Algorithm], name: str = "algorithms"):
         self.sk_algorithms = algorithms
-        self.name = name
+        self._name = name
+    
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def algorithms_dict(self) -> Dict[str, Algorithm]:

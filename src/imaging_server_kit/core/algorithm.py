@@ -300,7 +300,7 @@ class Algorithm(AlgorithmRunner):
         # Resolve the algo name (if None => use algo function name)
         if name is None:
             name = run_algorithm_func.__name__
-        self.name = name
+        self._name = name
 
         # Algorithm's run function from the user
         self._run_algorithm_func = run_algorithm_func
@@ -319,10 +319,14 @@ class Algorithm(AlgorithmRunner):
 
         # Initialize metadata info
         self.algo_info = etc.parse_algo_info(
-            metadata_file, name, description, project_url, tags
+            metadata_file, self._name, description, project_url, tags
         )
 
-        self._algorithms = [name]
+        self._algorithms = [self._name]
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def algorithms(self) -> Iterable[str]:
