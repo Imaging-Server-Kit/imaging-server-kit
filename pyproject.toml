@@ -24,32 +24,30 @@ classifiers = [
 
 dependencies = [
     "numpy",
-    "tifffile",  # To encode/decode
-    "tqdm",
-    "pydantic>=2.0",
-    "scikit-image[optional]",  # To imread samples and run demo examples
-    "jinja2",  # To template the info endpoint
-    "PyYAML",  # To load the metadata yaml file
-    "opencv-contrib-python-headless",  # We need this instead of opencv-python to be able to run servers in docker.
-    "imantics",  # To convert masks to features for QuPath. Comes with opencv-python.
-    "geojson",  # To convert masks and points to features for QuPath 
-    # Used in app
-    "fastapi",
-    "uvicorn[standard]",
-    "python-multipart",
-    # Used in app + client
-    "msgpack",
-    "networkx",
+    "tifffile",  # To encode/decode.
+    "tqdm",  # For progress bars.
+    "pydantic>=2.0",  # For schema validation.
+    "scikit-image[optional]",  # To imread samples and run demo examples.
+    "jinja2",  # To template the info endpoint.
+    "PyYAML",  # To load the metadata yaml file.
+    "imantics",  # To convert masks to features. Comes with opencv-python.
+    "opencv-contrib-python-headless",  # To be able to run servers in docker.
+    "geojson",  # To convert masks and points to features.
 ]
 
 [project.optional-dependencies]
-qupath = ["qubalab"]
+remote = ["fastapi", "uvicorn[standard]", "python-multipart", "msgpack", "networkx"]
+napari = ["qtpy", "napari[all]>=0.4.16", "napari-toolkit"]
+qupath = ["qtpy", "qubalab"]
+all = ["imaging-server-kit[remote,napari,qupath]"]
 docs = ["jupyter-book<2.0", "jupytext"]
 test = ["pytest"]
-all = ["imaging-server-kit[docs,test,qupath]"]
 
 [project.scripts]
 serverkit = "imaging_server_kit.cli:main"
+
+[project.entry-points."napari.manifest"]
+imaging_server_kit = "imaging_server_kit.gui.napari_serverkit:napari.yaml"
 
 [project.urls]
 repository = "https://github.com/Imaging-Server-Kit/imaging-server-kit"
