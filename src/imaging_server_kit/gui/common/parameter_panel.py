@@ -23,23 +23,21 @@ class UIStateItem:
     widget_value_recover_func: Callable
 
 
-class ParameterPanel:
+class ParameterPanel(QGroupBox):
     def __init__(self, trigger: Callable):
+        super().__init__()
+        self.setTitle("Parameters")
+        self.setLayout(QGridLayout())
+        
         self._trigger_func = trigger
 
         self.ui_state: Dict[str, UIStateItem] = {}
         self.layer_comboboxes = {}
 
-        self.widget = QGroupBox()
-        self.widget.setTitle("Parameters")
-
-        self.layout = QGridLayout()
-        self.widget.setLayout(self.layout)
-
     def update(self, schema: Dict):
         # Clean-up the previous dynamic UI layout
-        for i in reversed(range(self.layout.count())):
-            ui_item = self.layout.itemAt(i)
+        for i in reversed(range(self.layout().count())):
+            ui_item = self.layout().itemAt(i)
             if ui_item is not None:
                 ui_item_widget = ui_item.widget()
                 if ui_item_widget is not None:
@@ -126,8 +124,8 @@ class ParameterPanel:
                 widget_value_recover_func = lambda qt_widget: None
 
             if qt_widget is not None:
-                self.layout.addWidget(QLabel(param_values.get("title")), k, 0)
-                self.layout.addWidget(qt_widget, k, 1)
+                self.layout().addWidget(QLabel(param_values.get("title")), k, 0)
+                self.layout().addWidget(qt_widget, k, 1)
 
             state_item = UIStateItem(
                 param_type=param_type,

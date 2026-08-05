@@ -61,7 +61,6 @@ def open_doc_link(algo_params_schema: Dict, algo_info: Dict) -> None:
 
     webbrowser.open(output_path.resolve().as_uri())
 
-
 def parse_algo_info(
     metadata_file: Union[str, Path],
     name: str,

@@ -4,11 +4,11 @@ contributions:
   commands:
     - id: imaging-server-kit.remote_napari
       title: Connect to server
-      python_name: imaging_server_kit.gui.napari_serverkit:NapariHttpWidget
+      python_name: imaging_server_kit.gui.napari_serverkit.napari_http_widget:NapariHttpWidget
 
     - id: imaging-server-kit.remote_qupath
       title: Connect to QuPath
-      python_name: imaging_server_kit.gui.qupath_serverkit:QuPathHttpWidget
+      python_name: imaging_server_kit.gui.qupath_serverkit.qupath_http_widget:QuPathHttpWidget
 
     - id: imaging-server-kit.demos
       title: Demo algorithms

@@ -1,4 +1,4 @@
-from typing import Callable, Optional, List
+from typing import Optional, List
 
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -9,16 +9,20 @@ from qtpy.QtWidgets import (
     QPushButton,
     QSpinBox,
     QWidget,
+    QLineEdit,
 )
 
 from napari_toolkit.containers.collapsible_groupbox import QCollapsibleGroupBox
 
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.tiling import TilingSpecs
+from imaging_server_kit.remote import Client
 
 
-class RunnerWidget:
+class RunnerWidget(QWidget):
     def __init__(self, runner: AlgorithmRunner, algorithms: Optional[List[str]] = None):
+        super().__init__()
+        
         self.runner = runner
 
         # We can specify a subset of algorithms to display in the dropdown
@@ -31,10 +35,26 @@ class RunnerWidget:
             ]
 
         # Layout and widget
-        self._widget = QWidget()
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        self._widget.setLayout(layout)
+        self.setLayout(layout)
+        
+        # Server URL + Connect layout
+        server_url_label = QLabel("Server URL")
+        layout.addWidget(server_url_label, 0, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.server_url_field = QLineEdit()
+        layout.addWidget(self.server_url_field, 0, 1)
+        self.connect_btn = QPushButton("Connect")
+        layout.addWidget(self.connect_btn, 0, 2)
+        
+        if not isinstance(runner, Client):
+            server_url_label.setVisible(False)
+            self.server_url_field.setVisible(False)
+            self.connect_btn.setVisible(False)
+        else:
+            default_url = runner.server_url if runner.server_url is not None else "http://localhost:8000"
+            self.server_url_field.setText(default_url)
 
         # Algorithms
         self.cb_algorithms = QComboBox()
@@ -44,7 +64,6 @@ class RunnerWidget:
 
         # Info link
         self.algo_info_btn = QPushButton("🌐 Doc")
-        self.algo_info_btn.clicked.connect(self._open_info_link_from_btn)
         layout.addWidget(self.algo_info_btn, 1, 2)
 
         # Samples
@@ -104,14 +123,6 @@ class RunnerWidget:
         experimental_layout.addWidget(self.cb_randomize, 4, 1)
 
     @property
-    def widget(self) -> QWidget:
-        return self._widget
-
-    @property
-    def update_params_trigger(self) -> Callable:
-        return self.cb_algorithms.currentTextChanged  # type: ignore
-
-    @property
     def selected_algorithm_name(self) -> str:
         return self.cb_algorithms.currentText()
 
@@ -145,14 +156,6 @@ class RunnerWidget:
             self.cb_run_in_tiles.setChecked(False)
 
         self.experimental_gb.setVisible(algo_is_tileable)
-
-    def _open_info_link_from_btn(self, *args, **kwargs) -> None:
-        algorithm: str = self.cb_algorithms.currentText()
-        if algorithm == "":
-            print("Seletcting an algorithm is required!")
-            return
-
-        self.runner.info(algorithm)
 
     def _run_in_tiles_changed(self, run_in_tiles: bool):
         for ui_element in [

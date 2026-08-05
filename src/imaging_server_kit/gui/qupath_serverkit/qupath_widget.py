@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from napari_toolkit.containers.collapsible_groupbox import QCollapsibleGroupBox
 from qtpy.QtCore import Qt
@@ -19,6 +19,9 @@ from qtpy.QtWidgets import (
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.gui.common import ParameterPanel, RunnerWidget, TaskManager
 from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import QuPathBridge
+from imaging_server_kit.remote import Client
+from imaging_server_kit.core.errors import AlgorithmServerError
+from imaging_server_kit.remote.client import ServerRequestError
 
 
 def _if_compatible_get_qupath_schema(runner: AlgorithmRunner, algorithm: str) -> Dict:
@@ -62,6 +65,16 @@ def _if_compatible_get_qupath_schema(runner: AlgorithmRunner, algorithm: str) ->
         return {}
 
 
+def _qupath_compabile_algos(runner: AlgorithmRunner) -> List[str]:
+    """Select algorithms from a runner which are Qupath-compatible."""
+    compatible_algos = []
+    for algo in runner.algorithms:
+        if _if_compatible_get_qupath_schema(runner, algo):
+            compatible_algos.append(algo)
+
+    return compatible_algos
+
+
 class LogPanel(QPlainTextEdit):
     def __init__(self):
         super().__init__()
@@ -74,7 +87,7 @@ class LogPanel(QPlainTextEdit):
 class QuPathWidget(QWidget):
     def __init__(
         self,
-        runner_widget: RunnerWidget,
+        runner: AlgorithmRunner,
         port: int = 25333,
         token: str = "",
         viewer: Optional["napari.Viewer"] = None,
@@ -98,7 +111,8 @@ class QuPathWidget(QWidget):
             self.napari_stack = None
 
         # Runner widget
-        self.runner_widget = runner_widget
+        qupath_compatible_algos = _qupath_compabile_algos(runner=runner)
+        self.runner_widget = RunnerWidget(runner, algorithms=qupath_compatible_algos)
 
         # Layout
         layout = QVBoxLayout()
@@ -132,13 +146,21 @@ class QuPathWidget(QWidget):
         layout.addWidget(self.annotation_field)
 
         # Add the runner's extra UI
-        layout.addWidget(self.runner_widget.widget)
+        layout.addWidget(self.runner_widget)
+
+        # Connect the server URL field
+        self.runner_widget.connect_btn.clicked.connect(self._connect_from_btn)
 
         # Connect the ComboBox change from the runner to the UI update
-        self.runner_widget.update_params_trigger.connect(self._algorithm_changed)
+        self.runner_widget.cb_algorithms.currentTextChanged.connect(
+            self._algorithm_changed
+        )
+
+        # Connect the doc link button
+        self.runner_widget.algo_info_btn.clicked.connect(self._open_info_link_from_btn)
 
         # Add the parameters panel
-        layout.addWidget(self.params_panel.widget)
+        layout.addWidget(self.params_panel)
 
         # Run button
         self.run_btn = QPushButton("Run", self)
@@ -152,11 +174,7 @@ class QuPathWidget(QWidget):
             self.params_panel,  # linked to manage_cbs_events(worker)
         )
 
-        self.grayout_ui_list = [
-            self.params_panel.widget,
-            self.run_btn,
-            self.runner_widget.widget,
-        ]
+        self.grayout_ui_list = [self.params_panel, self.run_btn, self.runner_widget]
 
         # Cancel button
         cancel_btn = QPushButton("❌ Cancel")
@@ -206,7 +224,7 @@ class QuPathWidget(QWidget):
     def _algorithm_changed(self, selected_algo):
         if selected_algo == "":
             return
-        
+
         try:
             # Check for algo compatibility - if so, retreive the QuPath-modified schema
             schema = _if_compatible_get_qupath_schema(
@@ -236,7 +254,7 @@ class QuPathWidget(QWidget):
         if algorithm_name == "":
             self.logger.log("⚠️ Selecting an algorithm is required.")
             return
-        
+
         try:
             qp_annotations = self.bridge.get_annotations()
 
@@ -290,6 +308,30 @@ class QuPathWidget(QWidget):
 
             # Update QuPath
             self.bridge.merge_with_qupath(result_tile)
+
+    def _open_info_link_from_btn(self, *args, **kwargs) -> None:
+        algorithm = self.runner_widget.selected_algorithm_name
+        if algorithm == "":
+            return
+
+        self.runner_widget.runner.info(algorithm)
+
+    def _connect_from_btn(self):
+        server_url = self.runner_widget.server_url_field.text()
+        if server_url == "":
+            return
+
+        if isinstance(self.runner_widget.runner, Client):
+            try:
+                self.runner_widget.runner.connect(server_url)
+            except (ServerRequestError, AlgorithmServerError) as e:
+                self.logger.log(f"Could not connect to server on {server_url}")
+
+        self.runner_widget.cb_algorithms.clear()
+        qupath_compatible_algos = _qupath_compabile_algos(
+            runner=self.runner_widget.runner
+        )
+        self.runner_widget.cb_algorithms.addItems(qupath_compatible_algos)
 
     def _cancel(self):
         self.logger.log("⏳ Cancelling...")

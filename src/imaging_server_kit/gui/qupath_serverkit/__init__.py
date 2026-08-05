@@ -7,10 +7,7 @@ from qtpy.QtWidgets import QApplication
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm
 
-from imaging_server_kit.remote import Client
-
-from .qupath_algo_widget import QuPathAlgorithmWidget
-from .qupath_http_widget import QuPathHttpWidget
+from .qupath_widget import QuPathWidget
 
 
 def to_qwidget(
@@ -23,12 +20,7 @@ def to_qwidget(
     if not isinstance(runner, AlgorithmRunner):
         runner = Algorithm(runner)
 
-    if isinstance(runner, Client):
-        return QuPathHttpWidget(port=port, token=token, viewer=viewer)
-    else:
-        return QuPathAlgorithmWidget(
-            port=port, token=token, runner=runner, viewer=viewer
-        )
+    return QuPathWidget(port=port, token=token, runner=runner, viewer=viewer)
 
 
 def to_qupath(

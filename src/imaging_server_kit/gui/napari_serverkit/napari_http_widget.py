@@ -1,9 +1,8 @@
 import napari
 from imaging_server_kit.gui.napari_serverkit.napari_widget import NapariWidget
-from imaging_server_kit.gui.common import HttpRunnerWidget
+from imaging_server_kit.remote import Client
 
 
 class NapariHttpWidget(NapariWidget):
     def __init__(self, viewer: napari.Viewer):
-        runner_widget = HttpRunnerWidget()
-        super().__init__(runner_widget=runner_widget, viewer=viewer)
+        super().__init__(viewer=viewer, runner=Client())

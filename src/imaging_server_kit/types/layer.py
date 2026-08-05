@@ -228,18 +228,24 @@ class Layer:
     def select(self, domain: Domain) -> Layer:
         """Selection based on a domain in *global* coordinates."""
         cls = type(self)
+        
         required = True
         if self.meta:
             required=self.meta.get("required", True)
+            
+        _meta = self.meta.copy() if self.meta is not None else self.meta
+        
         layer_selection = cls(
             data=self.data,
             name=self.name,
-            meta=self.meta,
-            tile_meta=self.tile_meta,
+            meta=_meta,
+            tile_meta=self.tile_meta.copy(),
             required=required
         )
+        
         # Set the position to the domain's coords_min
         layer_selection.position = domain.coords_min
+        
         return layer_selection
 
     def __getitem__(self, key):

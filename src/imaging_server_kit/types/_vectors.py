@@ -78,10 +78,10 @@ class Vectors(Layer):
         """Select data in a given domain."""
         if (self.data is None) or (domain.size is None):
             _data = self.data
-            _meta = self.meta
+            _meta = self.meta.copy() if self.meta is not None else self.meta
         if self.n_objects == 0:
             _data = self._zeros_in(domain=domain)
-            _meta = self.meta
+            _meta = self.meta.copy() if self.meta is not None else self.meta
         else:
             # Mask of vector coordinates in the domain
             vector_coords_in_domain = (
@@ -93,7 +93,10 @@ class Vectors(Layer):
 
             selected_vectors = self.data_global_coords[filt]
 
-            selected_meta = select_object_meta(self.meta, self.n_objects, filt)
+            if self.meta:
+                selected_meta = select_object_meta(self.meta.copy(), self.n_objects, filt)
+            else:
+                selected_meta = self.meta
 
             if len(selected_vectors) > 0:
                 vtd = selected_vectors.copy()
@@ -107,7 +110,7 @@ class Vectors(Layer):
             data=_data,
             name=self.name,
             meta=_meta,
-            tile_meta=self.tile_meta,
+            tile_meta=self.tile_meta.copy(),
         )
         
         vectors_selection.position = domain.coords_min

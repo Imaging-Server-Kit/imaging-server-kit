@@ -130,11 +130,13 @@ class Image(Layer):
             _data = self.data[slices_with_channel]
 
         # Create a new layer
+        _meta = self.meta.copy() if self.meta is not None else self.meta
+        
         image_selection = Image(
             data=_data,
             name=self.name,
-            meta=self.meta,
-            tile_meta=self.tile_meta,
+            meta=_meta,
+            tile_meta=self.tile_meta.copy(),
         )
 
         image_selection.position = cmin_rounded

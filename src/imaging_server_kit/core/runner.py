@@ -11,7 +11,6 @@ from imaging_server_kit.core.stack import Stack, StackTileGenerator
 from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
-from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
 
 def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) -> str:
@@ -171,6 +170,7 @@ class AlgorithmRunner(ABC):
         # Handle the special napari case
         special_napari_case = False
         if isinstance(stack, napari.Viewer):
+            from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
             special_napari_case = True
             stack = NapariStack(viewer=stack)  # type: ignore
 

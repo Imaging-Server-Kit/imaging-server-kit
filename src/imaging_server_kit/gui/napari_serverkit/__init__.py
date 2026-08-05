@@ -7,10 +7,7 @@ import napari
 from imaging_server_kit import Algorithm, tools, demos
 from imaging_server_kit.core.runner import AlgorithmRunner
 
-from imaging_server_kit.remote import Client
-
-from .napari_algo_widget import NapariAlgorithmWidget
-from .napari_http_widget import NapariHttpWidget
+from .napari_widget import NapariWidget
 
 
 def to_qwidget(
@@ -20,10 +17,7 @@ def to_qwidget(
     if not isinstance(runner, AlgorithmRunner):
         runner = Algorithm(runner)
 
-    if isinstance(runner, Client):
-        return NapariHttpWidget(viewer=viewer)
-    else:
-        return NapariAlgorithmWidget(viewer=viewer, runner=runner)
+    return NapariWidget(viewer=viewer, runner=runner)
 
 
 def to_napari(

@@ -43,6 +43,7 @@ import imaging_server_kit as sk
             "dark_background": False,
         },
     ],
+    tileable=True,
 )
 def threshold_algo(image, threshold, dark_background):
     if image is None:

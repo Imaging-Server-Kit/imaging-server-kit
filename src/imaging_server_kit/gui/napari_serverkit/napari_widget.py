@@ -15,12 +15,14 @@ from imaging_server_kit.gui.common import (
     TaskManager,
 )
 from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
-from imaging_server_kit.remote.client import ServerRequestError
 from imaging_server_kit.types import layer_factory
+from imaging_server_kit.remote.client import Client, ServerRequestError
+from imaging_server_kit.core.errors import AlgorithmServerError
+from imaging_server_kit.core.runner import AlgorithmRunner
 
 
 class NapariWidget(QWidget):
-    def __init__(self, runner_widget: RunnerWidget, viewer: napari.Viewer):
+    def __init__(self, runner: AlgorithmRunner, viewer: napari.Viewer):
         super().__init__()
 
         # Algorithm parameters (dynamic UI)
@@ -34,25 +36,33 @@ class NapariWidget(QWidget):
             viewer, pbar=self.pbar, params_panel=self.params_panel
         )
 
-        # Runner widget
-        self.runner_widget = runner_widget
+        # # Runner widget
+        self.runner_widget = RunnerWidget(runner)
 
         # Layout
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignTop)  # type: ignore
         self.setLayout(layout)
-
+        
         # Add the runner's extra UI
-        layout.addWidget(self.runner_widget.widget)
+        layout.addWidget(self.runner_widget)
+
+        # Connect the server URL field
+        self.runner_widget.connect_btn.clicked.connect(self._connect_from_btn)
 
         # Connect the ComboBox change from the runner to the UI update
-        self.runner_widget.update_params_trigger.connect(self._algorithm_changed)
+        self.runner_widget.cb_algorithms.currentTextChanged.connect(
+            self._algorithm_changed
+        )
+
+        # Connect the doc link button
+        self.runner_widget.algo_info_btn.clicked.connect(self._open_info_link_from_btn)
 
         # Connect the samples loading event
         self.runner_widget.samples_select_btn.clicked.connect(self._sample_triggered)
 
         # Add the parameters panel
-        layout.addWidget(self.params_panel.widget)
+        layout.addWidget(self.params_panel)
 
         # Run button
         self.run_btn = QPushButton("Run", self)
@@ -66,11 +76,7 @@ class NapariWidget(QWidget):
             self.params_panel,  # linked to manage_cbs_events(worker)
         )
 
-        self.grayout_ui_list = [
-            self.params_panel.widget,
-            self.run_btn,
-            self.runner_widget.widget,
-        ]
+        self.grayout_ui_list = [self.params_panel, self.run_btn, self.runner_widget]
 
         cancel_btn = QPushButton("❌ Cancel")
         cancel_btn.clicked.connect(self._cancel)
@@ -82,7 +88,7 @@ class NapariWidget(QWidget):
         # Trigger an initial `algorithm selection`
         if len(self.runner_widget.runner.algorithms) > 0:
             self._algorithm_changed(self.runner_widget.runner.algorithms[0])
-
+            
     def _algorithm_changed(self, selected_algo: str):
         if selected_algo == "":
             return
@@ -218,6 +224,28 @@ class NapariWidget(QWidget):
                 ].qt_widget_setter_func
                 if qt_widget_setter_func is not None:
                     qt_widget_setter_func(sp.data)
+
+    def _open_info_link_from_btn(self, *args, **kwargs) -> None:
+        algorithm = self.runner_widget.selected_algorithm_name
+        if algorithm == "":
+            return
+
+        self.runner_widget.runner.info(algorithm)
+
+    def _connect_from_btn(self):
+        server_url = self.runner_widget.server_url_field.text()
+        if server_url == "":
+            show_warning("Please specify a server URL!")
+            return
+
+        if isinstance(self.runner_widget.runner, Client):
+            try:
+                self.runner_widget.runner.connect(server_url)
+            except (ServerRequestError, AlgorithmServerError) as e:
+                show_warning(f"Could not connect to server on {server_url}")
+
+        self.runner_widget.cb_algorithms.clear()
+        self.runner_widget.cb_algorithms.addItems(self.runner_widget.runner.algorithms)
 
     def _cancel(self):
         show_info("Cancelling...")

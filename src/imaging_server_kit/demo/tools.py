@@ -419,6 +419,7 @@ def otsu_threshold(image):
     name="Mask - Label",
     description="Connected components labelling.",
     tags=["Mask", "Scikit-image"],
+    tileable=True,
 )
 def label_algo(mask):
     if mask is None:

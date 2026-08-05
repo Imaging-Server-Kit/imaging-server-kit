@@ -42,6 +42,9 @@ from .merge import merge_layers, LayerMerger
 from .demo import multi_algo_tools as tools
 from .demo import multi_algo_demos as demos
 
+from .remote import Client, serve
+from .gui import to_napari, to_qwidget
+
 
 def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
     """

@@ -41,6 +41,7 @@ dependencies = [
     "qtpy",
     "napari[all]>=0.4.16",
     "napari-toolkit",
+    "opencv-contrib-python-headless",  # To avoid opencv interferring with PyQt
 ]
 
 [project.optional-dependencies]
