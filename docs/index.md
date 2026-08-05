@@ -12,13 +12,13 @@ Server Kit algorithms are versatile objects that allow you run computations in a
 
 For example, you can
 
-- [**Turn your algorithm into a web server**](./sections/07_server.md), connect to it and run computations from [QuPath](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit), [Napari](https://github.com/Imaging-Server-Kit/napari-serverkit), or [Python](./sections/08_python) via HTTP requests.
+- [**Turn your algorithm into a web server**](./sections/07_server.md), connect to it and run computations from [Napari](https://napari.org/stable/), [QuPath](https://qupath.github.io/), or [Python](./sections/08_python) via HTTP requests.
 
 <video width=512 controls loop autoplay>
-  <source src="./_static/stardist_blobs.mp4" type="video/mp4">
+  <source src="./_static/cellpose_example.mp4" type="video/mp4">
 </video>
 
-- [**Generate a dock widget**](./sections/01_algorithm) to run your algorithm interactively in Napari.
+- [**Generate a dock widget**](./sections/01_algorithm) to run your algorithm interactively in Napari or QuPath.
 
 <video width=512 controls loop autoplay>
   <source src="./_static/oripy_threshold.mp4" type="video/mp4">
@@ -36,7 +36,7 @@ For example, you can
   <source src="./_static/yolo-stream.mp4" type="video/webm">
 </video>
 
-On top of that, you can [**validate data**](./sections/08_python) passed as algorithm parameters, provide [**samples**](./sections/02_samples), and generate [**documentation**](./sections/03_metadata) for your algorithm that you can share with users.
+On top of that, you can provide [**samples**](./sections/02_samples) and automatically generate a [**documentation**](./sections/03_metadata) page for your algorithm that you can share with users.
 
 This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](./sections/01_algorithm), and give you some [suggestions of use cases](./sections/11_examples).
 
@@ -61,17 +61,7 @@ cd imaging-server-kit
 pip install -e .
 ```
 
-**Napari plugin**
-
-Install the [napari-serverkit](https://github.com/Imaging-Server-Kit/napari-serverkit) plugin with `pip` to enable all [Napari](https://napari.org/stable/)-related functionalities.
-
-```sh
-pip install napari-serverkit
-```
-
-**QuPath extention**
-
-To use the Imaging Server Kit in [QuPath](https://qupath.github.io/), follow the installation instructions at [qupath-extension-serverkit](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit).
+To use **QuPath-related functionalities**, you additionally have to install [`qubalab>=0.2.0`](https://pypi.org/project/qubalab/#history), which is not included by default.
 
 ## License
 

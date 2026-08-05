@@ -251,7 +251,7 @@ class Algorithm(AlgorithmRunner):
     
     Notes
     ----------
-    - Algorithms can be converted to Napari widgets (via napari-serverkit) or FastAPI servers.
+    - Algorithms can be converted to FastAPI servers or PyQt widgets for Napari or QuPath.
     - Algorithms are associated with a Pydantic Schema that can be used to validate input parameters.
     - Algorithms can be run tile-by-tile (in most cases).
     - Algorithms can be run on a subset of the spatial domain defined by their inputs.

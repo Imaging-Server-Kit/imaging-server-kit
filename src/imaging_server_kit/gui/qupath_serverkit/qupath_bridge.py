@@ -1,9 +1,7 @@
 """
 Experimental bridge between QuPath and the Imaging Server Kit via QuBaLab.
 
-This method is likely going to replace the qupath-extension-serverkit in the future.
-
-Currently, the bridge is implemented for algorithms returning sk.Mask and sk.Boxes objects.
+Currently, the bridge is implemented for algorithms returning sk.Mask and sk.Boxes objects, but this could be extended in the future.
 """
 
 from typing import List, Optional

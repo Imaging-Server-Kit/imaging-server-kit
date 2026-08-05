@@ -1,14 +1,6 @@
 # Getting started
 
-The following section will give you a first introduction to the Imaging Server Kit using a set of **interactive demos**.
-
-## Prerequisites
-
-Make sure to have installed the required packages:
-
-```
-pip install imaging-server-kit napari-serverkit
-```
+The following section will give you a first introduction to the Imaging Server Kit via **interactive demos**.
 
 ## Run the Napari demo
 
@@ -18,11 +10,11 @@ The Napari demo will give you a first idea of what the package can do. From a te
 serverkit demo napari
 ```
 
-This command should open a **Napari viewer** with the *Server Kit* plugin already loaded. In the *Algorithm* dropdown, you will see a list of available algorithms.
+This command should open a **Napari viewer** with the *Imaging Server Kit* plugin already loaded. In the *Algorithm* dropdown, you will see a list of "demo" algorithms.
 
 ![Demo-Napari](../assets/demo_napari_screenshot.png)
 
-When you select an **algorithm**, the *Parameters* panel will update to display a list of tunable **parameters** for the algorithm.
+When you select an **algorithm**, the *Parameters* panel will update to display a list of tunable **parameters** for this algorithm.
 
 Most algorithms require an input image. You can **load a sample image** from the *Samples* dropdown. Once you have loaded an image, you can **run** the algorithm and visualize the results in the Napari viewer.
 
@@ -51,10 +43,10 @@ This launches a web server on your local machine at http://localhost:8000. If yo
 While your server is running, you can connect to it directly from Napari. Open another terminal and run:
 
 ```
-napari -w napari-serverkit
+napari -w imaging-server-kit
 ```
 
-This is equivalent to opening the plugin in Napari from `Plugins > Server Kit (Napari Server Kit)`.
+This is equivalent to opening the plugin in Napari from `Plugins > Imaging Server Kit > Connect to server`.
 
 In the plugin panel, enter the server address (http://localhost:8000) and press *Connect*. The *Algorithm* dropdown will populate with the available algorithms. You can use them just like in the local case.
 
@@ -68,9 +60,23 @@ In this demo, both client and server run on your local machine, but keep in mind
 
 ### Connect from QuPath
 
-You can also use Server Kit algorithms direction from QuPath, for segmentation and object detection tasks. To try this out, follow the instructions in the [qupath-extension-serverkit](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit) repository.
+You can also use Imaging Server Kit algorithms direction from QuPath via [QuBaLab](https://github.com/qupath/qubalab), for segmentation and bounding box detection tasks. To try this out, you can run the command:
 
-![threshold-qupath](../assets/threshold_qupath.png)
+```sh
+serverkit qupath
+```
+
+This will bring up a user interface similar to the dock widget you used in Napari, with an extra field for connecting to QuPath via Py4J. Next, in a QuPath project:
+
+- Open an image, for example `blobs.tif`.
+- Draw a rectangular annotation in a region of interest (or use `Ctrl+Shift+A` to select the whole image).
+- Assign a class to this annotation via the QuPath `Annotations` menu, for example the class `Region`.
+
+After that, start a **Py4J** gateway from QuPath via the [qupath-extension-py4j](https://github.com/qupath/qupath-extension-py4j) (you can specify a token and port if needed). Then, click `Connect to QuPath` in the Imaging Server Kit window. The `Annotation` dropdown should now be filled with annotation class names (e.g., `Region`).
+
+Finally, with your server still active on http://localhost:8000, click on `Connect` to discover and use the algorithms available on that server. For this demonstration, you should be able to run a simple threshold on an image in QuPath!
+
+![threshold-qupath](../assets/threshold_qubalab.png)
 
 ## Next steps
 

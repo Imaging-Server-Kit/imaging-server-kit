@@ -2,11 +2,6 @@
 
 Any Imaging Server Kit algorithm can be **served as a web API** using a built-in [FastAPI](https://fastapi.tiangolo.com/) server. This turns algorithms into web servers that you can interact with from Napari, QuPath, or Python via HTTP requests.
 
-Serving an algorithm is particularly useful when:
-
-- You want to run computations on a remote machine and visualize the results on your local machine.
-- You want to use algorithms in **QuPath** via the `qupath-extension-serverkit` extension.
-
 ## Using `sk.serve`
 
 Let's consider the threshold algorithm once again. You can serve this algorithm by passing it to `sk.serve()`. 
@@ -42,13 +37,17 @@ Once the server is running, you can connect to it from Napari, QuPath, or direct
 
 ### Connecting from Napari
 
-The [Napari Server Kit](https://github.com/Imaging-Server-Kit/napari-serverkit) plugin provides a widget for connecting to algorithm servers.
-
-To try it out, open a new terminal window, start Napari, and then open the plugin from `Plugins > Server Kit (Napari Server Kit)`. In the `Server URL` field, enter: http://localhost:8000, and press *Connect*. You should see your threshold algorithm listed, with all related functionalities (load samples, run algorithm, access documentation) available.
+You can connect to algorithm servers from Napari via the menu `Plugins > Imaging Server Kit > Connect to server`. In the `Server URL` field, enter: http://localhost:8000, and press *Connect*. You should see your threshold algorithm listed, with all related functionalities (load samples, run algorithm, access documentation) available.
 
 ### Connecting from QuPath
 
-You can also connect to algorithm servers via QuPath through the [qupath-extension-serverkit](https://github.com/Imaging-Server-Kit/qupath-extension-serverkit) extension. The QuPath extension can handle compatible algorithm outputs, including segmentation masks, bounding boxes, vectors, points, and classification tasks.
+You can also connect to algorithm servers and use algorithms via QuPath. From the terminal, run:
+
+```sh
+serverkit qupath
+```
+
+to bring up the QuPath connection panel. Algorithms compatible with QuPath include those that take a single image as input (interpreted as the QuPath image), and return segmentation masks or bounding boxes.
 
 ## Summary
 
