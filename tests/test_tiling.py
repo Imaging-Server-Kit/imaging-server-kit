@@ -242,6 +242,7 @@ def test_sk_label():
     data = stack[0].data
     labelled = label(mask)
     assert len(np.unique(labelled)) == len(np.unique(data))
+    assert stack[0].position == (0, 0)
 
 
 ### -- Selecting data -- ###
