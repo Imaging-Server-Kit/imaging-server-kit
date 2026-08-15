@@ -11,7 +11,7 @@ def serve(
     algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs
 ) -> None:
     """
-    Serve an algorithm as an HTTP server.
+    Serve an algorithm, algorithm collection, or plain Python function as an HTTP server.
 
     Parameters
     ----------

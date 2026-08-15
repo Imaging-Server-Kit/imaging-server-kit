@@ -5,7 +5,16 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Integer(Layer):
-    """Data layer used to represent integer values."""
+    """Data layer used to represent integer values.
+
+    Parameters
+    ----------
+    data: An integer value.
+    min: Minimum accepted value.
+    max: Maximum accepted value.
+    step: Step size used by interactive sliders/spinboxes.
+    default: Default value used when `data` is not provided.
+    """
 
     kind = "int"
     type = Optional[int]

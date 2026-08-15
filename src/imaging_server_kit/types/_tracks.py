@@ -6,7 +6,7 @@ from imaging_server_kit.core.tiling import Domain
 
 
 class Tracks(Layer):
-    """Data layer used to represent tracking data.
+    """Data layer used to represent object tracks: point detections linked over time by a shared track ID.
 
     Parameters
     ----------

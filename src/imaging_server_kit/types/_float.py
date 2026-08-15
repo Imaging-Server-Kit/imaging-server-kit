@@ -5,7 +5,16 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Float(Layer):
-    """Data layer used to represent floating-point (decimal) values."""
+    """Data layer used to represent floating-point (decimal) values.
+
+    Parameters
+    ----------
+    data: A floating-point value.
+    min: Minimum accepted value.
+    max: Maximum accepted value.
+    step: Step size used by interactive sliders/spinboxes.
+    default: Default value used when `data` is not provided.
+    """
 
     kind = "float"
     type = Optional[float]

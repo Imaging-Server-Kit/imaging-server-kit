@@ -40,12 +40,10 @@ def to_qupath(
     viewer: Optional["napari.Viewer"] = None,
 ) -> None:
     """
-    Experimental bridge between QuPath and the Imaging Server Kit via QuBaLab.
+    Convert an algorithm, algorithm collection, or remote client into a QuPath-side user interface, via QuBaLab. Experimental.
 
-    This function creates a user interface for a server kit algorithm (or multi-algorithm, or client)
-    which can be used to run computations inside a QuPath annotation (e.g., a selected rectangular region).
-
-    Only algorithms that take a single image as input are compatible (this image is interpreted as the QuPath image).
+    Computations can be restricted to a selected QuPath annotation (e.g., a rectangular region).
+    Only algorithms that take a single image as input are compatible; that image is interpreted as the current QuPath image.
 
     Parameters
     ----------

@@ -6,10 +6,14 @@ from imaging_server_kit.types.layer import Layer
 class Notification(Layer):
     """Data layer used to represent a text notification.
 
-    Use the `level` parameter to define the notification level (`info`, `warning`, or `error`).
+    Parameters
+    ----------
+    data: The notification text.
+    level: Notification level (`info`, `warning`, or `error`).
 
-    Example:
-        notif = sk.Notification("Warning!", level="warning")
+    Examples
+    --------
+    >>> notif = sk.Notification("Warning!", level="warning")
     """
 
     kind = "notification"

@@ -31,6 +31,13 @@ class ServerRequestError(Exception):
 
 class Client(AlgorithmRunner):
     """Client to connect to and interact with algorithm servers.
+    
+    A `Client` exposes the same interface as `sk.Algorithm` so the same code can run an algorithm locally or remotely.
+
+    Parameters
+    ----------
+    server_url: Address of the algorithm server. If provided, `connect()` is called immediately.
+    name: A name identifying the client.
 
     Attributes
     ----------

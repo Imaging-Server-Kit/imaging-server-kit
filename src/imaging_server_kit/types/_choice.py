@@ -13,8 +13,15 @@ class Choice(Layer):
 
     The available choices are rendered as a dropdown selector in user interfaces.
 
-    Example:
-        choices = sk.Choice(items=["reflect", "constant"], default="reflect")
+    Parameters
+    ----------
+    data: The selected choice.
+    items: List of available choices.
+    default: Default value used when `data` is not provided.
+
+    Examples
+    --------
+    >>> choice = sk.Choice(items=["reflect", "constant"], default="reflect")
     """
 
     kind = "choice"

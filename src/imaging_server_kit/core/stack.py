@@ -13,7 +13,7 @@ from imaging_server_kit.core.tiling import (
 
 
 class Stack:
-    """A stack of data layers.
+    """An ordered collection of data layers.
 
     Access layers by index: `layer = stack[0]` or name: `layer = stack.read("Layer Name")`.
 

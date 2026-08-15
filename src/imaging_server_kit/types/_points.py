@@ -9,7 +9,7 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Points(Layer):
-    """Data layer used to represent points.
+    """Data layer used to represent a set of coordinate points (2D, 3D).
 
     Parameters
     ----------

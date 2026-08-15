@@ -4,7 +4,13 @@ from imaging_server_kit.types.layer import Layer
 
 
 class String(Layer):
-    """Data layer used to represent strings of text."""
+    """Data layer used to represent strings of text.
+
+    Parameters
+    ----------
+    data: A string value.
+    default: Default value used when `data` is not provided.
+    """
 
     kind = "str"
     type = Optional[str]

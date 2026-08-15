@@ -32,7 +32,7 @@ class TilingSpecs:
 
 
 class TileMeta:
-    """Tile metadata.
+    """Metadata describing a single tile's position within a series of tiles: its index, overlap, and whether it lies on the domain's edges.
 
     Attributes
     ----------

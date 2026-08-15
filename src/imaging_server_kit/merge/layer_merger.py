@@ -32,10 +32,29 @@ def find_layer_merger(layer: Layer) -> Merger:
 
 
 class LayerMerger:
+    """Dispatches layer merging to the appropriate `Merger` strategy based on layer kind and `meta["merger"]`.
+
+    Used internally by `Stack.merge()` to merge one tile's result layers into an
+    accumulating stack; also used by `merge_layers()` to merge a list of layers directly.
+
+    Methods
+    ----------
+    merge(): Merge an incoming layer into a receiving layer, in place.
+    """
+
     @staticmethod
     def merge(
         receiving_layer: Layer, incoming_layer: Layer, merge_data: bool = True
     ) -> None:
+        """Merge `incoming_layer` into `receiving_layer`, in place.
+
+        Parameters
+        ----------
+        receiving_layer: The layer to merge into. Modified in place.
+        incoming_layer: The layer being merged in.
+        merge_data: Whether to merge the layers' data. If False, only the first/last-tile
+            merger lifecycle hooks (`on_first_merge`/`on_last_merge`) are run.
+        """
         if incoming_layer.tile_meta.is_first_tile:
             merger = find_layer_merger(receiving_layer)
             receiving_layer._merger_instance = merger
@@ -54,9 +73,18 @@ class LayerMerger:
 
 
 def merge_layers(layers: List[Layer]) -> Layer:
-    """Merge a list of data layers of the same kind.
-    Note: This method differs from layer.merge(other_layer), which is an in-place merge.
-    Here, a new layer is created and the data from all `layers` are merged into it.
+    """Merge a list of data layers of the same kind into a new layer.
+
+    Note: unlike `LayerMerger.merge()`, which merges in place into an existing layer,
+    this creates a new layer and merges the data from all `layers` into it.
+
+    Parameters
+    ----------
+    layers: Layers to merge. Must all be of the same kind.
+
+    Returns
+    -------
+    A new layer containing the merged data.
     """
     if len(layers) == 0:
         raise ValueError("There should be at least one layer to merge.")

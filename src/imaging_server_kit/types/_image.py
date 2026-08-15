@@ -9,7 +9,7 @@ from imaging_server_kit.core.domain import Domain
 
 
 class Image(Layer):
-    """Data layer used to represent images and image-like data.
+    """Data layer used to represent images: 2D or 3D arrays, optionally multichannel or RGB.
 
     Parameters
     ----------

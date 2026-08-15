@@ -13,13 +13,18 @@ PBAR = tqdm()
 
 
 class Progress(Layer):
-    """Data layer used to represent a progress bar.
+    """Data layer used to render a progress bar in user interfaces.
 
-    Usage example:
+    Parameters
+    ----------
+    data: Current step (0-indexed).
+    max_val: Total number of steps.
 
-    max_val = 10
-    for k in range(max_val):
-        yield sk.Progress(k, max_val=max_val)
+    Examples
+    --------
+    >>> max_val = 10
+    >>> for k in range(max_val):
+    ...     yield sk.Progress(k, max_val=max_val)
     """
 
     kind = "progress"

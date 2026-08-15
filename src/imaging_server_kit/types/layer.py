@@ -13,7 +13,19 @@ from imaging_server_kit.core.tiling import (
 
 
 class Layer:
-    """A layer corresponding to a particular kind of data.
+    """Base class for a single piece of data — an image, a mask, a numeric parameter, etc.
+    
+    Used to represent both an algorithm's inputs and its outputs.
+
+    Parameters
+    ----------
+    name: Name of the layer.
+    data: Data held by the layer (type depends on the sublass).
+    meta: Metadata dictionary. If not provided, it is built from extra keyword arguments (e.g., `description`, `merger`, `position`).
+    position: Position of the layer in World coordinates.
+    tile_meta: Metadata about the layer's position and role in a tile set.
+    description: Description of the layer.
+    merger: A merging strategy for the layer (only used with Mask).
 
     Attributes
     ----------
@@ -30,7 +42,7 @@ class Layer:
     size : Size of the extent of the layer.
     coords_min : Minimum (World) coordinates of the data.
     coords_max : Maximum (World) coordinates of the data.
-    merger: Identifies a merging strategy for the layer (only used with segmentation masks).
+    merger: A merging strategy for the layer (only used with Mask).
     tile_meta : Metadata about the layer's position and role in a tile set.
 
     Methods

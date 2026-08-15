@@ -3,7 +3,12 @@ from typing import Dict, List, Optional, Tuple, Union
 
 
 class Domain:
-    """A nD-domain defined by a size and position in global pixel space.
+    """A nD-domain defined by a size and position in global pixel space. Used to represent tile extents, and to restrict an algorithm's computation to a specific region.
+
+    Parameters
+    ----------
+    size: Size of the domain in pixels, one value per dimension.
+    position: Position of the domain's top-left corner in global pixel space. Defaults to the origin (all zeros) if only `size` is provided.
 
     Attributes
     ----------

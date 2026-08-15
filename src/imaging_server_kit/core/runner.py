@@ -39,7 +39,30 @@ def validate_algorithm(func: Callable) -> Callable:
 
 
 class AlgorithmRunner(ABC):
-    """The algorithm runner base class, parent to sk.Algorithm, sk.MultiAlgorithm and sk.Client."""
+    """Abstract base class shared by `sk.Algorithm`, `sk.MultiAlgorithm`, and `sk.Client` — the common interface that lets the same code run an algorithm locally, remotely, or as part of a collection.
+
+    Subclasses provide `_stream()` (how to execute or request one parameter tile) and
+    inherit `run()`, which handles parameter resolution, tiling, domain restriction, and
+    result merging identically across all three.
+
+    Attributes
+    ----------
+    name: A name identifying the runner.
+    algorithms: A list of available algorithm names.
+
+    Methods
+    ----------
+    run(): Execute an algorithm with a set of parameters.
+        Set `tiled=True` for tiled inference.
+        Raises a ValidationError when parameters are invalidated.
+    run_generator(): Lower-level generator variant of run(), yielding one (result_tile, params_tile) pair per tile.
+    get_n_samples(): Get the number of samples available.
+    get_sample(): Get a sample by index.
+    info(): Access algorithm documentation.
+    get_parameters(): Get the algorithm parameters schema.
+    is_tileable(): Whether the algorithm can be run tile-by-tile.
+    get_signature_params(): List parameter names of the algorithm's run function.
+    """
 
     @property  # type: ignore
     @abstractmethod

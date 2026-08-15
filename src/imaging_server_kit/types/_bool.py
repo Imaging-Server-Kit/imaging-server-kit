@@ -4,7 +4,13 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Bool(Layer):
-    """Data layer used to represent boolean values."""
+    """Data layer used to represent boolean values.
+
+    Parameters
+    ----------
+    data: A boolean value.
+    default: Default value used when `data` is not provided.
+    """
 
     kind = "bool"
     type = Optional[bool]

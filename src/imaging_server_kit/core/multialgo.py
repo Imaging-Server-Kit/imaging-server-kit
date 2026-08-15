@@ -6,8 +6,13 @@ from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
 
 
 class MultiAlgorithm(AlgorithmRunner):
-    """A collection of algorithms, usually created via the `sk.combine()` method.
-    
+    """A collection of algorithms exposed under a single interface, with the target algorithm selected by name at call time. Usually created via the `sk.combine()` function rather than instantiated directly.
+
+    Parameters
+    ----------
+    algorithms: A list of algorithm instances in the collection.
+    name: A name for the algorithm collection.
+
     Attributes
     ----------
     algorithms_dict: A dictionary mapping algorithm names to instances in the collection.
@@ -70,7 +75,7 @@ class MultiAlgorithm(AlgorithmRunner):
 
 def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgorithm:
     """
-    Combine multiple algorithms into an algorithm collection.
+    Combine multiple algorithms, or plain Python functions, into a single algorithm collection.
 
     Parameters
     ----------

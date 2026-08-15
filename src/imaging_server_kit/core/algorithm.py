@@ -247,8 +247,20 @@ def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
 
 
 class Algorithm(AlgorithmRunner):
-    """An algorithm defined from a Python function.
-    
+    """An algorithm built by wrapping a Python function. Usually created via the `@sk.algorithm(...)` decorator rather than instantiated directly.
+
+    Parameters
+    ----------
+    run_algorithm_func: The Python function to convert.
+    parameters: A dictionary of annotated parameters.
+    name: A name for the algorithm (doesn't accept spaces and special characters).
+    description: A short description to display on the algorithm doc page.
+    tags: A list of tags (arbitrary).
+    project_url: A link to a related, or the original project (gets displayed on the algo doc page).
+    metadata_file: A path to a metadata.yaml file with algorithm metadata.
+    samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimage.io.imread`.
+    tileable: Whether to allow running the algorithm tile-by-tile.
+
     Notes
     ----------
     - Algorithms can be converted to FastAPI servers or PyQt widgets for Napari or QuPath.
@@ -467,7 +479,7 @@ def algorithm(
     samples: Optional[List[Dict[str, Any]]] = None,
     tileable: bool = False,
 ) -> Union[Algorithm, Callable]:
-    """Convert a Python function into an algorithm instance (sk.Algorithm).
+    """Wrap a Python function as an algorithm (sk.Algorithm). Typically used as the `@sk.algorithm(...)` decorator.
 
     Parameters
     ----------

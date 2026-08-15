@@ -165,7 +165,7 @@ def features2instance_mask_3d(features, image_shape):
 
 
 class Mask(Layer):
-    """Data layer used to represent segmentation masks.
+    """Data layer used to represent segmentation masks: label images where integer values encode either object classes or object instances.
 
     Parameters
     ----------

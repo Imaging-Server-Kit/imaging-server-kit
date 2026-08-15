@@ -12,7 +12,17 @@ def napari_available() -> bool:
 def to_qwidget(
     runner: Union[AlgorithmRunner, Callable], viewer: "napari.Viewer"
 ) -> "QWidget":
-    """Convert an algorithm to a QWidget. Used when packaging a Napari plugin."""
+    """Convert an algorithm, algorithm collection, or remote client to a QWidget. Used when packaging a Napari plugin.
+
+    Parameters
+    ----------
+    runner: A server kit algorithm, multi-algorithm, or client object. A plain Python function is also accepted and converted to an algorithm.
+    viewer: The Napari viewer the widget will interact with.
+
+    Returns
+    -------
+    A QWidget exposing the runner's parameters and results.
+    """
     if not napari_available():
         raise ImportError(
                 """
@@ -34,12 +44,16 @@ def to_napari(
     viewer: Optional["napari.Viewer"] = None,
 ) -> "napari.Viewer":
     """
-    Convert an algorithm (or algorithm collection) to a dock widget and add it to a Napari viewer.
+    Convert an algorithm, algorithm collection, or remote client into a dock widget and add it to a Napari viewer.
 
     Parameters
     ----------
-    algorithm : The algorithm object to add to Napari as a dock widget.
+    runner : A server kit algorithm, multi-algorithm, or client object to add to Napari as a dock widget. A plain Python function is also accepted and converted to an algorithm.
     viewer : An existing Napari viewer to add the dock widget to. If none is passed, a new Napari viewer is created.
+
+    Returns
+    -------
+    The Napari viewer with the dock widget added.
     """
     if not napari_available():
         raise ImportError(

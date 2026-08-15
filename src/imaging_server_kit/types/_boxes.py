@@ -9,7 +9,7 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Boxes(Layer):
-    """Data layer used to represent boxes (rectangular bounding boxes).
+    """Data layer used to represent rectangular bounding boxes (2D, 3D).
 
     Parameters
     ----------

@@ -3,8 +3,11 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Null(Layer):
-    """
-    Data layer used to represent None or the absence of data.
+    """Data layer used to represent None or the absence of data.
+
+    Parameters
+    ----------
+    data: Always None; accepted for interface consistency with other layers.
     """
 
     kind = "null"

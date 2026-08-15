@@ -9,7 +9,7 @@ from imaging_server_kit.types.common import select_object_meta
 
 
 class Vectors(Layer):
-    """Data layer used to represent vectors.
+    """Data layer used to represent a set of vectors, each defined by an origin point and a displacement (2D, 3D).
 
     Parameters
     ----------

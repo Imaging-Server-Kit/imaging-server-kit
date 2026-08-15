@@ -43,7 +43,7 @@ dependencies = [
 napari = ["qtpy", "napari[all]>=0.4.16", "napari-toolkit", "opencv-contrib-python-headless"]  # Use opencv-headless to avoid interferring with PyQt
 qupath = ["imaging-server-kit[napari]", "qubalab>=0.2.0"]  # Restricts Python version to be 3.11 -> 3.13...
 docs = ["jupyter-book<2.0", "jupytext"]
-test = ["pytest", "coverage"]
+test = ["pytest", "coverage", "httpx"]
 all = ["imaging-server-kit[napari,qupath,docs,test]"]
 
 [project.scripts]
