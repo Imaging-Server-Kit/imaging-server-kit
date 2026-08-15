@@ -43,7 +43,7 @@ from .demo import multi_algo_tools as tools
 from .demo import multi_algo_demos as demos
 
 from .remote import Client, serve
-from .gui import to_napari, to_qwidget
+from .gui import to_napari, to_qwidget, to_qupath
 
 
 def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
@@ -67,7 +67,17 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
 
     if to == "stack":
         return Stack(layers=stack.layers)
-    elif to == "napari":        
+    elif to == "napari":
+        from imaging_server_kit.gui.napari_serverkit import napari_available
+
+        if not napari_available():
+            raise ImportError(
+                """
+                    This function requires the optional Napari dependencies to be installed.\n
+                    Install them with: `pip install imaging-server-kit[napari]`.
+                """
+            )
+
         from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
         # For napari, we return the viewer directly

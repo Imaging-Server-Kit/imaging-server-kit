@@ -1,13 +1,13 @@
 import sys
 from typing import Callable, Optional, Union
-
-from qtpy.QtWidgets import QWidget
-from qtpy.QtWidgets import QApplication
+import importlib.util
 
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm
 
-from .qupath_widget import QuPathWidget
+
+def qubalab_available() -> bool:
+    return importlib.util.find_spec("qubalab") is not None
 
 
 def to_qwidget(
@@ -15,8 +15,18 @@ def to_qwidget(
     port: int = 25333,
     token: str = "",
     viewer=None,
-) -> QWidget:
+) -> "QWidget":
     """Convert an algorithm to a QWidget (QuPath version)."""
+    if not qubalab_available():
+        raise ImportError(
+                """
+                    This function requires the optional QuPath dependencies to be installed.\n
+                    Install them with: `pip install imaging-server-kit[qupath]`.
+                """
+            )
+    
+    from .qupath_widget import QuPathWidget
+    
     if not isinstance(runner, AlgorithmRunner):
         runner = Algorithm(runner)
 
@@ -44,6 +54,14 @@ def to_qupath(
     token: Token from the Py4J extension.
     viewer: An optional Napari Viewer to use to collect results from the compuatations that cannot be displayed in QuPath.
     """
+    if not qubalab_available():
+        raise ImportError(
+                """
+                    This function requires the optional QuPath dependencies to be installed.\n
+                    Install them with: `pip install imaging-server-kit[qupath]`.
+                """
+            )
+    
     if not isinstance(runner, AlgorithmRunner):
         runner = Algorithm(run_algorithm_func=runner)
 
@@ -52,6 +70,8 @@ def to_qupath(
         viewer.window.add_dock_widget(widget)
         return viewer
     else:
+        from qtpy.QtWidgets import QApplication
+        
         app = QApplication(sys.argv)
         widget = to_qwidget(runner=runner, port=port, token=token)
         widget.show()

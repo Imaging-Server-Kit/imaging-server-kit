@@ -122,7 +122,6 @@ class Stack:
             layer_selection = extract.layers[start:stop]
         else:
             # Layer_key is an int
-            ## TODO: extract as a.. hard copy of the layers?
             layer_selection = extract.layers[layer_key]
 
         return layer_selection

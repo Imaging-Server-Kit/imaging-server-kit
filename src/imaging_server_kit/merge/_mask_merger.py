@@ -279,12 +279,9 @@ class InstanceMaskTileMerger(DefaultMerger):
 
         receiving_layer.data = new_data  # Extend the source layer data
 
-        print()
-        print("HMID - ", receiving_layer.meta['position'])
         src_tile = receiving_layer.select(domain=incoming_layer.extent)
         if src_tile.data is None:
             raise ValueError(f"Could not get a mask tile where it was requested.")
-        print("HMID2 - ", receiving_layer.meta['position'])
 
         dst_arr = self.tile_tracker.add_N_to_tile(incoming_layer.data)
 

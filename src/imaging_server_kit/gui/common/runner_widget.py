@@ -92,7 +92,7 @@ class RunnerWidget(QWidget):
         experimental_layout.addWidget(QLabel("Tile size [px]"), 1, 0)
         self.qds_tile_size = QSpinBox()
         self.qds_tile_size.setMinimum(16)
-        self.qds_tile_size.setMaximum(4096)
+        self.qds_tile_size.setMaximum(65_536)
         self.qds_tile_size.setSingleStep(16)
         self.qds_tile_size.setValue(128)
         self.qds_tile_size.setEnabled(False)

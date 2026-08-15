@@ -34,7 +34,17 @@ cd imaging-server-kit
 pip install -e .
 ```
 
-To use **QuPath-related functionalities**, you additionally have to install [`qubalab>=0.2.0`](https://pypi.org/project/qubalab/#history), which is not included by default.
+To use the **Napari-related functionalities**, you additionally have to install [`napari`](https://github.com/napari/napari) and [`napari-toolkit`](https://github.com/MIC-DKFZ/napari_toolkit) which are not included by default. Install the package with:
+
+```sh
+pip install "imaging-server-kit[napari]"
+```
+
+To use the **QuPath-related functionalities**, you additionally have to install [`qubalab>=0.2.0`](https://pypi.org/project/qubalab/#history), which is not included by default. Install the package with:
+
+```sh
+pip install "imaging-server-kit[qupath]"
+```
 
 ## Getting started
 

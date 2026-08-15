@@ -12,11 +12,11 @@ contributions:
 
     - id: imaging-server-kit.demos
       title: Demo algorithms
-      python_name: imaging_server_kit.gui.napari_serverkit:AlgorithmDemosWidget
+      python_name: imaging_server_kit.gui.napari_serverkit.extra_widgets:AlgorithmDemosWidget
 
     - id: imaging-server-kit.tools
       title: Tool algorithms
-      python_name: imaging_server_kit.gui.napari_serverkit:AlgorithmToolsWidget
+      python_name: imaging_server_kit.gui.napari_serverkit.extra_widgets:AlgorithmToolsWidget
   widgets:
     - command: imaging-server-kit.remote_napari
       display_name: Connect to server

@@ -264,3 +264,4 @@ class NapariWidget(QWidget):
         self.pbar.setMaximum(1)  # Stop the pbar
         for ui_element in self.grayout_ui_list:
             ui_element.setEnabled(True)
+

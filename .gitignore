@@ -29,3 +29,8 @@ venv/
 push.sh
 todo.txt
 release.md
+TODO.md
+AGENTS.md
+CLAUDE.md
+.claude/
+summary.md

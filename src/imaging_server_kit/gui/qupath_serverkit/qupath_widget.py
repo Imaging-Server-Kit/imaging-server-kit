@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from napari_toolkit.containers.collapsible_groupbox import QCollapsibleGroupBox
 from qtpy.QtCore import Qt
@@ -18,58 +18,20 @@ from qtpy.QtWidgets import (
 
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.gui.common import ParameterPanel, RunnerWidget, TaskManager
-from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import QuPathBridge
+from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import (
+    QuPathBridge,
+    if_compatible_get_qupath_schema,
+)
 from imaging_server_kit.remote import Client
 from imaging_server_kit.core.errors import AlgorithmServerError
 from imaging_server_kit.remote.client import ServerRequestError
-
-
-def _if_compatible_get_qupath_schema(runner: AlgorithmRunner, algorithm: str) -> Dict:
-    """Check if an algorithm is compatible with a QuPath run (= single image as input + no masks, points, etc.)."""
-    schema = runner.get_parameters(algorithm)
-    params = schema["properties"]
-
-    image_params = []
-    for param_name, param in params.items():
-        # Parameters inputs that QuPath won't support (if they are required):
-        if (param["required"] is True) and (
-            param["param_type"]
-            in [
-                "mask",
-                "paths",
-                "boxes",
-                "points",
-                "vectors",
-                "tracks",
-            ]
-        ):
-            param_type = param["param_type"]
-            print(
-                f"Algorithm `{algorithm}` is incompatible with QuPath (requires a parameter of type `{param_type}` as input)."
-            )
-            return {}
-
-        if param["param_type"] == "image":
-            image_params.append(param_name)
-
-    if len(image_params) == 1:
-        qp_image_param = image_params[0]
-        params.pop(qp_image_param)
-        schema["properties"] = params
-
-        return schema
-    else:
-        print(
-            f"Algorithm `{algorithm}` is incompatible with QuPath (requires `{len(image_params)}` images as input)."
-        )
-        return {}
 
 
 def _qupath_compabile_algos(runner: AlgorithmRunner) -> List[str]:
     """Select algorithms from a runner which are Qupath-compatible."""
     compatible_algos = []
     for algo in runner.algorithms:
-        if _if_compatible_get_qupath_schema(runner, algo):
+        if if_compatible_get_qupath_schema(runner, algo)[0]:
             compatible_algos.append(algo)
 
     return compatible_algos
@@ -227,7 +189,7 @@ class QuPathWidget(QWidget):
 
         try:
             # Check for algo compatibility - if so, retreive the QuPath-modified schema
-            schema = _if_compatible_get_qupath_schema(
+            schema, _ = if_compatible_get_qupath_schema(
                 self.runner_widget.runner, selected_algo
             )
             if not schema:
