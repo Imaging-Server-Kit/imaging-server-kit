@@ -54,7 +54,6 @@ class Client(AlgorithmRunner):
         self._algorithms = []
         if server_url:
             self.connect(server_url)
-        self.token = None
         self._name = name
     
     @property
@@ -136,7 +135,6 @@ class Client(AlgorithmRunner):
                     json=stack_serializer.serialize(params_stack, "Python/Napari"),
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.token}",
                         "accept": "application/msgpack",
                         "User-Agent": "Python/Napari",
                     },

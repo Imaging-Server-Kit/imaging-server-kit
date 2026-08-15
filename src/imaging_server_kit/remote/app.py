@@ -30,8 +30,6 @@ static_dir = pathlib.Path(
 
 templates = Jinja2Templates(directory=str(templates_dir))
 
-ALGORITHM_HUB_URL = os.getenv("ALGORITHM_HUB_URL", "http://algorithm_hub:8000")
-
 
 def find_algorithm(algorithm_name: str, algorithms_dict: Dict) -> Algorithm:
     if algorithm_name not in algorithms_dict:
