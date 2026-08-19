@@ -18,6 +18,10 @@ https://github.com/user-attachments/assets/47c2f734-5683-49d9-8aea-388c3a2bc16d
 
 https://github.com/user-attachments/assets/a3f69a9f-fb68-4580-a804-6c57d5807b9a
 
+## Development status
+
+The Imaging Server Kit is being actively developed and is iterating rapidly. It is likely that there will be **compatibility-breaking changes** in future versions.
+
 ## Installation
 
 Install the `imaging-server-kit` package with `pip`:
