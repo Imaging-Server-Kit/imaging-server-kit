@@ -5,9 +5,11 @@ Currently, the bridge is implemented for algorithms returning sk.Mask and sk.Box
 """
 
 from typing import Dict, List, Optional, Tuple
+from tqdm import tqdm
 
 import geojson
 import numpy as np
+import pandas as pd
 import qubalab.qupath as qp
 from qubalab.images import QuPathServer
 from qubalab.objects import ObjectType
@@ -19,68 +21,143 @@ from imaging_server_kit.types._mask import mask2features, instance_mask2features
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.tiling import TilingSpecs
 
+# Max image size to transfer from qupath at once via QuBaLab (found empirically)
+MAX_IMAGE_PIXELS = 1024 * 1024 * 256
 
-MAX_IMAGE_PIXELS = 1024 * 1024 * 256  # Set arbitrarily...
+# Practical limit: max objects to send to QuPath at once (found empirically)
+MAX_OBJECTS_AT_ONCE = 5000
+
+# Max labels or pixels to do mask2features in one go
+MAX_LABELS_FEATURIZATION = 20_000
+MAX_PIXELS_FEATURIZATION = 7000 * 7000
+
+
+def to_native(v):
+    if isinstance(v, (int, np.integer)):
+        return int(v)
+    elif isinstance(v, (float, np.floating)):
+        return float(v)
+    return v
+
+
+def _check_mask_tiles_for_featurization(mask: np.ndarray) -> int:
+    """Check that the mask is not too large or has too many objects for featurization as a single tile."""
+    n_tiles = 1  # default
+
+    n_pixels = mask.size
+    if n_pixels > MAX_PIXELS_FEATURIZATION:
+        n_tiles = int(np.ceil(n_pixels / MAX_PIXELS_FEATURIZATION))
+        print(
+            f"⚠️ Mask is too large for featurization in one go: {n_pixels} pixels (max {MAX_PIXELS_FEATURIZATION}). Using {n_tiles} tiles instead."
+        )
+
+    n_labels = len(np.unique(mask))
+    if n_labels > MAX_LABELS_FEATURIZATION:
+        n_tiles = int(np.ceil(n_labels / MAX_LABELS_FEATURIZATION))
+        print(
+            f"⚠️ Mask has too many objects for featurization in one go: {n_labels} (max {MAX_LABELS_FEATURIZATION}). Using {n_tiles} tiles instead."
+        )
+
+    return n_tiles
 
 
 def _mask2detections(mask: sk.Mask) -> List[Feature]:
     """Convert a Mask object to a list of GeoJson features for QuPath."""
     if mask.meta is None:
         return []
-    
+
     if mask.position is None:
         return []
-    
-    # TODO: We have an issue with handling instance segmentation algorithms in tiled mode, here.
-    # With instance masks the detection ID (label of the mask) changes at the end of the process, on_last_tile. 
-    # So, if we stream them into QuPath immediately on tile collected, the object IDs will be wrong, and it's unclear 
-    # what to do on_last_tile (we cannot currently erase objects from QuPath).
-    # On the other hand, with mask2features on a semantic mask we would get `detection ID` = 1, so that doesn't work either.
-    # A possible solution would be to only send detections to QuPath on_last_tile after the correct IDs are resolved,
-    # but this is a bit disappointing from the user's perspective (no partial results in QuPath...)
-    
-    # Distinguish between semantic/instance masks
-    if mask.meta["merger"] == "default":  # semantic mask
-        features = mask2features(mask.data)
-    elif mask.meta["merger"] == "instances":
-        features = instance_mask2features(mask.data)
 
-    detections = []
-    
+    if mask.ndim is None:
+        return []
+
+    features = []
+
+    n_tiles = _check_mask_tiles_for_featurization(mask.data)
+
+    if n_tiles > 1:
+        # Estimate corresponding tile size, assuming objects are homogeneously distributed
+        tile_size = np.array(
+            [int((mask.data.size / n_tiles) ** (1 / mask.ndim))] * mask.ndim
+        )
+
+        pbar = tqdm(total=1, desc="Converting mask to features", unit="tile")
+        for tile_meta, tile_domain in sk.generate_tiles(
+            mask.extent, tile_size=tile_size.tolist()
+        ):
+            pbar.total = tile_meta.n_tiles
+            pbar.update(1)
+            pbar.refresh()
+
+            mask_tile = mask.select(tile_domain)
+
+            # Distinguish between semantic and instance masks
+            if mask.meta["merger"] == "default":  # semantic mask
+                features_tile = mask2features(mask_tile.data)
+            elif mask.meta["merger"] == "instances":
+                features_tile = instance_mask2features(mask_tile.data)
+
+            for f in features_tile:
+                feature_geom = np.array(f["geometry"]["coordinates"])
+                feature_geom = feature_geom[0]
+
+                # Offset the coordinates by the position of the tile relative to the mask
+                feature_geom[:, 0] = (
+                    feature_geom[:, 0] + mask_tile.position[1] - mask.position[1]
+                )
+                feature_geom[:, 1] = (
+                    feature_geom[:, 1] + mask_tile.position[0] - mask.position[0]
+                )
+                f["geometry"]["coordinates"] = feature_geom[None].tolist()
+
+            features.extend(features_tile)
+    else:
+        # Don't bother doing mask2features in tiles
+        if mask.meta["merger"] == "default":  # semantic mask
+            features = mask2features(mask.data)
+        elif mask.meta["merger"] == "instances":
+            features = instance_mask2features(mask.data)
+
     if len(features) == 0:
-        return detections
+        return features
 
-    feature_classes = None
+    # Get a features dataframe
+    feature_df = None
     if isinstance(mask.meta, dict):
         mask_features = mask.meta.get("features")
         if isinstance(mask_features, dict):
-            feature_classes = mask_features.get("class")
-            feature_keys = list(mask_features.keys())
+            feature_df = pd.DataFrame(mask_features)
+            if "label" in feature_df.columns:
+                feature_df = feature_df.set_index("label", drop=False)
 
-            for k in feature_keys:
-                if len(mask_features[k]) != len(features):
-                    print(f"Properties array for key {k} does not match features.")
-                    # TODO: Do something, like ignore `k` or pop it from the dict?
-                    # ...
-
-    for idx, f in enumerate(features):
+    # Features => Detections
+    detections = []
+    for f in features:
         f["object_type"] = "detection"
-        
         detection_id = f["properties"]["Detection ID"]
 
-        if feature_classes:
-            f["classification"] = {
-                "name": feature_classes,
-                "color": (0, 255, 0),
-            }
+        if (feature_df is not None) and (detection_id in feature_df.index):
+            feature_row = feature_df.loc[detection_id]
+            if isinstance(feature_row, pd.DataFrame):
+                feature_row = feature_row.iloc[0]
 
-        if isinstance(mask_features, dict):
-            f["properties"]["measurements"] = [
-                {"name": key, "value": mask_features[key][detection_id]}
-                for key in feature_keys
+            if "class" in feature_row:
+                f["classification"] = {
+                    "name": feature_row["class"],
+                    "color": (0, 255, 0),
+                }
+
+            measurements = [
+                {"name": key, "value": to_native(v)}
+                for key, v in feature_row.items()
+                if key != "class" and not pd.isna(v)
             ]
-        
-        # f["properties"]["name"] = f"Mask - {idx}"
+
+            if measurements:
+                f["properties"]["measurements"] = measurements
+
+        f["properties"]["name"] = f"ID {detection_id}"
 
         feature_geom = np.array(f["geometry"]["coordinates"])
         feature_geom = feature_geom[0]
@@ -109,25 +186,28 @@ def _boxes2detections(boxes: sk.Boxes) -> List[Feature]:
         feature_classes = None
 
     for box_data in boxes.data_global_coords:
-        box_data_closed = np.vstack(
-            [box_data, box_data[0]]
-        )  # Close the polygon for QuPath
+        # Close the polygon for QuPath
+        box_data_closed = np.vstack([box_data, box_data[0]])
         coords = np.asarray([box_data_closed.tolist()])
         coords = coords[:, :, ::-1]  # Invert X-Y
+
         try:
-            geom = Polygon(coordinates=coords.tolist(), validate=True)
-            f = Feature(geometry=geom)
-            f["object_type"] = "detection"
+            geom = Polygon(coordinates=[coords.tolist()], validate=True)
+        except ValueError as e:
+            print("⚠️ Invalid polygon found in _boxes2detections (ignoring it).")
+            continue
 
-            if feature_classes:
-                f["classification"] = {
-                    "name": feature_classes,
-                    "color": (0, 255, 0),
-                }
+        f = Feature(geometry=geom)
 
-            detections.append(f)
-        except ValueError:
-            print("Invalid polygon geometry.")
+        f["object_type"] = "detection"
+
+        if feature_classes:
+            f["classification"] = {
+                "name": feature_classes,
+                "color": (0, 255, 0),
+            }
+
+        detections.append(f)
 
     return detections
 
@@ -233,7 +313,7 @@ class QuPathBridge:
         else:
             return found_annotations[0]
 
-    def run_in_annotation(
+    def run(
         self,
         runner: AlgorithmRunner,
         annotation: Optional[geojson.Feature] = None,
@@ -262,7 +342,7 @@ class QuPathBridge:
         schema, qp_image_param = if_compatible_get_qupath_schema(runner, algorithm)
         if not schema:
             return
-        
+
         if isinstance(annotation, geojson.Feature):
             bounds = shape(annotation.geometry).bounds
 
@@ -270,7 +350,7 @@ class QuPathBridge:
             min_y = int(max(0, bounds[1]))
             max_x = int(min(self.server.metadata.width, bounds[2]))
             max_y = int(min(self.server.metadata.height, bounds[3]))
-        
+
         else:
             # Run on the entire image
             min_x = 0
@@ -291,15 +371,26 @@ class QuPathBridge:
         # Estimated tile size
         max_tile_size = n_z * n_t * n_c * domain.size[0] * domain.size[1]
 
-        if max_tile_size <= MAX_IMAGE_PIXELS:
-            tile_size = domain.size
-        else:
-            # Reduce the XY tile size so that the whole tile does not exceed the limit (use a square tile)
-            tile_size = int(np.floor(np.sqrt(MAX_IMAGE_PIXELS / (n_z * n_t * n_c))))
-            print(f"Using tile size: {tile_size}")
-
+        # Logic around tiling context
         if tiling_ctx is None:
+            if max_tile_size <= MAX_IMAGE_PIXELS:
+                tile_size = domain.size
+            else:
+                # Reduce the XY tile size so that the whole tile does not exceed the limit (use a square tile)
+                tile_size = int(np.floor(np.sqrt(MAX_IMAGE_PIXELS / (n_z * n_t * n_c))))
+
+                if tiling_ctx is None:
+                    print(
+                        f"⚠️ Selected region is too big to be processed all at once. Using tile size: {tile_size}."
+                    )
+
             tiling_ctx = TilingSpecs(tile_size=tile_size)
+        else:
+            # Warn that tile size seems too big for the image (but don't stop it)
+            if np.array(tiling_ctx.tile_size).size > MAX_IMAGE_PIXELS:
+                print(
+                    f"⚠️ Selected region might be too big to be processed in tiles of size {tiling_ctx.tile_size}."
+                )
 
         # Generate tiles
         for tile_meta, tile_domain in sk.generate_tiles(
@@ -354,7 +445,7 @@ class QuPathBridge:
             yield result_tile, domain
 
     def merge_with_qupath(self, stack: sk.Stack) -> None:
-        """Send back results (Mask or Boxes) to QuPath (TODO: quite unreliable)"""
+        """Send a stack of results (Mask or Boxes) to QuPath."""
         detections = []
         for layer in stack:
             if isinstance(layer, sk.Mask):
@@ -365,10 +456,20 @@ class QuPathBridge:
                 detections.extend(box_detections)
 
         if len(detections) > 0:
-            qp.add_objects(
-                detections,
-                gateway=self.gateway,
-                image_data=qp.get_current_image_data(self.gateway),
-            )
+            n_batches = (
+                len(detections) + MAX_OBJECTS_AT_ONCE - 1
+            ) // MAX_OBJECTS_AT_ONCE
+            for k in tqdm(
+                range(0, len(detections), MAX_OBJECTS_AT_ONCE),
+                total=n_batches,
+                desc="Sending detections to QuPath",
+                unit="batch",
+            ):
+                detections_selection = detections[k : k + MAX_OBJECTS_AT_ONCE]
+                try:
+                    # This can sometimes fail with incomprehensible java error, so we just catch it
+                    qp.add_objects(detections_selection, gateway=self.gateway)
+                except:
+                    print("❌ Failed to send detections to QuPath!")
 
             qp.refresh_qupath(gateway=self.gateway)

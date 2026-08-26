@@ -66,11 +66,13 @@ class QuPathWidget(QWidget):
         if viewer is not None:
             from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
-            self.napari_stack = NapariStack(
+            self.stack = NapariStack(
                 viewer, pbar=self.pbar, params_panel=self.params_panel
             )
         else:
-            self.napari_stack = None
+            from imaging_server_kit.core import Stack
+
+            self.stack = Stack()
 
         # Runner widget
         qupath_compatible_algos = _qupath_compabile_algos(runner=runner)
@@ -243,7 +245,7 @@ class QuPathWidget(QWidget):
             algo_params = self.params_panel.get_algo_params()
 
             task = partial(
-                self.bridge.run_in_annotation,
+                self.bridge.run,
                 runner=self.runner_widget.runner,
                 annotation=annotation,
                 tiling_ctx=tiling_ctx,
@@ -259,17 +261,16 @@ class QuPathWidget(QWidget):
     def _merge_wrap(self, payload):
         if payload is not None:
             result_tile, params_domain = payload
-            if self.napari_stack is not None:
-                # Update Napari
-                self.napari_stack.merge(result_tile, reinitialize_domain=params_domain)
-            else:
-                # Update the Qt progress bar
-                if result_tile.tile_meta.n_tiles > 0:
-                    self.pbar.setMaximum(result_tile.tile_meta.n_tiles)
-                    self.pbar.setValue(result_tile.tile_meta.tile_idx + 1)
+            self.stack.merge(result_tile, reinitialize_domain=params_domain)
 
-            # Update QuPath
-            self.bridge.merge_with_qupath(result_tile)
+            # Update the Qt progress bar
+            if result_tile.tile_meta.n_tiles > 0:
+                self.pbar.setMaximum(result_tile.tile_meta.n_tiles)
+                self.pbar.setValue(result_tile.tile_meta.tile_idx + 1)
+
+            # Update QuPath only on last tile (best solution to handle instance masks)
+            if result_tile.tile_meta.is_last_tile:
+                self.bridge.merge_with_qupath(self.stack)
 
     def _open_info_link_from_btn(self, *args, **kwargs) -> None:
         algorithm = self.runner_widget.selected_algorithm_name
