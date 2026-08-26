@@ -19,6 +19,10 @@ from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.remote.stack_serializer import StackSerializer
 
 
+# Unlimited input size - Implies trusted input. TODO: should this be made more clear (or configurable)?
+MAX_BUFFER_SIZE = 0
+
+
 class ServerRequestError(Exception):
     """Exception raised when HTTP requests fail."""
 
@@ -31,7 +35,7 @@ class ServerRequestError(Exception):
 
 class Client(AlgorithmRunner):
     """Client to connect to and interact with algorithm servers.
-    
+
     A `Client` exposes the same interface as `sk.Algorithm` so the same code can run an algorithm locally or remotely.
 
     Parameters
@@ -56,13 +60,13 @@ class Client(AlgorithmRunner):
     get_parameters(): Get the algorithm parameters schema.
     """
 
-    def __init__(self, server_url: Optional[str] = None, name: str="client") -> None:
+    def __init__(self, server_url: Optional[str] = None, name: str = "client") -> None:
         self.server_url = server_url
         self._algorithms = []
         if server_url:
             self.connect(server_url)
         self._name = name
-    
+
     @property
     def name(self) -> str:
         return self._name
@@ -151,17 +155,14 @@ class Client(AlgorithmRunner):
                 raise ServerRequestError(endpoint, e)
 
             if response.status_code == 200:
-                unpacker = msgpack.Unpacker(
-                    raw=False,
-                    max_buffer_size=0,  # TODO: Unlimited input size! Implies trusted input.
-                )
-                
+                unpacker = msgpack.Unpacker(raw=False, max_buffer_size=MAX_BUFFER_SIZE)
+
                 for chunk in response.iter_content(chunk_size=8192):
                     if not chunk:
                         continue
-                    
+
                     unpacker.feed(chunk)
-                    
+
                     for serialized_stack in unpacker:
                         yield stack_serializer.deserialize(
                             [serialized_stack], "Python/Napari"

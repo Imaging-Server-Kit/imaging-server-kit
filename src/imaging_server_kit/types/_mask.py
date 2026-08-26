@@ -12,55 +12,58 @@ from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.domain import Domain
 
 
+from skimage.measure import regionprops
+
+
 def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
     """
     Args:
-        segm_mask: Segmentation mask with the background pixels set to zero and the pixels assigned to a segmented
-        class set to an int value
+        segmentation_mask: Segmentation mask with the background set to zero and the pixels assigned to a class set to an int value
 
     Returns:
         A list containing the contours of each object as a geojson.Feature
     """
     features = []
-    indices = np.unique(segmentation_mask)
-    indices = indices[indices != 0]  # remove background
 
-    if indices.size == 0:
-        return features
+    for prop in regionprops(segmentation_mask):
+        pixel_class = prop.label
+        minr, minc, maxr, maxc = prop.bbox
+        local_mask = prop.image
 
-    for pixel_class in indices:
-        mask = segmentation_mask == int(pixel_class)
-        polygons = imantics.Mask(mask).polygons()
+        polygons = imantics.Mask(local_mask).polygons()
         for detection_id, contour in enumerate(polygons.points, start=1):
             coords = np.array(contour)
-            coords = np.vstack([coords, coords[0]])  # Close the polygon for QuPath
+            if coords.shape[0] < 3:
+                continue
+
+            coords = coords + np.array([minc, minr])
+
+            coords = np.vstack([coords, coords[0]])
+
             try:
                 geom = Polygon(coordinates=[coords.tolist()], validate=True)
-                feature = Feature(
-                    geometry=geom,
-                    properties={
-                        "Detection ID": detection_id,
-                        "Class": int(
-                            pixel_class
-                        ),  # the int() casting solves a bug with json serialization
-                    },
-                )
-                features.append(feature)
             except ValueError:
-                print("Invalid polygon geometry.")
+                print("⚠️ Invalid polygon (ignoring it).")
+                continue
+
+            feature = Feature(
+                geometry=geom,
+                properties={"Detection ID": detection_id, "Class": int(pixel_class)},
+            )
+            features.append(feature)
 
     return features
 
 
-def features2mask(features, image_shape):
+def features2mask(features: List[Feature], image_shape: Tuple) -> np.ndarray:
     segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
     for feature in features:
         feature_coordinates = np.array(feature["geometry"]["coordinates"])
         feature_coordinates = feature_coordinates[0, :, :]  # Remove an extra dimension
         feature_coordinates = feature_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask(image_shape, feature_coordinates)
-        feature_properites = feature.get("properties")
-        feature_class = feature_properites.get("Class")
+        feature_properites = feature["properties"]
+        feature_class = feature_properites["Class"]
         segmentation_mask[feature_mask] = feature_class
     return segmentation_mask
 
@@ -68,47 +71,54 @@ def features2mask(features, image_shape):
 def instance_mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
     """
     Args:
-        segm_mask: Segmentation mask with the background pixels set to zero and the pixels assigned to a segmented
-         object instance set to an int value
+        segmentation_mask: Segmentation mask with the background set to zero and the pixels assigned to an object instance set to an int value
 
     Returns:
         A list containing the contours of each object as a geojson.Feature
     """
     features = []
-    indices = np.unique(segmentation_mask)
-    indices = indices[indices != 0]  # remove background
 
-    if indices.size == 0:
-        return features
+    for prop in regionprops(segmentation_mask):
+        detection_id = prop.label
+        minr, minc, maxr, maxc = prop.bbox
+        local_mask = prop.image
 
-    for detection_id in indices:
-        mask = segmentation_mask == int(detection_id)
-        polygons = imantics.Mask(mask).polygons()
+        polygons = imantics.Mask(local_mask).polygons()
         for contour in polygons.points:
             coords = np.array(contour)
+            if coords.shape[0] < 3:
+                # Only 3 points, let's skip it.
+                continue
+
+            # Offset back into full-image coordinates
+            coords = coords + np.array([minc, minr])
+
             coords = np.vstack([coords, coords[0]])  # Close the polygon for QuPath
+
             try:
                 geom = Polygon(coordinates=[coords.tolist()], validate=True)
-                feature = Feature(
-                    geometry=geom,
-                    properties={"Detection ID": int(detection_id), "Class": 1},
-                )
-                features.append(feature)
             except ValueError:
-                print("Invalid polygon geometry.")
+                print("⚠️ Invalid polygon (ignoring it).")
+                continue
+
+            feature = Feature(
+                geometry=geom,
+                properties={"Detection ID": int(detection_id), "Class": 1},
+            )
+            features.append(feature)
 
     return features
 
 
-def features2instance_mask(features, image_shape):
+def features2instance_mask(features: List[Feature], image_shape: Tuple) -> np.ndarray:
     segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
     for feature in features:
         feature_coordinates = np.array(feature["geometry"]["coordinates"])
         feature_coordinates = feature_coordinates[0, :, :]  # Remove an extra dimension
         feature_coordinates = feature_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask(image_shape, feature_coordinates)
-        feature_properites = feature.get("properties")
-        feature_id = feature_properites.get("Detection ID")
+        feature_properites = feature["properties"]
+        feature_id = feature_properites["Detection ID"]
         segmentation_mask[feature_mask] = feature_id
     return segmentation_mask
 
@@ -123,7 +133,7 @@ def mask2features_3d(segmentation_mask: np.ndarray) -> List[Feature]:
     return features
 
 
-def features2mask_3d(features, image_shape):
+def features2mask_3d(features: List[Feature], image_shape: Tuple) -> np.ndarray:
     segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
     _, ry, rx = image_shape
     for feature in features:
@@ -132,8 +142,8 @@ def features2mask_3d(features, image_shape):
         feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
         feature_z_idx = feature["properties"]["z_idx"]
-        feature_properites = feature.get("properties")
-        feature_id = feature_properites.get("Class")
+        feature_properites = feature["properties"]
+        feature_id = feature_properites["Class"]
         segmentation_mask[feature_z_idx][feature_mask] = feature_id
     return segmentation_mask
 
@@ -148,7 +158,7 @@ def instance_mask2features_3d(segmentation_mask: np.ndarray) -> List[Feature]:
     return features
 
 
-def features2instance_mask_3d(features, image_shape):
+def features2instance_mask_3d(features: List[Feature], image_shape: Tuple) -> np.ndarray:
     segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
     _, ry, rx = image_shape
     for feature in features:
@@ -158,8 +168,8 @@ def features2instance_mask_3d(features, image_shape):
         feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
         feature_z_idx = feature["properties"]["z_idx"]
-        feature_properites = feature.get("properties")
-        feature_id = feature_properites.get("Detection ID")
+        feature_properites = feature["properties"]
+        feature_id = feature_properites["Detection ID"]
         segmentation_mask[feature_z_idx][feature_mask] = feature_id
     return segmentation_mask
 
@@ -198,9 +208,10 @@ class Mask(Layer):
         )
 
     @property
-    def channel_axis(self):
-        if self.meta["channel_axis"] is not None:
-            return self.meta["channel_axis"]
+    def channel_axis(self) -> Optional[int]:
+        if self.meta:
+            if self.meta["channel_axis"] is not None:
+                return self.meta["channel_axis"]
 
     @property
     def _bounds(self) -> Optional[Tuple]:
@@ -226,7 +237,7 @@ class Mask(Layer):
         """Select data in a given domain."""
         if (self.data is None) or (domain.size is None):
             _data = None
-        
+
         # Get the slice indices
         cmin = [
             max([domain_cmin, this_cmin])
@@ -245,7 +256,7 @@ class Mask(Layer):
             _data = None
         else:
             cmin_rounded = [math.floor(x) for x in cmin]
-            
+
             slices = []
             for cmin_i, size_i, shape_i, this_cmin in zip(
                 cmin_rounded,
@@ -259,7 +270,7 @@ class Mask(Layer):
                 s1 = s0 + int(size_i)
                 slices.append(slice(s0, s1))
             slices = tuple(slices)
-    
+
             # Account for the channel_axis
             if self.channel_axis:
                 slices_with_channel = (
@@ -272,19 +283,19 @@ class Mask(Layer):
 
             # Select the data via indexing
             _data = self.data[slices_with_channel]
-        
+
         # Create a new layer
         _meta = self.meta.copy() if self.meta is not None else self.meta
-        
+
         mask_selection = Mask(
             data=_data,
             name=self.name,
             meta=_meta,
             tile_meta=self.tile_meta.copy(),
         )
-        
+
         mask_selection.position = cmin_rounded
-        
+
         return mask_selection
 
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:

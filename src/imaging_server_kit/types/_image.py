@@ -45,18 +45,19 @@ class Image(Layer):
         )
 
     @property
-    def channel_axis(self):
-        if self.meta["rgb"] is True:
-            if self.data is not None:
-                if self.data.ndim == 4:
-                    return 3
+    def channel_axis(self) -> Optional[int]:
+        if self.meta:
+            if self.meta["rgb"] is True:
+                if self.data is not None:
+                    if self.data.ndim == 4:
+                        return 3
+                    else:
+                        return 2
                 else:
                     return 2
-            else:
-                return 2
 
-        if self.meta["channel_axis"] is not None:
-            return self.meta["channel_axis"]
+            if self.meta["channel_axis"] is not None:
+                return self.meta["channel_axis"]
 
     @property
     def _bounds(self) -> Optional[Tuple]:
