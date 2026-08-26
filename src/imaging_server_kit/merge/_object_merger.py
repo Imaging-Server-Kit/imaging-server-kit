@@ -9,7 +9,11 @@ from imaging_server_kit.types._boxes import Boxes
 from imaging_server_kit.core.domain import merge_domains
 
 
-def _merge_meta(incoming_meta_val, receiving_meta_val, n_objects_incoming):
+def _merge_meta(
+    incoming_meta_val: Union[Dict, np.ndarray],
+    receiving_meta_val: Union[Dict, np.ndarray],
+    n_objects_incoming: int,
+) -> Union[Dict, np.ndarray]:
     if isinstance(incoming_meta_val, Dict):
         return {
             k: _merge_meta(v, receiving_meta_val.get(k), n_objects_incoming)
@@ -48,7 +52,7 @@ class ObjectMerger(DefaultMerger):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
-            receiving_layer.position = incoming_layer.position  # TODO: correct?
+            receiving_layer.position = incoming_layer.position
             receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
             return

@@ -1,6 +1,7 @@
 from typing import Callable, Dict, List, Optional, Type
 from dataclasses import dataclass
 import numpy as np
+import pandas as pd
 
 import napari
 import napari.layers
@@ -23,14 +24,32 @@ NAPARI_LAYER_MAPPINGS: Dict[str, Type[napari.layers.Layer]] = {
 }
 
 
+def _set_layer_features(napari_layer: napari.layers.Layer, value) -> None:
+    try:
+        setattr(napari_layer, "features", value)
+    except Exception as e:
+        print(f"⚠️ Could not set the layer features attribute: {e}")
+
+
 def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Layer):
     # Set the features first
     if "features" in meta:
         value = meta["features"]
-        try:
-            setattr(napari_layer, "features", value)
-        except:
-            print("Could not set the  layer features attribute.")
+        
+        if isinstance(napari_layer, napari.layers.Labels):
+            if "label" in value.keys():
+                df = pd.DataFrame(value)
+                
+                # For Napari to display the correct label on hover, we need to sort rows by 'label' and add missing labels (incl. 0)
+                full_labels = pd.DataFrame({"label": np.arange(df.label.max()+1)})
+                df_merged = pd.merge(full_labels, df, how="outer", on="label")
+                value = df_merged.sort_values(by="label")
+                
+                _set_layer_features(napari_layer, value)
+            else:
+                print("⚠️ For mask data, features must contain a `label` column.")
+        else:
+            _set_layer_features(napari_layer, value)
     
     if "position" in meta:
         value = meta["position"]
@@ -38,14 +57,14 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
             try:
                 setattr(napari_layer, "translate", value)
             except:
-                print("Could not set the layer translate attribute.")
+                print("⚠️ Could not set the layer translate attribute.")
 
     for key, value in meta.items():
         if key not in ["tile_params", "name", "features", "ndim"]:
             try:
                 setattr(napari_layer, key, value)
             except:
-                print("Could not set this layer property: ", key)
+                print("⚠️ Could not set this layer property: ", key)
 
 
 @dataclass
