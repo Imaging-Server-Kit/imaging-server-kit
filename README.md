@@ -2,7 +2,7 @@
 
 Turn Python-based image processing workflows into **algorithms** that gain extra functionalities.
 
-- [**Turn your algorithms into web servers**](https://imaging-server-kit.github.io/imaging-server-kit/sections/07_server.html) and run computations from [Napari](https://napari.org/stable/), [QuPath](https://qupath.github.io/), or [Python](./sections/08_python) via HTTP requests.
+- [**Turn your algorithms into web servers**](https://imaging-server-kit.github.io/imaging-server-kit/sections/07_server.html) and run computations from [Napari](https://napari.org/stable/), [QuPath](https://qupath.github.io/), or [Python](https://imaging-server-kit.github.io/imaging-server-kit/sections/08_python.html) via HTTP requests.
 
 https://github.com/user-attachments/assets/0be819ea-fcc1-48ee-8fae-7265e63a00d4
 

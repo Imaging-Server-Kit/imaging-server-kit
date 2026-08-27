@@ -38,7 +38,7 @@ For example, you can
 
 On top of that, you can provide [**samples**](./sections/02_samples) and automatically generate a [**documentation**](./sections/03_metadata) page for your algorithm that you can share with users.
 
-This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](./sections/01_algorithm), and give you some [suggestions of use cases](./sections/11_examples).
+This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](./sections/01_algorithm), and give you some [suggestions of use cases](./sections/10_examples).
 
 ## Contents
 
