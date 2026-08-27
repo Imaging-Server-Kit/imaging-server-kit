@@ -7,7 +7,7 @@ def basic_stream():
     yield sk.Notification("Success")
 
 def test_basic_stream():
-    assert basic_stream()[0] == "Success"
+    assert basic_stream() == "Success"
     assert basic_stream.run().read("Notification").data == "Success"
 
 
@@ -18,7 +18,7 @@ def loop_stream():
         yield k
 
 def test_loop_stream():
-    assert loop_stream()[0] == 4
+    assert loop_stream() == 4
     assert loop_stream.run().read("Int").data == 4
 
 

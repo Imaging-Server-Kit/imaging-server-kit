@@ -239,7 +239,12 @@ class Mask(Layer):
     def select(self, domain: Domain) -> Mask:
         """Select data in a given domain."""
         if (self.data is None) or (domain.size is None):
-            _data = None
+            return Mask(
+                data=None,
+                name=self.name,
+                meta=self.meta.copy() if self.meta is not None else self.meta,
+                tile_meta=self.tile_meta.copy(),
+            )
 
         # Get the slice indices
         cmin = [

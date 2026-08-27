@@ -240,7 +240,8 @@ class AlgoStream:
 def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
     for x in algo_stream:
         yield x
-    yield algo_stream.value
+    if algo_stream.value is not None:
+        yield algo_stream.value
 
 
 ### Algorithm implementation ###

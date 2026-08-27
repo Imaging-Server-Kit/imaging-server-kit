@@ -147,6 +147,7 @@ class AlgorithmRunner(ABC):
 
         Parameters
         ----------
+        *args, **algo_params: The algorithm parameters matching its function signature (e.g. `algo.run(image, threshold=100)`).
         algorithm: The algorithm to run (only used with algorithm collections).
         tiled: Set to True for tiled inference.
         tile_size: Tile size in pixels.
@@ -170,6 +171,14 @@ class AlgorithmRunner(ABC):
 
         # Ordered list of parameter names based on the run function signature (args + kwargs)
         signature_params = self.get_signature_params(algorithm)
+        
+        # Catch users making typos or sending unknown parameters
+        unknown_params = set(algo_params) - set(signature_params)
+        if unknown_params:
+            raise TypeError(
+                f"{self.name} got unexpected parameter(s) {sorted(unknown_params)}; "
+                f"expected one of {signature_params}"
+            )
 
         # Default parameters resolution. Priority is given to defaults set in the wrapped function.
         # If no defaults are set, the defaults from the decorated parameters are used.
