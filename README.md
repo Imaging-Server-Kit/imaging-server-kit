@@ -68,22 +68,9 @@ If you encounter any problems, please file an issue along with a detailed descri
 
 ## Citing
 
+If you use the Imaging Server Kit in the context of scientific publication, you can cite it from the Zenodo repository:
+
 [![DOI](https://zenodo.org/badge/912741131.svg)](https://doi.org/10.5281/zenodo.15673151)
-
-If you use the Imaging Server Kit in the context of scientific publication, you can cite it as below.
-
-BibTeX:
-
-```
-@software{mallory_wittwer_2025_15673152,
-  author       = {Mallory Wittwer and Edward Andò and Maud Barthélemy and Florian Aymanns},
-  title        = {Imaging-Server-Kit/imaging-server-kit: v0.0.14},
-  url          = {https://doi.org/10.5281/zenodo.15673152},
-  doi          = {10.5281/zenodo.15673152},
-  version      = {v0.0.14},
-  year         = 2025,
-}
-```
 
 ## Acknowledgements
 
