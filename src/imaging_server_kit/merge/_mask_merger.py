@@ -3,13 +3,15 @@ from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
+import networkx as nx
+from skimage.util import map_array
 
 from imaging_server_kit.merge.layer_merger import DefaultMerger
 from imaging_server_kit.types._mask import Mask
 from imaging_server_kit.core.domain import merge_domains
 from imaging_server_kit.merge.common import _get_slices_with_channel
-import networkx as nx
-from skimage.util import map_array
+from imaging_server_kit.core.tiling import generate_tiles
+from imaging_server_kit.merge.layer_merger import LayerMerger
 
 # Max pixels for doing the resolve() operation of instance masks one go (set arbitrarily, could be configurable in future versions).
 # If the image is bigger than that, we do the instance mask resolution in tiles, too.
@@ -418,9 +420,6 @@ class InstanceMaskTileMerger(DefaultMerger):
         old_unique_labels = np.unique(receiving_layer.data)
 
         if receiving_layer.data.size > MAX_MAP_ARRAY_SIZE:
-            from imaging_server_kit.core.tiling import generate_tiles
-            from imaging_server_kit.merge.layer_merger import LayerMerger
-
             # Use ndim to approximate tile size
             tile_size = int(np.floor(MAX_MAP_ARRAY_SIZE ** (1 / receiving_layer.ndim)))
 

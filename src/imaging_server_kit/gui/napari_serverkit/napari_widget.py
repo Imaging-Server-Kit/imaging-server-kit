@@ -195,7 +195,7 @@ class NapariWidget(QWidget):
             if sample is not None:
                 return sample
         except:
-            show_warning("Failed to download sample.")
+            show_warning("❌ Failed to download sample.")
 
         return Stack()
 

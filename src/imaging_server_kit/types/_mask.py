@@ -24,7 +24,10 @@ def mask2features(segmentation_mask: np.ndarray) -> List[Feature]:
         A list containing the contours of each object as a geojson.Feature
     """
     features = []
-
+    
+    if segmentation_mask.dtype == "bool":
+        segmentation_mask = segmentation_mask.astype(int)
+        
     for prop in regionprops(segmentation_mask):
         pixel_class = prop.label
         minr, minc, maxr, maxc = prop.bbox
