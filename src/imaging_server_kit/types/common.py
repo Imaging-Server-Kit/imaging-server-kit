@@ -16,5 +16,9 @@ def select_object_meta(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> D
     """Iterates over two levels of the meta dictionary.
     Any numpy array found with length==n_objects is filtered using tile_filter.
     """
-    assert len(tile_filter) == n_objects
+    if len(tile_filter) != n_objects:
+        raise ValueError(
+            f"tile_filter length ({len(tile_filter)}) does not match n_objects ({n_objects})"
+        )
+    
     return {k: _extract_meta(v, n_objects, tile_filter) for k, v in meta.items()}

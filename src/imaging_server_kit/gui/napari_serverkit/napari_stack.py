@@ -56,14 +56,14 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
         if value is not None:
             try:
                 setattr(napari_layer, "translate", value)
-            except:
+            except Exception:
                 print("⚠️ Could not set the layer translate attribute.")
 
     for key, value in meta.items():
         if key not in ["tile_params", "name", "features", "ndim"]:
             try:
                 setattr(napari_layer, key, value)
-            except:
+            except Exception:
                 print("⚠️ Could not set this layer property: ", key)
 
 

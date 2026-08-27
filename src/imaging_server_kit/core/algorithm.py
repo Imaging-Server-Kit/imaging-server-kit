@@ -457,15 +457,20 @@ class Algorithm(AlgorithmRunner):
         # If user-defined run function has `yield` statements:
         if isgeneratorfunction(self._run_algorithm_func):
             gen = algo_stream_gen(AlgoStream(self._run_algorithm_func(**algo_params)))
-            for payload in gen:
-                yield _parse_user_func_output(payload)
+            try:
+                for payload in gen:
+                    yield _parse_user_func_output(payload)
+            except AlgorithmRuntimeError:
+                raise
+            except Exception as e:
+                raise AlgorithmRuntimeError(algorithm=algorithm, error=e)
         # Otherwise:
         else:
             try:
                 payload = self._run_algorithm_func(**algo_params)
+                yield _parse_user_func_output(payload)
             except Exception as e:
                 raise AlgorithmRuntimeError(algorithm=algorithm, error=e)
-            yield _parse_user_func_output(payload)
 
 
 def algorithm(

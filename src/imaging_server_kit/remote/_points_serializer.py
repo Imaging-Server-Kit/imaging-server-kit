@@ -27,8 +27,8 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
             point_features.append(
                 Feature(geometry=geom, properties={"Detection ID": detection_id})
             )
-        except:
-            print("Invalid point geometry.")
+        except Exception:
+            print("⚠️ Invalid point geometry.")
     return point_features
 
 

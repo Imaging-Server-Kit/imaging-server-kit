@@ -57,7 +57,7 @@ def _deserialize_value(obj: Any) -> Any:
         # if the values in meta correspond to numpy arrays (features, etc.)
         try:
             return decode_contents(obj)
-        except:
+        except Exception:
             return obj
     return obj
 

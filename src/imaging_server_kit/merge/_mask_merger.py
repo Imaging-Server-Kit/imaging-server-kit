@@ -11,7 +11,6 @@ from imaging_server_kit.types._mask import Mask
 from imaging_server_kit.core.domain import merge_domains
 from imaging_server_kit.merge.common import _get_slices_with_channel
 from imaging_server_kit.core.tiling import generate_tiles
-from imaging_server_kit.merge.layer_merger import LayerMerger
 
 # Max pixels for doing the resolve() operation of instance masks one go (set arbitrarily, could be configurable in future versions).
 # If the image is bigger than that, we do the instance mask resolution in tiles, too.
@@ -138,6 +137,8 @@ class InstanceTileTracker:
     def add_N_to_tile(
         self, labels: np.ndarray, features: Optional[Dict] = None
     ) -> np.ndarray:
+        labels = labels.copy()  # Important - to avoid mutating the original array
+        
         if labels.sum() > 0:
             labels[labels != 0] = labels[labels != 0] + self.N
 
@@ -412,6 +413,8 @@ class InstanceMaskTileMerger(DefaultMerger):
         self.tile_tracker = InstanceTileTracker()
 
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):
+        from imaging_server_kit.merge.layer_merger import LayerMerger
+
         if incoming_layer.tile_meta.is_first_tile:
             # We need at least one merge call, otherwise we end up erasing the objects.
             # So, when `merge_data` is false in layer_merger, we still manually trigger it here.

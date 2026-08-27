@@ -469,7 +469,7 @@ class QuPathBridge:
                 try:
                     # This can sometimes fail with incomprehensible java error, so we just catch it
                     qp.add_objects(detections_selection, gateway=self.gateway)
-                except:
+                except Exception:
                     print("❌ Failed to send detections to QuPath!")
 
             qp.refresh_qupath(gateway=self.gateway)

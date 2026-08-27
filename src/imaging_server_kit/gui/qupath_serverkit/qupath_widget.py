@@ -172,7 +172,7 @@ class QuPathWidget(QWidget):
 
         try:
             self.bridge.connect(port=port, token=token)
-        except:
+        except Exception:
             self.logger.log("⚠️ Could not connect to QuPath.")
             return
 
@@ -205,7 +205,7 @@ class QuPathWidget(QWidget):
             self.params_panel.update(schema)
 
             self.runner_widget.update_tiled_ui(algo_is_tileable)
-        except:
+        except Exception:
             self.logger.log("⚠️ Algorithm `{selected_algo}` is unavailable.")
 
     def _run(self):
@@ -252,7 +252,7 @@ class QuPathWidget(QWidget):
                 algorithm_name=algorithm_name,
                 **algo_params,
             )
-        except:
+        except Exception:
             self.logger.log("⚠️ Something went wrong while running the algorithm.")
             return
 

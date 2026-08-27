@@ -150,6 +150,8 @@ class Client(AlgorithmRunner):
                         "User-Agent": "Python/Napari",
                     },
                     stream=True,
+                    # TODO: We *could* implement a timeout here, but not sure what's the best strategy for that, so we leave it as todo.
+                    # timeout=3600,
                 )
             except requests.RequestException as e:
                 raise ServerRequestError(endpoint, e)

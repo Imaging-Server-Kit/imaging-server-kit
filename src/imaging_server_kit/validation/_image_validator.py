@@ -10,21 +10,24 @@ from imaging_server_kit.types._image import Image
 class ImageValidator(Validator):
     @staticmethod
     def validate(image: Optional[Image]) -> None:
+        if image is None:
+            return
+        
         data = image.data        
         meta = image.meta
         
-        assert isinstance(
-            data, np.ndarray
-        ), f"Image data ({type(data)}) is not a Numpy array"
+        if not isinstance(data, np.ndarray):
+            raise TypeError(f"Image data ({type(data)}) is not a Numpy array")
 
         if not all(data.shape):
             raise ValueError("Image array has an invalid shape: ", data.shape)
 
-        if len(data.shape) not in meta["dimensionality"]:
-            raise ValueError("Image array has the wrong dimensionality.")
+        if meta:
+            if len(data.shape) not in meta["dimensionality"]:
+                raise ValueError("Image array has the wrong dimensionality.")
 
-        if meta["rgb"] is True:
-            if len(data.shape) not in [3, 4]:
-                raise ValueError("Image should be RGB.")
-            if data.shape[-1] != 3:
-                raise ValueError("Image should be RGB.")
+            if meta["rgb"] is True:
+                if len(data.shape) not in [3, 4]:
+                    raise ValueError("Image should be RGB.")
+                if data.shape[-1] != 3:
+                    raise ValueError("Image should be RGB.")

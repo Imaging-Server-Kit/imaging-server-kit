@@ -141,7 +141,7 @@ def features2mask_3d(features: List[Feature], image_shape: Tuple) -> np.ndarray:
     _, ry, rx = image_shape
     for feature in features:
         feature_xy_coordinates = np.array(feature["geometry"]["coordinates"])
-        feature_coordinates = feature_coordinates[0, :, :]  # Remove an extra dimension
+        feature_xy_coordinates = feature_xy_coordinates[0, :, :]  # Remove an extra dimension
         feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
         feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
         feature_z_idx = feature["properties"]["z_idx"]

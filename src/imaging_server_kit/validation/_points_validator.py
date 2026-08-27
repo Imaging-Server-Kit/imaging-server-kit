@@ -10,10 +10,14 @@ from imaging_server_kit.types._points import Points
 class PointsValidator(Validator):
     @staticmethod
     def validate(points: Optional[Points]) -> None:
+        if points is None:
+            return
+        
         data = points.data
         
-        assert isinstance(
-            data, np.ndarray
-        ), f"Points data ({type(data)}) is not a Numpy array"
-        assert len(data.shape) == 2, "Points data should have shape (N, D)"
+        if not isinstance(data, np.ndarray):
+            raise TypeError(f"Points data ({type(data)}) is not a Numpy array")
+        
+        if len(data.shape) != 2:
+            raise ValueError("Points data should have shape (N, D)")
         

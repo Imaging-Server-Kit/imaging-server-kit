@@ -158,11 +158,13 @@ class Stack:
 
     @property
     def coords_min(self) -> Optional[Tuple]:
-        return self.extent.coords_min
+        if self.extent is not None:
+            return self.extent.coords_min
 
     @property
     def coords_max(self) -> Optional[Tuple]:
-        return self.extent.coords_max
+        if self.extent is not None:
+            return self.extent.coords_max
 
     @property
     def position(self) -> Optional[Tuple]:
