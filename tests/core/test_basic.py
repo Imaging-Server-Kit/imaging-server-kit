@@ -168,3 +168,28 @@ def int_required_true(val=sk.Integer(required=True)):
 def test_required_int_true():
     stack = int_required_true.run()
     assert stack[0].data == 0
+
+
+# Test specific types (TODO: we should probably have a specific test_types.py suite)
+from dataclasses import dataclass
+from typing import Callable
+
+
+@dataclass
+class SomeObject:
+    val: int = 0
+    msg: str = "Result is "
+    clb: Callable = lambda x: x + 1
+
+
+@sk.algorithm(parameters={"obj": sk.Any(name="Object")})
+def anytry(obj: SomeObject):
+    out = obj.msg + str(obj.clb(obj.val))
+    return sk.String(out)
+
+def test_any_type():
+    obj = SomeObject()
+    out = anytry(obj)
+    res = anytry.run(obj=obj)
+    assert out == "Result is 1"
+    assert res[0].data == "Result is 1"

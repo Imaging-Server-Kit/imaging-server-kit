@@ -12,6 +12,7 @@ from imaging_server_kit.remote._points_serializer import PointsDataSerializer
 from imaging_server_kit.remote._tracks_serializer import TracksDataSerializer
 from imaging_server_kit.remote._vectors_serializer import VectorsDataSerializer
 from imaging_server_kit.remote._null_serializer import NullDataSerializer
+from imaging_server_kit.remote._any_serializer import AnyDataSerializer
 
 
 LAYER_DATA_SERIALIZERS: Dict[str, Type[Serializer]] = {
@@ -23,6 +24,7 @@ LAYER_DATA_SERIALIZERS: Dict[str, Type[Serializer]] = {
     "tracks": TracksDataSerializer,
     "vectors": VectorsDataSerializer,
     "null": NullDataSerializer,
+    "any": AnyDataSerializer,
 }
 
 

@@ -15,6 +15,7 @@ from ._choice import Choice
 from ._notification import Notification
 from ._null import Null
 from ._progress import Progress
+from ._any import Any
 
 
 DATA_TYPES: Dict[str, Type[Layer]] = {
@@ -35,6 +36,7 @@ DATA_TYPES: Dict[str, Type[Layer]] = {
         Notification,
         Null,
         Progress,
+        Any,
     ]
 }
 
@@ -66,4 +68,5 @@ __all__ = [
     "Notification",
     "Null",
     "Progress",
+    "Any",
 ]
