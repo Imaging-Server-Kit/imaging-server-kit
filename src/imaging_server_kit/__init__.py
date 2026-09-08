@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 from ._version import version as __version__
 
 try:
@@ -72,15 +72,41 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
         from imaging_server_kit.gui.napari_serverkit import napari_available
 
         if not napari_available():
-            raise ImportError(
-                """
+            raise ImportError("""
                     This function requires the optional Napari dependencies to be installed.\n
                     Install them with: `pip install imaging-server-kit[napari]`.
-                """
-            )
+                """)
 
         from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 
         # For napari, we return the viewer directly
         napari_stack = NapariStack(layers=stack.layers)
         return napari_stack.viewer
+
+
+def run(
+    runner: AlgorithmRunner,
+    *args,
+    algorithm: Optional[str] = None,
+    tiled: bool = False,
+    tile_size: int = 64,
+    tile_overlap: float = 0.0,
+    tile_delay: float = 0.0,
+    tile_randomize: bool = False,
+    stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
+    domain: Optional[Domain] = None,
+    **algo_params,
+) -> Union[Stack, "napari.Viewer"]:  # type: ignore
+    """Allows the syntax `sk.run(...)` instead of runner.run(...)."""
+    return runner.run(
+        *args,
+        algorithm=algorithm,
+        tiled=tiled,
+        tile_size=tile_size,
+        tile_overlap=tile_overlap,
+        tile_delay=tile_delay,
+        tile_randomize=tile_randomize,
+        stack=stack,
+        domain=domain,
+        **algo_params,
+    )
