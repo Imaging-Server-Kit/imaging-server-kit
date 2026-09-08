@@ -52,11 +52,9 @@ TYPE_MAPPINGS: Dict[Any, Type[Layer]] = {
     skt.Integer: skt.Integer,
     skt.Bool: skt.Bool,
     skt.String: skt.String,
-    # skt.Choice: skt.Choice,  # Won't work
     skt.Notification: skt.Notification,
 }
 
-RECOGNIZED_TYPES = tuple(TYPE_MAPPINGS.keys())
 
 ### Parameters parsing ###
 
@@ -65,15 +63,18 @@ class Parameters(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-def _parse_run_func_signature(
-    func: Callable,
-    parameters: Dict[str, Layer],
-) -> Dict[str, Layer]:
+def _parse_run_func_signature(func: Callable, parameters: Dict[str, Layer]) -> Dict[str, Layer]:
     """Resolve parameters into {param_name : Layer} based on the annotations from the decorator
     and the signature of the wrapped Python function."""
 
     def get_layer_type(hinted_type, default, param_name) -> Layer:
-        cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
+
+        if hinted_type in TYPE_MAPPINGS:
+            cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
+        else:
+            print(f"⚠️ Parameter `{param_name}` is of an unrecognized type (`Hinted: {hinted_type}` ; Default: `{default}`). It will be treated as a `sk.Any` type and the default value will be ignored.")
+            return skt.Any(name=param_name)
+
         if default is _empty:
             return cls(name=param_name)
         else:
@@ -98,36 +99,23 @@ def _parse_run_func_signature(
         if annotation is _empty:
             # If the absence of type hints, we look at the type of eventual default values
             if default is _empty:
-                # Last resort: is the parameter named unambiguously (variable name == parameter `kind`, for example the variable is named `image`)?
+                # If the parameter name is unambiguous (variable name == parameter `kind`, e.g., the variable is named `mask`), we handle it accordingly:
                 if param_name in DATA_TYPES:
                     cls: Type[Layer] = DATA_TYPES[param_name]
                     resolved[param_name] = cls()  # Initialized with defaults
                 else:
-                    raise TypeError(
-                        f"Could not parse this parameter: '{param_name}'. Reason: No type hint or default provided."
-                    )
+                    # Last resort: we handle the parameter as a `Any` class:
+                    resolved[param_name] = skt.Any(name=param_name)
             else:
-                if isinstance(default, RECOGNIZED_TYPES):
-                    if isinstance(default, Layer):
-                        # Case where default is a data layer, for example user has defaulted x=sk.Float(...)
-                        resolved[param_name] = default
-                    else:
-                        # int, float, str, None defaults...
-                        default_type = type(default)
-                        resolved[param_name] = get_layer_type(
-                            default_type, default, param_name
-                        )
+                if isinstance(default, Layer):
+                    # Case where default is a data layer, for example user has defaulted x=sk.Float(...)
+                    resolved[param_name] = default
                 else:
-                    raise TypeError(
-                        f"Could not parse this parameter: '{param_name}'. Reason: Parameter default is an unrecognized type."
-                    )
+                    # int, float, str, None defaults...
+                    default_type = type(default)
+                    resolved[param_name] = get_layer_type(default_type, default, param_name)
         else:
-            if annotation in RECOGNIZED_TYPES:
-                resolved[param_name] = get_layer_type(annotation, default, param_name)
-            else:
-                raise TypeError(
-                    f"Could not parse this parameter: '{param_name}'. Reason: Parameter type hint is an unrecognized type."
-                )
+            resolved[param_name] = get_layer_type(annotation, default, param_name)
 
     return resolved
 
@@ -173,7 +161,7 @@ def _parse_pydantic_params_schema(
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"
         )(val_func)
-        
+
         fields[param_name] = (layer.type, Field(**field_constraints))
 
     return create_model(
@@ -190,11 +178,12 @@ def _parse_pydantic_params_schema(
 def _parse_output(payload: Any) -> Layer:
     if isinstance(payload, Layer):
         return payload
-    if isinstance(payload, RECOGNIZED_TYPES):  # Not a data layer...
+    if isinstance(payload, tuple(TYPE_MAPPINGS.keys())):  # Not a data layer...
         cls: Type[Layer] = TYPE_MAPPINGS[type(payload)]
         return cls(data=payload)
     else:
-        raise TypeError(f"Function should return: List[Layer]. Got: {type(payload)}")
+        # Unidentified return types are wrapped as the `Any` type:
+        return skt.Any(data=payload)
 
 
 def _parse_payload(payload: Any) -> Union[List[Layer], Layer]:
