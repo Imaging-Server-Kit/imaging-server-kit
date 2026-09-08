@@ -124,6 +124,7 @@ def auto_threshold(image, method):
             "sigma": 2.0,
         },
     ],
+    tileable=True,
 )
 def gaussian_algo(image, sigma, mode):
     if image is None:
@@ -145,6 +146,7 @@ def gaussian_algo(image, sigma, mode):
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.sobel",
     tags=["Filtering", "Scikit-image", "Demo"],
     samples=[{"image": skimage.data.camera()}],
+    tileable=True,
 )
 def sobel_algo(image):
     filtered = sobel(image)

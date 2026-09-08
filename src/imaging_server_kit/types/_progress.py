@@ -9,7 +9,7 @@ from tqdm import tqdm
 # We use a global progress bar instead of one attached to the instance
 # so that it doesnt re-print itself line-by-line in the terminal.
 # However, this means we can only control a single progress bar.
-PBAR = tqdm()
+PBAR = None
 
 
 class Progress(Layer):
@@ -54,9 +54,14 @@ class Progress(Layer):
         return f"Progress (current: {self.data}/{max_val})"
 
     def _refresh(self):
+        global PBAR
+
         max_val = self.meta.get("max_val", 1)
         # Only print the progress bar if there is more than 1 step.
         if (max_val > 1) & (self.data is not None):
+            if PBAR is None:
+                PBAR = tqdm()
+            
             PBAR.total = max_val
             PBAR.n = self.data
             PBAR.refresh()
