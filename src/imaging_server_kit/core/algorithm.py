@@ -63,113 +63,81 @@ class Parameters(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+def _layer_from_type(hinted_type, default, param_name: str) -> Layer:
+    if hinted_type not in TYPE_MAPPINGS:
+        print(
+            f"⚠️ Parameter `{param_name}` is of an unrecognized type "
+            f"(`Hinted: {hinted_type}` ; Default: `{default}`). "
+            "It will be treated as a `sk.Any` type and the default value will be ignored."
+        )
+        return skt.Any(name=param_name)
+
+    cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
+    return cls(name=param_name) if default is _empty else cls(name=param_name, default=default)
+
+
+def _resolve_param_layer(param_name: str, annotation, default) -> Layer:
+    """Resolve a parameter to its Layer type from a type hint annotation or a default value."""
+    # First we check if a type hint was provided:
+    if annotation is not _empty:
+        return _layer_from_type(annotation, default, param_name)
+
+    # If not, we check if there are recognizable defaults:
+    if default is _empty:
+        if param_name in DATA_TYPES:
+            return DATA_TYPES[param_name]()
+        return skt.Any(name=param_name)
+
+    if isinstance(default, Layer):
+        return default
+    
+    return _layer_from_type(type(default), default, param_name)
+
+
 def _parse_run_func_signature(func: Callable, parameters: Dict[str, Layer]) -> Dict[str, Layer]:
-    """Resolve parameters into {param_name : Layer} based on the annotations from the decorator
-    and the signature of the wrapped Python function."""
-
-    def get_layer_type(hinted_type, default, param_name) -> Layer:
-
-        if hinted_type in TYPE_MAPPINGS:
-            cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
-        else:
-            print(f"⚠️ Parameter `{param_name}` is of an unrecognized type (`Hinted: {hinted_type}` ; Default: `{default}`). It will be treated as a `sk.Any` type and the default value will be ignored.")
-            return skt.Any(name=param_name)
-
-        if default is _empty:
-            return cls(name=param_name)
-        else:
-            return cls(name=param_name, default=default)  # type: ignore
-
-    # Copy of the original parameters to avoid mutating them
     resolved = dict(parameters)
 
-    sig = signature(func)
-
-    for param_name, param in sig.parameters.items():
-        # Skip parameters explicitely defined in `parameters={}` (check that they are Layer instances)
+    for param_name, param in signature(func).parameters.items():
         if param_name in resolved:
-            if not isinstance(resolved.get(param_name), Layer):
+            if not isinstance(resolved[param_name], Layer):
                 raise TypeError(f"Parameter '{param_name}' should be a Layer instance.")
             continue
-
-        annotation = param.annotation  # Type hints
-        default = param.default
-
-        # Check type hints
-        if annotation is _empty:
-            # If the absence of type hints, we look at the type of eventual default values
-            if default is _empty:
-                # If the parameter name is unambiguous (variable name == parameter `kind`, e.g., the variable is named `mask`), we handle it accordingly:
-                if param_name in DATA_TYPES:
-                    cls: Type[Layer] = DATA_TYPES[param_name]
-                    resolved[param_name] = cls()  # Initialized with defaults
-                else:
-                    # Last resort: we handle the parameter as a `Any` class:
-                    resolved[param_name] = skt.Any(name=param_name)
-            else:
-                if isinstance(default, Layer):
-                    # Case where default is a data layer, for example user has defaulted x=sk.Float(...)
-                    resolved[param_name] = default
-                else:
-                    # int, float, str, None defaults...
-                    default_type = type(default)
-                    resolved[param_name] = get_layer_type(default_type, default, param_name)
-        else:
-            resolved[param_name] = get_layer_type(annotation, default, param_name)
+        resolved[param_name] = _resolve_param_layer(param_name, param.annotation, param.default)
 
     return resolved
 
 
-def _parse_pydantic_params_schema(
-    run_algorithm_func: Callable,
-    params_from_decorator: Dict,
-):
-    """Convert the parameters dictionary provided by @algorithm to a Pydantic model."""
-    # Parse the provided parameters dictionary + run function signature to a dict(str: Layer)
-    parsed_params: Dict[str, Layer] = _parse_run_func_signature(
-        run_algorithm_func, params_from_decorator
-    )
+def _field_constraints_from_layer(layer: Layer) -> dict:
+    meta = layer.meta or {}
+    constraints = {}
+    if "default" in meta:
+        constraints["default"] = meta["default"]
+    if "min" in meta:
+        constraints["ge"] = meta["min"]
+    if "max" in meta:
+        constraints["le"] = meta["max"]
 
-    # Generate a Pydantic BaseModel
-    fields = {}
-    validators = {}
+    return {
+        "title": layer.name,
+        "description": meta.get("description"),
+        "json_schema_extra": {"param_type": layer.kind} | meta,
+        **constraints,
+    }
+
+
+def _parse_pydantic_params_schema(run_algorithm_func: Callable, params_from_decorator: Dict):
+    parsed_params = _parse_run_func_signature(run_algorithm_func, params_from_decorator)
+
+    layer_validator = LayerValidator()  # stateless — hoist out of the loop
+    fields, validators = {}, {}
+
     for param_name, layer in parsed_params.items():
+        validators[f"validate_{param_name}"] = field_validator(param_name, mode="after")(
+            partial(layer_validator.validate, layer=layer)
+        )
+        fields[param_name] = (layer.type, Field(**_field_constraints_from_layer(layer)))
 
-        meta = layer.meta
-        if meta is None:
-            meta = {}
-
-        layer_field_constraints = {}
-
-        if "default" in meta:
-            layer_field_constraints["default"] = meta["default"]
-        if "min" in meta:
-            layer_field_constraints["ge"] = meta["min"]
-        if "max" in meta:
-            layer_field_constraints["le"] = meta["max"]
-
-        field_constraints = {
-            "title": layer.name,
-            "description": meta.get("description"),
-            "json_schema_extra": {"param_type": layer.kind} | meta,
-        } | layer_field_constraints
-
-        # Resolve the validator function
-        layer_validator = LayerValidator()
-        val_func = partial(layer_validator.validate, layer=layer)
-
-        validators[f"validate_{param_name}"] = field_validator(
-            param_name, mode="after"
-        )(val_func)
-
-        fields[param_name] = (layer.type, Field(**field_constraints))
-
-    return create_model(
-        "Parameters",
-        __base__=Parameters,
-        __validators__=validators,
-        **fields,
-    )
+    return create_model("Parameters", __base__=Parameters, __validators__=validators, **fields)
 
 
 ### Function output parsing ###
