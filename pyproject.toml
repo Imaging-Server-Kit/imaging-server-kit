@@ -77,3 +77,9 @@ where = ["src"]
 write_to = "src/imaging_server_kit/_version.py"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Ignore warnings related to pydantic (coming from napari)
+    "ignore:.*json_encoders.*:DeprecationWarning",
+]
