@@ -215,6 +215,13 @@ class Mask(Layer):
         if self.meta:
             if self.meta["channel_axis"] is not None:
                 return self.meta["channel_axis"]
+    
+    @property
+    def n_objects(self) -> int:
+        if self.data is None:
+            return 0
+        else:
+            return len(np.unique(self.data))
 
     @property
     def _bounds(self) -> Optional[Tuple]:
