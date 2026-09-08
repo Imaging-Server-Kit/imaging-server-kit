@@ -18,7 +18,6 @@ from imaging_server_kit.core.errors import (
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.remote.stack_serializer import StackSerializer
 
-
 # Unlimited input size - Implies trusted input. TODO: should this be made more clear (or configurable)?
 MAX_BUFFER_SIZE = 0
 
@@ -94,7 +93,14 @@ class Client(AlgorithmRunner):
         self.algorithms = json_response.get("algorithms")
 
     @validate_algorithm
-    def info(self, algorithm=None):
+    def info(self, algorithm: Optional[str] = None):
+        if algorithm is None:
+            # Try to default to the first available algorithm:
+            if len(self.algorithms) == 0:
+                return
+            
+            algorithm = self.algorithms[0]
+        
         webbrowser.open(f"{self.server_url}/{algorithm}/info")
 
     @validate_algorithm

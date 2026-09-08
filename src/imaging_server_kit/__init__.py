@@ -110,3 +110,9 @@ def run(
         domain=domain,
         **algo_params,
     )
+
+
+def info(runner: AlgorithmRunner, algorithm: Optional[str] = None):
+    """Allow the syntax `sk.info(...)` instead of runner.info(...)."""
+    return runner.info(algorithm=algorithm)
+    
