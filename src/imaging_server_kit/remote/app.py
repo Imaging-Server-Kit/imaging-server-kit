@@ -1,6 +1,8 @@
+import errno
 import importlib.resources
 import os
 import pathlib
+import socket
 from typing import Dict, Iterable, List, Optional
 
 import msgpack
@@ -74,6 +76,20 @@ class AlgorithmApp:
 
     def serve(self, host="0.0.0.0", port=8000, reload=False):
         """Run the algorithm server with uvicorn on the specified port for access on http://localhost:<port>."""
+        # Check that the `port` is available:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((host, port))
+            except OSError as e:
+                if e.errno == errno.EADDRINUSE:
+                    print(
+                        f"Port {port} is already in use. Please choose a different port, "
+                        f"e.g. sk.serve(..., port={port + 1})."
+                    )
+                    return
+                raise
+
         uvicorn.run(self.app, host=host, port=port, reload=reload)
 
     def _register_routes(self):
