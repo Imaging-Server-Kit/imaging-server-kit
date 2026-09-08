@@ -28,24 +28,41 @@
             {% endfor %}
         </p>
 
-        <table>
+        <table class="table table-sm table-hover align-middle">
             <thead>
                 <tr>
+                    <th>Title</th>
                     <th>Parameter</th>
-                    <th></th>
+                    <th>Description</th>
                     <th>Default</th>
                 </tr>
             </thead>
             <tbody>
                 {% for key, val in algo_params.items() %}
                 <tr>
-                    <td>{{ key }}</td>
-                    <td>{{ val.get("description") }}</td>
-                    <td>{{ val.get("default") }}</td>
+                    <td class="fw-semibold">
+                        {{ val.get("title") }}
+                        {% if val.get("required") %}
+                        <span class="text-danger" data-bs-toggle="tooltip" title="Required parameter">*</span>
+                        {% endif %}
+                    </td>
+                    <td><code class="text-muted">{{ key }}</code></td>
+                    <td class="text-muted small">{{ val.get("description") }}</td>
+                    <td>
+                        {% if val.get("default") is not none %}
+                        <code>{{ val.get("default") }}</code>
+                        {% else %}
+                        <span class="text-muted">&mdash;</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if algo_params.values() | selectattr("required") | list %}
+        <p class="text-muted small"><span class="text-danger">*</span> Required parameter</p>
+        {% endif %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
         integrity="sha384-QFfYf8qpCIem7U+Uz5XYW6XPiA5sdP7ePLCTDBSMF0Os3J8nt9wM5L3yZGOI+73s"
@@ -53,7 +70,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js"
         integrity="sha384-Q8KdjMRRhHpXEmsdpu2x9NkRBe/HHU6hLmjNw07uGpD7jz1zPoj2a9t8WbQhAjc"
         crossorigin="anonymous"></script>
-
+    <script>
+        // Enable Bootstrap tooltips for the required-parameter asterisk
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                new bootstrap.Tooltip(el);
+            });
+        });
+    </script>
 </body>
 
 </html>
