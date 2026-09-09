@@ -41,7 +41,7 @@ class NapariWidget(QWidget):
 
         # Layout
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignTop)  # type: ignore
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(layout)
         
         # Add the runner's extra UI

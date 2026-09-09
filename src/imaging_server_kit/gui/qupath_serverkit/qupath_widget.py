@@ -80,7 +80,7 @@ class QuPathWidget(QWidget):
 
         # Layout
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignTop)  # type: ignore
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.setLayout(layout)
 
         # QuPath context
