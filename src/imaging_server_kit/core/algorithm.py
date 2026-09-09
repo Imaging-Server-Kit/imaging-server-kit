@@ -5,7 +5,6 @@ from typing import (
     Callable,
     Dict,
     Generator,
-    Iterable,
     List,
     Optional,
     Tuple,
@@ -73,7 +72,11 @@ def _layer_from_type(hinted_type, default, param_name: str) -> Layer:
         return skt.Any(name=param_name)
 
     cls: Type[Layer] = TYPE_MAPPINGS[hinted_type]
-    return cls(name=param_name) if default is _empty else cls(name=param_name, default=default)
+    return (
+        cls(name=param_name)
+        if default is _empty
+        else cls(name=param_name, default=default)
+    )
 
 
 def _resolve_param_layer(param_name: str, annotation, default) -> Layer:
@@ -90,11 +93,13 @@ def _resolve_param_layer(param_name: str, annotation, default) -> Layer:
 
     if isinstance(default, Layer):
         return default
-    
+
     return _layer_from_type(type(default), default, param_name)
 
 
-def _parse_run_func_signature(func: Callable, parameters: Dict[str, Layer]) -> Dict[str, Layer]:
+def _parse_run_func_signature(
+    func: Callable, parameters: Dict[str, Layer]
+) -> Dict[str, Layer]:
     resolved = dict(parameters)
 
     for param_name, param in signature(func).parameters.items():
@@ -102,7 +107,9 @@ def _parse_run_func_signature(func: Callable, parameters: Dict[str, Layer]) -> D
             if not isinstance(resolved[param_name], Layer):
                 raise TypeError(f"Parameter '{param_name}' should be a Layer instance.")
             continue
-        resolved[param_name] = _resolve_param_layer(param_name, param.annotation, param.default)
+        resolved[param_name] = _resolve_param_layer(
+            param_name, param.annotation, param.default
+        )
 
     return resolved
 
@@ -125,19 +132,23 @@ def _field_constraints_from_layer(layer: Layer) -> dict:
     }
 
 
-def _parse_pydantic_params_schema(run_algorithm_func: Callable, params_from_decorator: Dict):
+def _parse_pydantic_params_schema(
+    run_algorithm_func: Callable, params_from_decorator: Dict
+):
     parsed_params = _parse_run_func_signature(run_algorithm_func, params_from_decorator)
 
     layer_validator = LayerValidator()  # stateless — hoist out of the loop
     fields, validators = {}, {}
 
     for param_name, layer in parsed_params.items():
-        validators[f"validate_{param_name}"] = field_validator(param_name, mode="after")(
-            partial(layer_validator.validate, layer=layer)
-        )
+        validators[f"validate_{param_name}"] = field_validator(
+            param_name, mode="after"
+        )(partial(layer_validator.validate, layer=layer))
         fields[param_name] = (layer.type, Field(**_field_constraints_from_layer(layer)))
 
-    return create_model("Parameters", __base__=Parameters, __validators__=validators, **fields)
+    return create_model(
+        "Parameters", __base__=Parameters, __validators__=validators, **fields
+    )
 
 
 ### Function output parsing ###
@@ -299,13 +310,13 @@ class Algorithm(AlgorithmRunner):
         return self._name
 
     @property
-    def algorithms(self) -> Iterable[str]:
+    def algorithms(self) -> Union[List[str], Tuple[str, ...]]:
         return self._algorithms
 
     @algorithms.setter
-    def algorithms(self, algorithms: Iterable[str]):
+    def algorithms(self, algorithms: Union[List[str], Tuple[str, ...]]):
         self._algorithms = algorithms
-    
+
     @property
     def tileable(self) -> bool:
         return self._tileable

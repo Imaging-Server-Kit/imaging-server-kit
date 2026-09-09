@@ -17,17 +17,17 @@ class MultiAlgorithm(AlgorithmRunner):
     ----------
     algorithms_dict: A dictionary mapping algorithm names to instances in the collection.
     algorithms: A list of algorithm names in the collection.
-    
+
     Methods
     ----------
-    This class implements the same methods as the Algorithm class (via AlgorithmRunner), 
+    This class implements the same methods as the Algorithm class (via AlgorithmRunner),
     but methods take an extra argument `algorithm` to identify the algorithm to use.
     """
 
     def __init__(self, algorithms: List[Algorithm], name: str = "algorithms"):
         self.sk_algorithms = algorithms
         self._name = name
-    
+
     @property
     def name(self) -> str:
         return self._name
@@ -41,27 +41,29 @@ class MultiAlgorithm(AlgorithmRunner):
         return list(self.algorithms_dict.keys())
 
     @validate_algorithm
-    def info(self, algorithm: str):
-        return self.algorithms_dict[algorithm].info(algorithm)
+    def info(self, algorithm: Optional[str] = None):
+        return self.algorithms_dict[algorithm].info(algorithm)  # type: ignore
 
     @validate_algorithm
-    def get_parameters(self, algorithm: str) -> Dict:
-        return self.algorithms_dict[algorithm].get_parameters(algorithm)
+    def get_parameters(self, algorithm: Optional[str] = None) -> Dict:
+        return self.algorithms_dict[algorithm].get_parameters(algorithm)  # type: ignore
 
     @validate_algorithm
-    def get_sample(self, algorithm: str, idx: int = 0) -> Optional[Stack]:
-        return self.algorithms_dict[algorithm].get_sample(algorithm, idx=idx)
+    def get_sample(
+        self, algorithm: Optional[str] = None, idx: int = 0
+    ) -> Optional[Stack]:
+        return self.algorithms_dict[algorithm].get_sample(algorithm, idx=idx)  # type: ignore
 
     @validate_algorithm
-    def get_n_samples(self, algorithm: str) -> int:
-        return self.algorithms_dict[algorithm].get_n_samples(algorithm)
+    def get_n_samples(self, algorithm: Optional[str] = None) -> int:
+        return self.algorithms_dict[algorithm].get_n_samples(algorithm)  # type: ignore
 
     @validate_algorithm
-    def is_tileable(self, algorithm: str) -> bool:
-        return self.algorithms_dict[algorithm].is_tileable(algorithm)
+    def is_tileable(self, algorithm: Optional[str] = None) -> bool:
+        return self.algorithms_dict[algorithm].is_tileable(algorithm)  # type: ignore
 
     @validate_algorithm
-    def get_signature_params(self, algorithm: str) -> List[str]:
+    def get_signature_params(self, algorithm: Optional[str] = None) -> List[str]:
         return self.algorithms_dict[algorithm].get_signature_params(algorithm)
 
     @validate_algorithm

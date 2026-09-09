@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Generator, List, Optional, Union
+from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
 import importlib.util
 
 import imaging_server_kit.core._etc as etc
@@ -32,7 +32,7 @@ def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) 
 
 def validate_algorithm(func: Callable) -> Callable:
     def wrapper(self, algorithm: Optional[str] = None, *args, **kwargs):
-        algorithm = _check_algorithm_available(algorithm, self.algorithms)
+        algorithm: str = _check_algorithm_available(algorithm, self.algorithms)
         return func(self, algorithm, *args, **kwargs)
 
     return wrapper
@@ -70,25 +70,25 @@ class AlgorithmRunner(ABC):
 
     @property  # type: ignore
     @abstractmethod
-    def algorithms() -> List[str]: ...
+    def algorithms() -> Union[List[str], Tuple[str, ...]]: ...
 
     @abstractmethod
-    def info(self, algorithm: str) -> None: ...
+    def info(self, algorithm: Optional[str]) -> None: ...
 
     @abstractmethod
-    def get_parameters(self, algorithm: str) -> Dict: ...
+    def get_parameters(self, algorithm: Optional[str]) -> Dict: ...
 
     @abstractmethod
-    def get_sample(self, algorithm: str, idx: int = 0) -> Stack: ...
+    def get_sample(self, algorithm: Optional[str], idx: int = 0) -> Stack: ...
 
     @abstractmethod
-    def get_n_samples(self, algorithm: str) -> int: ...
+    def get_n_samples(self, algorithm: Optional[str]) -> int: ...
 
     @abstractmethod
-    def is_tileable(self, algorithm: str) -> bool: ...
+    def is_tileable(self, algorithm: Optional[str]) -> bool: ...
 
     @abstractmethod
-    def get_signature_params(self, algorithm: str) -> List[str]: ...
+    def get_signature_params(self, algorithm: Optional[str]) -> List[str]: ...
 
     @abstractmethod
     def _stream(
@@ -171,7 +171,7 @@ class AlgorithmRunner(ABC):
 
         # Ordered list of parameter names based on the run function signature (args + kwargs)
         signature_params = self.get_signature_params(algorithm)
-        
+
         # Catch users making typos or sending unknown parameters
         unknown_params = set(algo_params) - set(signature_params)
         if unknown_params:
@@ -205,11 +205,15 @@ class AlgorithmRunner(ABC):
 
         # Handle the special napari case
         special_napari_case = False
-        
+
         if napari_available():
             import napari
+
             if isinstance(stack, napari.Viewer):
-                from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
+                from imaging_server_kit.gui.napari_serverkit.napari_stack import (
+                    NapariStack,
+                )
+
                 special_napari_case = True
                 stack = NapariStack(viewer=stack)  # type: ignore
 
@@ -227,7 +231,7 @@ class AlgorithmRunner(ABC):
         # If a domain is passed, restrict the computation to that domain
         if domain:
             params_stack = params_stack.select(domain)
-        
+
         # Run the algorithm and assemble the stack
         for result_tile, params_tile in self.run_generator(
             algorithm, params_stack, tiling_ctx

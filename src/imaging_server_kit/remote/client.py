@@ -3,7 +3,7 @@ Client interface for the Imaging Server Kit.
 """
 
 import webbrowser
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import requests
@@ -71,11 +71,11 @@ class Client(AlgorithmRunner):
         return self._name
 
     @property
-    def algorithms(self) -> Iterable[str]:
+    def algorithms(self) -> Union[List[str], Tuple[str, ...]]:
         return self._algorithms
 
     @algorithms.setter
-    def algorithms(self, algorithms: Iterable[str]):
+    def algorithms(self, algorithms: Union[List[str], Tuple[str, ...]]):
         self._algorithms = algorithms
 
     @property
@@ -94,22 +94,15 @@ class Client(AlgorithmRunner):
 
     @validate_algorithm
     def info(self, algorithm: Optional[str] = None):
-        if algorithm is None:
-            # Try to default to the first available algorithm:
-            if len(self.algorithms) == 0:
-                return
-            
-            algorithm = self.algorithms[0]
-        
         webbrowser.open(f"{self.server_url}/{algorithm}/info")
 
     @validate_algorithm
-    def get_parameters(self, algorithm=None) -> Dict:
+    def get_parameters(self, algorithm: Optional[str] = None) -> Dict:
         endpoint = f"{self.server_url}/{algorithm}/parameters"
         return self._access_algo_get_endpoint(endpoint)
 
     @validate_algorithm
-    def get_sample(self, algorithm=None, idx: int = 0) -> Stack:
+    def get_sample(self, algorithm: Optional[str] = None, idx: int = 0) -> Stack:
         n_samples = self.get_n_samples(algorithm)
         if (idx < 0) | (idx > n_samples - 1):
             raise ValueError(
@@ -124,21 +117,21 @@ class Client(AlgorithmRunner):
         return sample_stack
 
     @validate_algorithm
-    def get_n_samples(self, algorithm=None) -> int:
+    def get_n_samples(self, algorithm: Optional[str] = None) -> int:
         endpoint = f"{self.server_url}/{algorithm}/n_samples"
         json_response = self._access_algo_get_endpoint(endpoint)
         n_samples = json_response.get("n_samples")
         return n_samples
 
     @validate_algorithm
-    def is_tileable(self, algorithm=None) -> bool:
+    def is_tileable(self, algorithm: Optional[str] = None) -> bool:
         endpoint = f"{self.server_url}/{algorithm}/tileable"
         json_response = self._access_algo_get_endpoint(endpoint)
         is_tileable = json_response.get("tileable")
         return is_tileable
 
     @validate_algorithm
-    def get_signature_params(self, algorithm: str) -> List[str]:
+    def get_signature_params(self, algorithm: Optional[str] = None) -> List[str]:
         endpoint = f"{self.server_url}/{algorithm}/signature"
         return self._access_algo_get_endpoint(endpoint)
 
