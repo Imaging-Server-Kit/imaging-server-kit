@@ -322,8 +322,10 @@ class Algorithm(AlgorithmRunner):
         return self._tileable
 
     @tileable.setter
-    def tileable(self, tileable: bool):
-        self._tileable = tileable
+    def tileable(self, value: bool):
+        if not isinstance(value, bool):
+            raise TypeError(f"Value must be bool, got {type(value).__name__}")
+        self._tileable = value
 
     def __call__(self, *args, **kwargs) -> Any:
         # Get a Stack object

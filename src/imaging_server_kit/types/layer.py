@@ -137,6 +137,8 @@ class Layer:
 
     @name.setter
     def name(self, value: str):
+        if not isinstance(value, str):
+            raise TypeError(f"Value must be str, got {type(value).__name__}")
         self._name = value
 
     @property
