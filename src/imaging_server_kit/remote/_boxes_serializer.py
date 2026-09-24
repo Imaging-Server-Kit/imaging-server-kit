@@ -8,13 +8,13 @@ from imaging_server_kit.types._boxes import Boxes
 
 class BoxesDataSerializer(Serializer):
     @staticmethod
-    def serialize(boxes: Optional[Boxes], client_origin: str) -> Optional[List[Feature]]:
+    def serialize(boxes: Optional[Boxes]) -> Optional[List[Feature]]:
         if boxes is None:
             return
-        
+
         if boxes.data is None:
             return
-        
+
         features = []
         for i, box in enumerate(boxes.data):
             coords = np.array(box)[:, ::-1]  # Invert XY
@@ -27,11 +27,11 @@ class BoxesDataSerializer(Serializer):
                 print(
                     "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box."
                 )
-        
+
         return features
 
     @staticmethod
-    def deserialize(serialized_boxes: Optional[List[Feature]], client_origin: str) -> Optional[np.ndarray]:
+    def deserialize(serialized_boxes: Optional[List[Feature]]) -> Optional[np.ndarray]:
         if serialized_boxes is None:
             return None
         boxes = np.array(

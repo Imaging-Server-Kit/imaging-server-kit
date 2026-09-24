@@ -9,9 +9,7 @@ from imaging_server_kit.types.layer import Layer
 
 class MetaSerializer(Serializer):
     @staticmethod
-    def serialize(
-        layer: Optional[Layer], client_origin: Optional[str] = None
-    ) -> Optional[Dict]:
+    def serialize(layer: Optional[Layer]) -> Optional[Dict]:
         if layer is not None:
             if layer.meta is not None:
                 return _serialize_meta(layer.meta)
@@ -19,7 +17,7 @@ class MetaSerializer(Serializer):
                 return {}
 
     @staticmethod
-    def deserialize(serialized_meta: Dict, client_origin: Optional[str] = None) -> Any:
+    def deserialize(serialized_meta: Dict) -> Any:
         return _deserialize_meta(serialized_meta)
 
 

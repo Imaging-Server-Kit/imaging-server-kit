@@ -11,7 +11,7 @@ from imaging_server_kit.remote.encoding import decode_contents, encode_contents
 
 class AnyDataSerializer(Serializer):
     @staticmethod
-    def serialize(any: Optional[Any], client_origin: str) -> typing.Any:
+    def serialize(any: Optional[Any]) -> typing.Any:
         if any is None:
             return None
 
@@ -31,43 +31,37 @@ class AnyDataSerializer(Serializer):
         # Dictionary case:
         elif isinstance(value, dict):
             return {
-                key: AnyDataSerializer.serialize(Any(data=item), client_origin)
+                key: AnyDataSerializer.serialize(Any(data=item))
                 for key, item in value.items()
             }
 
         # List/Tuple case:
         elif isinstance(value, (list, tuple)):
-            return [
-                AnyDataSerializer.serialize(Any(data=item), client_origin)
-                for item in value
-            ]
-        
+            return [AnyDataSerializer.serialize(Any(data=item)) for item in value]
+
         else:
             # If unsuccessful with any of the previous approaches, we raise:
             raise ValueError(f"Cannot serialize this object: {value}")
 
     @staticmethod
-    def deserialize(serialized_data: typing.Any, client_origin: str) -> typing.Any:
+    def deserialize(serialized_data: typing.Any) -> typing.Any:
         if isinstance(serialized_data, str):
             try:
                 return decode_contents(serialized_data)
             except Exception:
                 return serialized_data
-        
+
         elif isinstance(serialized_data, (int, float, bool)):
             return serialized_data
-        
+
         elif isinstance(serialized_data, list):
-            return [
-                AnyDataSerializer.deserialize(item, client_origin)
-                for item in serialized_data
-            ]
-        
+            return [AnyDataSerializer.deserialize(item) for item in serialized_data]
+
         elif isinstance(serialized_data, dict):
             return {
-                key: AnyDataSerializer.deserialize(item, client_origin)
+                key: AnyDataSerializer.deserialize(item)
                 for key, item in serialized_data.items()
             }
-        
+
         else:
             raise ValueError(f"Cannot deserialize this object: {serialized_data}")

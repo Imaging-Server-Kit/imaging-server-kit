@@ -34,32 +34,16 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
 
 class PointsDataSerializer(Serializer):
     @staticmethod
-    def serialize(points: Optional[Points], client_origin: str) -> Optional[Union[str, List[Feature]]]:
+    def serialize(points: Optional[Points]) -> Optional[Union[str, List[Feature]]]:
         if points is None:
             return
-        
+
         if points.data is None:
             return
-        
-        if client_origin == "Python/Napari":
-            point_features = encode_contents(points.data.astype(np.float32))
-        elif client_origin == "Java/QuPath":
-            point_features = encode_point_features(points.data)
-        else:
-            raise ValueError(f"Unrecognized client origin: {client_origin}")
-        
-        return point_features
+
+        return encode_contents(points.data.astype(np.float32))
 
     @staticmethod
-    def deserialize(
-        serialized_points: Optional[Union[str, List[Feature]]], client_origin: str
-    ) -> Optional[np.ndarray]:
-        if serialized_points is None:
-            return
-        
+    def deserialize(serialized_points: Optional[str]) -> Optional[np.ndarray]:
         if isinstance(serialized_points, str):
-            points = decode_contents(serialized_points).astype(float)
-        else:
-            points = decode_point_features(serialized_points)
-        
-        return points
+            return decode_contents(serialized_points).astype(float)

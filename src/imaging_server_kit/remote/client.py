@@ -111,9 +111,7 @@ class Client(AlgorithmRunner):
         endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
         serialized_sample_stack = self._access_algo_get_endpoint(endpoint)
         stack_serializer = StackSerializer()
-        sample_stack = stack_serializer.deserialize(
-            serialized_sample_stack, client_origin="Python/Napari"
-        )
+        sample_stack = stack_serializer.deserialize(serialized_sample_stack)
         return sample_stack
 
     @validate_algorithm
@@ -142,11 +140,10 @@ class Client(AlgorithmRunner):
             try:
                 response = client.post(
                     endpoint,
-                    json=stack_serializer.serialize(params_stack, "Python/Napari"),
+                    json=stack_serializer.serialize(params_stack),
                     headers={
                         "Content-Type": "application/json",
                         "accept": "application/msgpack",
-                        "User-Agent": "Python/Napari",
                     },
                     stream=True,
                     # TODO: We *could* implement a timeout here, but not sure what's the best strategy for that, so we leave it as todo.
@@ -165,9 +162,7 @@ class Client(AlgorithmRunner):
                     unpacker.feed(chunk)
 
                     for serialized_stack in unpacker:
-                        yield stack_serializer.deserialize(
-                            [serialized_stack], "Python/Napari"
-                        )
+                        yield stack_serializer.deserialize([serialized_stack])
             else:
                 self._handle_response_errored(response)
 

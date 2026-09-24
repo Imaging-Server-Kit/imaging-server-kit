@@ -21,7 +21,6 @@ from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.remote.stack_serializer import StackSerializer
 
-
 templates_dir = pathlib.Path(
     importlib.resources.files("imaging_server_kit.core").joinpath("templates")  # type: ignore
 )
@@ -105,7 +104,7 @@ class AlgorithmApp:
                 algo_infos = []
                 for algo in self.algorithms:
                     algo_infos.append(self.algorithms_dict[algo].algo_info)
-                
+
                 return templates.TemplateResponse(
                     request=request,
                     name="index.html",
@@ -183,7 +182,7 @@ class AlgorithmApp:
             sample = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
             if sample is not None:
                 stack_serializer = StackSerializer()
-                return stack_serializer.serialize(sample, "Python/Napari")
+                return stack_serializer.serialize(sample)
 
         @self.app.get(
             "/{algorithm_name}/n_samples",
@@ -229,31 +228,9 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             encoded_params = await request.json()
 
-            # Python/Napari or Java/QuPath
-            client_origin = str(request.headers.get("User-Agent"))
-
             # Reconstruct the algo parameters as a `Stack` object
             stack_serializer = StackSerializer()
-            params_stack = stack_serializer.deserialize(encoded_params, client_origin)
-
-            # Special case: when request is sent from QuPath, the image is named `qupath-image`
-            # and should be assigned to whichever parameter is an image in the algo (we assume)
-            # TODO: shouldn't this decision be handled by the QuPath extension?
-            if client_origin == "Java/QuPath":
-                qupath_image: Optional[Layer] = params_stack.read("image-qupath")
-                if qupath_image is not None:
-                    params_stack.delete("image-qupath")
-                    # Find the first image parameter in the schema and assume it's what the QuPath image is meant to be
-                    for param_name, param_values in algorithm.get_parameters()[
-                        "properties"
-                    ].items():
-                        param_type = param_values.get("param_type")
-                        if param_type == "image":
-                            param_layer = layer_factory(
-                                kind="image", data=qupath_image.data, name=param_name
-                            )
-                            params_stack.add(param_layer)
-                            break
+            params_stack = stack_serializer.deserialize(encoded_params)
 
             # Validate the parameters `manually` with Pydantic...
             try:
@@ -269,14 +246,14 @@ class AlgorithmApp:
             )
 
             # Will do stack.serialize() => msgpack.packrb() to stream the response
-            stream = self._stream_msgpack(gen, client_origin)
+            stream = self._stream_msgpack(gen)
 
             # To check: `content` is a Python generator, where StreamingResponse expects a special ContentStream object..
             # but it iseems to work anyway
             return StreamingResponse(stream, media_type="application/msgpack")
 
-    def _stream_msgpack(self, stream_generator: Iterable[Stack], client_origin: str):
+    def _stream_msgpack(self, stream_generator: Iterable[Stack]):
         stack_serializer = StackSerializer()
         for result_tile, params_tile in stream_generator:
-            for r in stack_serializer.serialize(result_tile, client_origin):
+            for r in stack_serializer.serialize(result_tile):
                 yield msgpack.packb(r)

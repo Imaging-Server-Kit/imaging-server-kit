@@ -46,17 +46,17 @@ def _decode_process_response(resp) -> sk.Stack:
     unpacker.feed(resp.content)
     stack = sk.Stack()
     for serialized_layer in unpacker:
-        for layer in StackSerializer().deserialize([serialized_layer], "Python/Napari"):
+        for layer in StackSerializer().deserialize([serialized_layer]):
             stack.add(layer)
     return stack
 
 
 def _post_process(client, algorithm_name, params_stack):
-    payload = StackSerializer().serialize(params_stack, "Python/Napari")
+    payload = StackSerializer().serialize(params_stack)
     return client.post(
         f"/{algorithm_name}/process",
         json=payload,
-        headers={"User-Agent": "Python/Napari", "accept": "application/msgpack"},
+        headers={"accept": "application/msgpack"},
     )
 
 
@@ -100,7 +100,7 @@ def test_n_samples_and_sample(client):
 
     resp = client.get("/add_offset/sample/0")
     assert resp.status_code == 200
-    stack = StackSerializer().deserialize(resp.json(), "Python/Napari")
+    stack = StackSerializer().deserialize(resp.json())
     image_layer = stack.read("image")
     assert image_layer is not None
     assert image_layer.data.shape == (4, 4)

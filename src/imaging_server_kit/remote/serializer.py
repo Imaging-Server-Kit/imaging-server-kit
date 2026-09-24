@@ -15,19 +15,19 @@ class Serializer(ABC):
 
     @staticmethod
     @abstractmethod
-    def serialize(layer: Optional[Layer], client_origin: str) -> Any: ...
+    def serialize(layer: Optional[Layer]) -> Any: ...
 
     @staticmethod
     @abstractmethod
-    def deserialize(serialized_data: Any, client_origin: str) -> Any: ...
+    def deserialize(serialized_data: Any) -> Any: ...
 
 
 class DefaultDataSerializer(Serializer):
     @staticmethod
-    def serialize(layer: Optional[Layer], client_origin: str) -> Any:
+    def serialize(layer: Optional[Layer]) -> Any:
         if layer is not None:
             return layer.data
 
     @staticmethod
-    def deserialize(serialized_data: Any, client_origin: str) -> Any:
+    def deserialize(serialized_data: Any) -> Any:
         return serialized_data

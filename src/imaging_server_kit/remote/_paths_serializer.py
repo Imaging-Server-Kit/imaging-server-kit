@@ -9,7 +9,7 @@ from imaging_server_kit.types._paths import Paths
 
 class PathsDataSerializer(Serializer):
     @staticmethod
-    def serialize(paths: Optional[Paths], client_origin: str) -> Optional[List[str]]:
+    def serialize(paths: Optional[Paths]) -> Optional[List[str]]:
         if paths is None:
             return
 
@@ -18,7 +18,7 @@ class PathsDataSerializer(Serializer):
 
     @staticmethod
     def deserialize(
-        serialized_paths: Optional[List[str]], client_origin: str
+        serialized_paths: Optional[List[str]],
     ) -> Optional[List[np.ndarray]]:
         if serialized_paths is None:
             return
