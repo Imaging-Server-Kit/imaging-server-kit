@@ -2,14 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from imaging_server_kit.core import _progress_display as progress_display
 from imaging_server_kit.types.layer import Layer
-
-from tqdm import tqdm
-
-# We use a global progress bar instead of one attached to the instance
-# so that it doesnt re-print itself line-by-line in the terminal.
-# However, this means we can only control a single progress bar.
-PBAR = None
 
 
 class Progress(Layer):
@@ -17,7 +11,7 @@ class Progress(Layer):
 
     Parameters
     ----------
-    data: Current step (0-indexed).
+    data: Number of completed steps.
     max_val: Total number of steps.
 
     Examples
@@ -54,14 +48,7 @@ class Progress(Layer):
         return f"Progress (current: {self.data}/{max_val})"
 
     def _refresh(self):
-        global PBAR
-
         max_val = self.meta.get("max_val", 1)
-        # Only print the progress bar if there is more than 1 step.
-        if (max_val > 1) & (self.data is not None):
-            if PBAR is None:
-                PBAR = tqdm()
-            
-            PBAR.total = max_val
-            PBAR.n = self.data
-            PBAR.refresh()
+        # Only show the progress bar if there is more than 1 step.
+        if (max_val > 1) and (self.data is not None):
+            progress_display.update(self.name, completed=self.data, total=max_val)

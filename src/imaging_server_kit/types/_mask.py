@@ -6,6 +6,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import geojson
 import numpy as np
+import pandas as pd
 import rasterio.features
 import shapely
 from geojson import Feature
@@ -17,7 +18,7 @@ from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.domain import Domain
 
 # Largest mask (in pixels) for which the number of labels is shown in `repr`
-MAX_SIZE_COUNT_LABELS = 2**22
+MAX_SIZE_COUNT_LABELS = 2**24
 
 # Label dtypes accepted by `rasterio.features.shapes`
 _RASTERIO_INT_DTYPES = (np.uint8, np.int16, np.uint16, np.int32)
@@ -236,7 +237,8 @@ class Mask(Layer):
         if self.data is None:
             return 0
         else:
-            labels = np.unique(self.data)
+            # pd.unique (hash-based) is several times faster than np.unique (sort-based)
+            labels = pd.unique(self.data.ravel())
             n_labels = len(labels) - int(0 in labels)
             return n_labels
 

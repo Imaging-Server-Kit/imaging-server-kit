@@ -3,6 +3,7 @@ from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
 import importlib.util
 
 import imaging_server_kit.core._etc as etc
+import imaging_server_kit.core._progress_display as progress_display
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
@@ -233,30 +234,34 @@ class AlgorithmRunner(ABC):
             params_stack = params_stack.select(domain)
 
         # Run the algorithm and assemble the stack
-        for result_tile, params_tile in self.run_generator(
-            algorithm, params_stack, tiling_ctx
-        ):
-            # If the parameters tile and result tile both have a position,
-            # the result tile's position is offset by that of the parameters tile
-            if (result_tile.position is not None) and (
-                params_tile.position is not None
+        try:
+            for result_tile, params_tile in self.run_generator(
+                algorithm, params_stack, tiling_ctx
             ):
-                result_tile.position = tuple(
-                    [p + q for p, q in zip(params_tile.position, result_tile.position)]
-                )
-            else:
-                result_tile.position = params_tile.position
+                # If the parameters tile and result tile both have a position,
+                # the result tile's position is offset by that of the parameters tile
+                if (result_tile.position is not None) and (
+                    params_tile.position is not None
+                ):
+                    result_tile.position = tuple(
+                        [p + q for p, q in zip(params_tile.position, result_tile.position)]
+                    )
+                else:
+                    result_tile.position = params_tile.position
 
-            # We assume that reinitializing the parameters domain on first tile
-            # will be the correct behaviour most of the time.
-            if params_stack.extent is None:
-                # If inputs don't have an extent, we clear up the whole output
-                domain_to_erase = stack.extent
-            else:
-                domain_to_erase = params_stack.extent
+                # We assume that reinitializing the parameters domain on first tile
+                # will be the correct behaviour most of the time.
+                if params_stack.extent is None:
+                    # If inputs don't have an extent, we clear up the whole output
+                    domain_to_erase = stack.extent
+                else:
+                    domain_to_erase = params_stack.extent
 
-            # Merge the result tile into the stack
-            stack.merge(result_tile, domain_to_erase)
+                # Merge the result tile into the stack
+                stack.merge(result_tile, domain_to_erase)
+        finally:
+            # Stop the terminal progress bars, even if the run fails or is interrupted
+            progress_display.stop()
 
         # Remove the progress bar
         stack.delete("Tile progress")

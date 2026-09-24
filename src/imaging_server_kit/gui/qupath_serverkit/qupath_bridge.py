@@ -5,7 +5,7 @@ Currently, the bridge is implemented for algorithms returning sk.Mask and sk.Box
 """
 
 from typing import Dict, List, Optional, Tuple
-from tqdm import tqdm
+from rich.progress import track
 
 import geojson
 import numpy as np
@@ -19,6 +19,7 @@ from shapely.geometry import shape
 
 import imaging_server_kit as sk
 from imaging_server_kit.types._mask import mask2features, instance_mask2features
+import imaging_server_kit.core._progress_display as progress_display
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.tiling import TilingSpecs
 
@@ -98,13 +99,14 @@ def _mask2detections(mask: sk.Mask) -> List[Feature]:
             [int((mask.data.size / n_tiles) ** (1 / mask.ndim))] * mask.ndim
         )
 
-        pbar = tqdm(total=1, desc="Converting mask to features", unit="tile")
         for tile_meta, tile_domain in sk.generate_tiles(
             mask.extent, tile_size=tile_size.tolist()
         ):
-            pbar.total = tile_meta.n_tiles
-            pbar.update(1)
-            pbar.refresh()
+            progress_display.update(
+                "Converting mask to features",
+                completed=tile_meta.tile_idx + 1,
+                total=tile_meta.n_tiles,
+            )
 
             mask_tile = mask.select(tile_domain)
             if mask_tile.data is None:
@@ -462,11 +464,10 @@ class QuPathBridge:
             n_batches = (
                 len(detections) + MAX_OBJECTS_AT_ONCE - 1
             ) // MAX_OBJECTS_AT_ONCE
-            for k in tqdm(
+            for k in track(
                 range(0, len(detections), MAX_OBJECTS_AT_ONCE),
                 total=n_batches,
-                desc="Sending detections to QuPath",
-                unit="batch",
+                description="Sending detections to QuPath",
             ):
                 detections_selection = detections[k : k + MAX_OBJECTS_AT_ONCE]
                 try:
