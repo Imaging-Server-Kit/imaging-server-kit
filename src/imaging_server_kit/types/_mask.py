@@ -126,57 +126,6 @@ def features2instance_mask(features: List[Feature], image_shape: Tuple) -> np.nd
     return segmentation_mask
 
 
-def mask2features_3d(segmentation_mask: np.ndarray) -> List[Feature]:
-    features = []
-    for z_idx, mask_2d in enumerate(segmentation_mask):
-        features_2d = mask2features(mask_2d)
-        for feature_2d in features_2d:
-            feature_2d.properties["z_idx"] = z_idx
-            features.append(feature_2d)
-    return features
-
-
-def features2mask_3d(features: List[Feature], image_shape: Tuple) -> np.ndarray:
-    segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
-    _, ry, rx = image_shape
-    for feature in features:
-        feature_xy_coordinates = np.array(feature["geometry"]["coordinates"])
-        feature_xy_coordinates = feature_xy_coordinates[0, :, :]  # Remove an extra dimension
-        feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
-        feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
-        feature_z_idx = feature["properties"]["z_idx"]
-        feature_properites = feature["properties"]
-        feature_id = feature_properites["Class"]
-        segmentation_mask[feature_z_idx][feature_mask] = feature_id
-    return segmentation_mask
-
-
-def instance_mask2features_3d(segmentation_mask: np.ndarray) -> List[Feature]:
-    features = []
-    for z_idx, mask_2d in enumerate(segmentation_mask):
-        features_2d = instance_mask2features(mask_2d)
-        for feature_2d in features_2d:
-            feature_2d.properties["z_idx"] = z_idx
-            features.append(feature_2d)
-    return features
-
-
-def features2instance_mask_3d(features: List[Feature], image_shape: Tuple) -> np.ndarray:
-    segmentation_mask = np.zeros(image_shape, dtype=np.uint16)
-    _, ry, rx = image_shape
-    for feature in features:
-        feature_xy_coordinates = np.array(feature["geometry"]["coordinates"])
-        # Remove an extra dimension
-        feature_xy_coordinates = feature_xy_coordinates[0, :, :]
-        feature_xy_coordinates = feature_xy_coordinates[:, ::-1]  # Invert XY
-        feature_mask = polygon2mask((ry, rx), feature_xy_coordinates)
-        feature_z_idx = feature["properties"]["z_idx"]
-        feature_properites = feature["properties"]
-        feature_id = feature_properites["Detection ID"]
-        segmentation_mask[feature_z_idx][feature_mask] = feature_id
-    return segmentation_mask
-
-
 class Mask(Layer):
     """Data layer used to represent segmentation masks: label images where integer values encode either object classes or object instances.
 

@@ -25,7 +25,7 @@ from imaging_server_kit.core.tiling import TilingSpecs
 MAX_IMAGE_PIXELS = 1024 * 1024 * 256
 
 # Practical limit: max objects to send to QuPath at once (found empirically)
-MAX_OBJECTS_AT_ONCE = 5000
+MAX_OBJECTS_AT_ONCE = 100
 
 # Max labels or pixels to do mask2features in one go
 MAX_LABELS_FEATURIZATION = 20_000
