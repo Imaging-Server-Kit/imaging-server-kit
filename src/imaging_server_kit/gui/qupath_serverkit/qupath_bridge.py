@@ -14,6 +14,7 @@ import qubalab.qupath as qp
 from qubalab.images import QuPathServer
 from qubalab.objects import ObjectType
 from geojson import Feature, Polygon
+import shapely
 from shapely.geometry import shape
 
 import imaging_server_kit as sk
@@ -61,6 +62,21 @@ def _check_mask_tiles_for_featurization(mask: np.ndarray) -> int:
     return n_tiles
 
 
+def _merge_features_by_id(features: List[Feature]) -> List[Feature]:
+    """Merge features sharing the same `Detection ID` into a single (Multi)Polygon feature."""
+    groups: Dict[int, List[Feature]] = {}
+    for f in features:
+        groups.setdefault(f["properties"]["Detection ID"], []).append(f)
+
+    merged = []
+    for group in groups.values():
+        if len(group) > 1:
+            geom = shapely.union_all([shape(f["geometry"]) for f in group])
+            group[0]["geometry"] = geojson.loads(shapely.to_geojson(geom))
+        merged.append(group[0])
+    return merged
+
+
 def _mask2detections(mask: sk.Mask) -> List[Feature]:
     """Convert a Mask object to a list of GeoJson features for QuPath."""
     if mask.meta is None:
@@ -91,33 +107,28 @@ def _mask2detections(mask: sk.Mask) -> List[Feature]:
             pbar.refresh()
 
             mask_tile = mask.select(tile_domain)
+            if mask_tile.data is None:
+                continue
 
             # Distinguish between semantic and instance masks
             if mask.meta["merger"] == "default":  # semantic mask
-                features_tile = mask2features(mask_tile.data)
+                features.extend(
+                    mask2features(mask_tile.data, offset=mask_tile.position)
+                )
             elif mask.meta["merger"] == "instances":
-                features_tile = instance_mask2features(mask_tile.data)
-
-            for f in features_tile:
-                feature_geom = np.array(f["geometry"]["coordinates"])
-                feature_geom = feature_geom[0]
-
-                # Offset the coordinates by the position of the tile relative to the mask
-                feature_geom[:, 0] = (
-                    feature_geom[:, 0] + mask_tile.position[1] - mask.position[1]
+                features.extend(
+                    instance_mask2features(mask_tile.data, offset=mask_tile.position)
                 )
-                feature_geom[:, 1] = (
-                    feature_geom[:, 1] + mask_tile.position[0] - mask.position[0]
-                )
-                f["geometry"]["coordinates"] = feature_geom[None].tolist()
 
-            features.extend(features_tile)
+        if mask.meta["merger"] == "instances":
+            # Merge the parts of objects that were split across tiles
+            features = _merge_features_by_id(features)
     else:
         # Don't bother doing mask2features in tiles
         if mask.meta["merger"] == "default":  # semantic mask
-            features = mask2features(mask.data)
+            features = mask2features(mask.data, offset=mask.position)
         elif mask.meta["merger"] == "instances":
-            features = instance_mask2features(mask.data)
+            features = instance_mask2features(mask.data, offset=mask.position)
 
     if len(features) == 0:
         return features
@@ -158,14 +169,6 @@ def _mask2detections(mask: sk.Mask) -> List[Feature]:
                 f["properties"]["measurements"] = measurements
 
         f["properties"]["name"] = f"ID {detection_id}"
-
-        feature_geom = np.array(f["geometry"]["coordinates"])
-        feature_geom = feature_geom[0]
-
-        # Global offset (coords have to be inverted, for some reason)
-        feature_geom[:, 0] = feature_geom[:, 0] + mask.position[1]
-        feature_geom[:, 1] = feature_geom[:, 1] + mask.position[0]
-        f["geometry"]["coordinates"] = feature_geom[None].tolist()
 
         detections.append(f)
 

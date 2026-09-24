@@ -27,7 +27,8 @@ dependencies = [
     "scikit-image[optional]", # To imread samples and run demo examples.
     "jinja2",                 # To template the info endpoint.
     "PyYAML",                 # To load the metadata yaml file.
-    "imantics",               # To convert masks to features. Comes with opencv-python.
+    "rasterio",               # To convert masks to features and back.
+    "shapely>=2.0",           # To merge polygons of the same object.
     "geojson",                # To convert masks and points to features.
     # FastAPI and related:
     "fastapi",
