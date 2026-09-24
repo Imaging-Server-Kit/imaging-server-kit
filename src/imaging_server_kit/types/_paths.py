@@ -34,9 +34,6 @@ class Paths(Layer):
             **kwargs,
         )
 
-    def __str__(self) -> str:
-        return f"{self.name} ({self.kind} layer). Paths: {self.n_objects}"
-
     @property
     def n_objects(self) -> int:
         if self.data is None:

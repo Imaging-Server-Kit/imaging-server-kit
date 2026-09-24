@@ -5,6 +5,7 @@ from typing import Generator, List, Optional, Tuple, Union
 from imaging_server_kit.merge.layer_merger import LayerMerger
 from imaging_server_kit.types import Layer
 from imaging_server_kit.core.domain import Domain, merge_domains
+from imaging_server_kit.core._fmt import fmt_slices
 from imaging_server_kit.core.tiling import (
     TileMeta,
     TilingSpecs,
@@ -54,15 +55,35 @@ class Stack:
 
         self._position = position  # self._resolve_stack_position(position)
 
-    def __str__(self):
-        message = f"Stack (Layers: {len(self.layers)})"
-        for l in self.layers:
-            message += "\n"
-            message += l.__str__()
-        return message
+    def __repr__(self) -> str:
+        n = len(self.layers)
+        message = f"<Stack {n} layer{'' if n == 1 else 's'}"
+        if self.extent is not None:
+            message += f", extent {fmt_slices(self.coords_min, self.coords_max)}"
+        return message + ">"
 
-    def __repr__(self):
-        return self.__str__()
+    def __str__(self) -> str:
+        if len(self.layers) == 0:
+            return "Stack | empty"
+
+        header = [f"Stack | {len(self.layers)} layers"]
+        if self.extent is not None:
+            header.append(f"extent {fmt_slices(self.coords_min, self.coords_max)}")
+        if self.tile_meta.n_tiles > 1:
+            header.append(f"tile {self.tile_meta.tile_idx}/{self.tile_meta.n_tiles}")
+
+        rows = [("#", "kind", "name", "data")]
+        rows += [(str(i), l.kind, l.name, l._summary()) for i, l in enumerate(self.layers)]
+        # Only show the first and last layers of very large stacks
+        if len(rows) > 21:
+            rows = rows[:11] + [("...", "", "", "")] + rows[-5:]
+
+        widths = [max(len(row[col]) for row in rows) for col in range(3)]
+        lines = [" | ".join(header)]
+        for row in rows:
+            cells = [cell.ljust(width) for cell, width in zip(row, widths)]
+            lines.append(f"  {'  '.join(cells)}  {row[3]}".rstrip())
+        return "\n".join(lines)
 
     def __len__(self):
         return len(self.layers)

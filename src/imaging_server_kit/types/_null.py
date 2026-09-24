@@ -30,3 +30,6 @@ class Null(Layer):
             serializer=serializer,
             **kwargs,
         )
+
+    def _summary(self) -> str:
+        return ""

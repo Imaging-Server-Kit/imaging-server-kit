@@ -4,6 +4,7 @@ from typing import Any, Dict, Generator, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.core._fmt import fmt_tuple, truncate
 
 from imaging_server_kit.core.tiling import (
     TileMeta,
@@ -229,11 +230,36 @@ class Layer:
     def _merger_instance(self, value):
         self._merger = value
 
-    def __str__(self) -> str:
-        return f"{self.name} ({self.kind} layer). Data: {self.data.shape if isinstance(self.data, np.ndarray) else self.data}"
+    def __repr__(self) -> str:
+        parts = [self._summary()]
+        if self._position is not None and any(self._position):
+            parts.append(f"at {fmt_tuple(self._position)}")
+        if self.tile_meta.n_tiles > 1:
+            parts.append(f"tile {self.tile_meta.tile_idx}/{self.tile_meta.n_tiles}")
+        details = ", ".join(p for p in parts if p)
+        return f"<{type(self).__name__} '{self.name}'{' ' + details if details else ''}>"
 
-    def __repr__(self):
-        return self.__str__()
+    def _summary(self) -> str:
+        """Short description of the layer's data, used in `__repr__` and in the Stack table.
+
+        Must stay cheap to compute: avoid full passes over large arrays."""
+        data = self.data
+        if data is None:
+            return "empty"
+        n_objects = getattr(self, "n_objects", None)
+        if n_objects is not None:
+            # Points, Boxes, Vectors, Paths
+            summary = f"{n_objects} {self.kind}"
+            if self.ndim is not None:
+                summary += f", {self.ndim}D"
+            return summary
+        if isinstance(data, np.ndarray):
+            return f"{data.dtype} {data.shape}"
+        if isinstance(data, (bool, int, float, str, np.generic)):
+            return f"= {truncate(repr(data))}"
+        if isinstance(data, (list, tuple, dict)):
+            return f"{type(data).__name__}[{len(data)}]"
+        return f"= <{type(data).__name__}>"
 
     def _refresh(self):
         """Refresh the layer's state."""

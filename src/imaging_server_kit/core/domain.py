@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple, Union
 
+from imaging_server_kit.core._fmt import fmt_tuple
+
 
 class Domain:
     """A nD-domain defined by a size and position in global pixel space. Used to represent tile extents, and to restrict an algorithm's computation to a specific region.
@@ -37,16 +39,10 @@ class Domain:
         else:
             self._coords_min = position
 
-    def __str__(self):
-        message = "Domain"
-        message += "\n"
-        message += f"Position: {self.coords_min}"
-        message += "\n"
-        message += f"Size: {self.size}"
-        return message
-
-    def __repr__(self):
-        return self.__str__()
+    def __repr__(self) -> str:
+        if self.size is None and self.coords_min is None:
+            return "Domain(undefined)"
+        return f"Domain(position={fmt_tuple(self.coords_min)}, size={fmt_tuple(self.size)})"
 
     @property
     def size(self) -> Optional[Tuple]:

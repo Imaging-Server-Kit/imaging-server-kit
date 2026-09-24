@@ -16,6 +16,9 @@ from shapely.geometry.base import BaseGeometry
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.domain import Domain
 
+# Largest mask (in pixels) for which the number of labels is shown in `repr`
+MAX_SIZE_COUNT_LABELS = 2**22
+
 # Label dtypes accepted by `rasterio.features.shapes`
 _RASTERIO_INT_DTYPES = (np.uint8, np.int16, np.uint16, np.int32)
 
@@ -212,6 +215,16 @@ class Mask(Layer):
             **kwargs,
         )
 
+    def _summary(self) -> str:
+        data = self.data
+        if data is None:
+            return "empty"
+        summary = f"{data.dtype} {data.shape}"
+        # Counting labels requires a full pass over the data, so we skip it for large masks
+        if data.size <= MAX_SIZE_COUNT_LABELS:
+            summary += f", {self.n_objects} labels"
+        return summary
+
     @property
     def channel_axis(self) -> Optional[int]:
         if self.meta:
@@ -223,7 +236,9 @@ class Mask(Layer):
         if self.data is None:
             return 0
         else:
-            return len(np.unique(self.data))
+            labels = np.unique(self.data)
+            n_labels = len(labels) - int(0 in labels)
+            return n_labels
 
     @property
     def _bounds(self) -> Optional[Tuple]:

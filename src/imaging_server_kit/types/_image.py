@@ -44,6 +44,16 @@ class Image(Layer):
             **kwargs,
         )
 
+    def _summary(self) -> str:
+        summary = super()._summary()
+        if self.data is None:
+            return summary
+        if self.meta.get("rgb"):
+            summary += ", rgb"
+        elif self.meta.get("channel_axis") is not None:
+            summary += f", channel_axis={self.meta['channel_axis']}"
+        return summary
+
     @property
     def channel_axis(self) -> Optional[int]:
         if self.meta:

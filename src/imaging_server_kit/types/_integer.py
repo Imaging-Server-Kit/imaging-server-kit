@@ -2,6 +2,7 @@ from typing import Optional
 import numpy as np
 
 from imaging_server_kit.types.layer import Layer
+from imaging_server_kit.core._fmt import fmt_num
 
 
 class Integer(Layer):
@@ -44,3 +45,10 @@ class Integer(Layer):
             step=step,
             **kwargs,
         )
+
+    def _summary(self) -> str:
+        summary = super()._summary()
+        value_range = (self.meta.get("min"), self.meta.get("max"))
+        if value_range != (int(np.iinfo(np.int16).min), int(np.iinfo(np.int16).max)):
+            summary += f" in [{fmt_num(value_range[0])}, {fmt_num(value_range[1])}]"
+        return summary

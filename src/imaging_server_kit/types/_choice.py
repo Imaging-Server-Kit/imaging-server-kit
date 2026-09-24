@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, get_args
 
 try:
     from typing import Literal
@@ -6,6 +6,7 @@ except ImportError:
     from typing_extensions import Literal
 
 from imaging_server_kit.types.layer import Layer
+from imaging_server_kit.core._fmt import truncate
 
 
 class Choice(Layer):
@@ -52,3 +53,10 @@ class Choice(Layer):
 
         # Special: type defined here because it depends on items...
         self.type = Literal.__getitem__(tuple(items))  # type: ignore
+
+    def _summary(self) -> str:
+        summary = super()._summary()
+        items = get_args(self.type)
+        if items:
+            summary += f" of {{{truncate(', '.join(str(i) for i in items))}}}"
+        return summary

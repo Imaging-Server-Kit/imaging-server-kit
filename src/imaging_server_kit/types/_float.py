@@ -2,6 +2,7 @@ from typing import Optional
 import numpy as np
 
 from imaging_server_kit.types.layer import Layer
+from imaging_server_kit.core._fmt import fmt_num
 
 
 class Float(Layer):
@@ -44,3 +45,10 @@ class Float(Layer):
             step=step,
             **kwargs,
         )
+
+    def _summary(self) -> str:
+        summary = super()._summary()
+        value_range = (self.meta.get("min"), self.meta.get("max"))
+        if value_range != (float(np.finfo(np.float32).min), float(np.finfo(np.float32).max)):
+            summary += f" in [{fmt_num(value_range[0])}, {fmt_num(value_range[1])}]"
+        return summary

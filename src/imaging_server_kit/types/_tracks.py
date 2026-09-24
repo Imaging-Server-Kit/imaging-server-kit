@@ -36,6 +36,15 @@ class Tracks(Layer):
         if domain is not None:
             return np.zeros((1, self.ndim + 2), dtype=np.float32)
 
+    def _summary(self) -> str:
+        if self.data is None:
+            return "empty"
+        n_tracks = len(np.unique(self.data[:, 0])) if len(self.data) else 0
+        summary = f"{n_tracks} tracks ({self.n_objects} points)"
+        if self.ndim is not None:
+            summary += f", {self.ndim}D"
+        return summary
+
     @property
     def n_objects(self) -> int:
         if self.data is None:

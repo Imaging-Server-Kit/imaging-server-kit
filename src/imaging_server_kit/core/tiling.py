@@ -10,6 +10,12 @@ from typing import Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.core._fmt import fmt_tuple
+
+
+def _fmt_flags(flags: Tuple) -> str:
+    """Format a tuple of booleans compactly, e.g. (True, False) -> '(T, F)'."""
+    return f"({', '.join('T' if f else 'F' for f in flags)})"
 
 
 class TilingError(Exception):
@@ -64,16 +70,18 @@ class TileMeta:
         self._last_tile = last_tile
         self._overlap_px = overlap_px
 
-    def __str__(self):
-        message = "Tile Meta"
-        message += "\n"
-        message += f"Index: {self.tile_idx}"
-        message += "\n"
-        message += f"Tiles: {self.n_tiles}"
-        return message
+    def __repr__(self) -> str:
+        if self.n_tiles == 1:
+            return "TileMeta(untiled)"
 
-    def __repr__(self):
-        return self.__str__()
+        parts = [f"tile={self.tile_idx}/{self.n_tiles}"]
+        if self.overlap_px is not None:
+            parts.append(f"overlap_px={fmt_tuple(self.overlap_px)}")
+        if self.first_tile is not None:
+            parts.append(f"first={_fmt_flags(self.first_tile)}")
+        if self.last_tile is not None:
+            parts.append(f"last={_fmt_flags(self.last_tile)}")
+        return f"TileMeta({', '.join(parts)})"
 
     @property
     def overlap_px(self) -> Optional[Tuple]:
