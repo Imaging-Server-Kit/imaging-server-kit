@@ -1,17 +1,16 @@
-# Build the package and publish it to PyPI on tag push.
 name: Publish to PyPI
 on:
   push:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -25,9 +24,6 @@ jobs:
           python -m build
       - name: Publish
         uses: pypa/gh-action-pypi-publish@v1.13.0
-        with:
-          user: __token__
-          password: ${{ secrets.TWINE_API_KEY }}
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
