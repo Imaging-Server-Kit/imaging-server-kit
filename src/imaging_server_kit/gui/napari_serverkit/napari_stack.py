@@ -13,7 +13,7 @@ from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.gui.common.parameter_panel import ParameterPanel
 
 
-NAPARI_LAYER_MAPPINGS: Dict[str, Type[napari.layers.Layer]] = {
+KIND_TO_NAPARI: Dict[str, Type[napari.layers.Layer]] = {
     "image": napari.layers.Image,
     "mask": napari.layers.Labels,
     "points": napari.layers.Points,
@@ -21,6 +21,17 @@ NAPARI_LAYER_MAPPINGS: Dict[str, Type[napari.layers.Layer]] = {
     "paths": napari.layers.Shapes,
     "vectors": napari.layers.Vectors,
     "tracks": napari.layers.Tracks,
+}
+
+
+NAPARI_TO_KIND: Dict[Type[napari.layers.Layer], str] = {
+    napari.layers.Image: "image",
+    napari.layers.Labels: "mask",
+    napari.layers.Points: "points",
+    napari.layers.Tracks: "tracks",
+    napari.layers.Vectors: "vectors",
+    # Shapes layers are assumed to hold boxes (rectangles); "paths" as input is not supported.
+    napari.layers.Shapes: "boxes",
 }
 
 
@@ -176,37 +187,21 @@ class NapariStack(Stack):
         self.delete(layer_name)
 
     def _handle_new_napari_layer(self, napari_layer):
-        existing_layer = self.read(napari_layer.name)
-        if existing_layer is not None:
-            return
-        # layer_to_kind = {}  # TODO: better approach...
-        if isinstance(napari_layer, napari.layers.Image):
-            kind = "image"
-            data = napari_layer.data
-        elif isinstance(napari_layer, napari.layers.Labels):
-            kind = "mask"
-            data = napari_layer.data
-        elif isinstance(napari_layer, napari.layers.Points):
-            kind = "points"
-            data = napari_layer.data
-        elif isinstance(napari_layer, napari.layers.Tracks):
-            kind = "tracks"
-            data = napari_layer.data
-        elif isinstance(napari_layer, napari.layers.Vectors):
-            kind = "vectors"
-            data = napari_layer.data
-        elif isinstance(napari_layer, napari.layers.Shapes):
-            # TODO: For now, when a `Shapes` layer is created, we assume it's meant to contain boxes (rectangles).
-            # So, it won't work with algorithms that would use annotated "Paths" as input (quite rare).
-            kind = "boxes"
-            data = None  # instead of []
-        else:
-            print("Could not convert this layer: ", napari_layer)
+        if self.read(napari_layer.name) is not None:
             return
 
-        # Keep track of the new Napari layer in the layer stack (without any layer metadata)
-        layer = layer_factory(kind=kind, name=napari_layer.name, data=data)
-        self.add(layer)
+        kind = next(
+            (k for cls, k in NAPARI_TO_KIND.items() if isinstance(napari_layer, cls)),
+            None,
+        )
+        if kind is None:
+            show_warning(f"Could not convert this layer: {napari_layer}")
+            return
+
+        data = None if kind == "boxes" else napari_layer.data
+
+        # Keep track of the new Napari layer in the layer stack (Note: we don't track layer metadata)
+        self.add(layer_factory(kind=kind, name=napari_layer.name, data=data))
 
     def _post_add(self, layer: Layer) -> Layer:
         if layer.data is None:
@@ -286,7 +281,7 @@ class NapariStack(Stack):
 
     def _on_layer_change(self, *args, **kwargs):
         for kind, cb_list in self.parameters_panel.layer_comboboxes.items():
-            layer_type: Type[napari.layers.Layer] = NAPARI_LAYER_MAPPINGS[kind]
+            layer_type: Type[napari.layers.Layer] = KIND_TO_NAPARI[kind]
             for cb in cb_list:
                 cb.clear()
                 for layer in self.viewer.layers:

@@ -28,7 +28,7 @@ class Image(Layer):
         self,
         data: Optional[np.ndarray] = None,
         name="Image",
-        description="Input image (2D, 3D)",
+        description="Input image",
         dimensionality: Optional[List[int]] = None,
         rgb: bool = False,
         channel_axis: Optional[int] = None,

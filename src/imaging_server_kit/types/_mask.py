@@ -202,7 +202,7 @@ class Mask(Layer):
         self,
         data: Optional[np.ndarray] = None,
         name: str = "Mask",
-        description: str = "Segmentation mask (2D, 3D)",
+        description: str = "Segmentation mask",
         dimensionality: Optional[List[int]] = None,
         channel_axis: Optional[int] = None,
         **kwargs,
