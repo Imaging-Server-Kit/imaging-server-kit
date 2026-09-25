@@ -1,5 +1,5 @@
 from functools import partial, update_wrapper
-from inspect import _empty, isgeneratorfunction, signature
+from inspect import _empty, getdoc, isgeneratorfunction, signature
 from typing import (
     Any,
     Callable,
@@ -223,7 +223,7 @@ class Algorithm(AlgorithmRunner):
     run_algorithm_func: The Python function to convert.
     parameters: A dictionary of annotated parameters.
     name: A name for the algorithm (doesn't accept spaces and special characters).
-    description: A short description to display on the algorithm doc page.
+    description: A short description to display on the algorithm doc page. Defaults to the docstring of the Python function.
     tags: A list of tags (arbitrary).
     project_url: A link to a related, or the original project (gets displayed on the algo doc page).
     metadata_file: A path to a metadata.yaml file with algorithm metadata.
@@ -263,7 +263,7 @@ class Algorithm(AlgorithmRunner):
         run_algorithm_func: Callable,
         parameters: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
-        description: str = "Implementation of an image processing algorithm.",
+        description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
         metadata_file: str = "metadata.yaml",
@@ -277,6 +277,10 @@ class Algorithm(AlgorithmRunner):
             samples = []
         if parameters is None:
             parameters = {}
+
+        # Resolve the description (if None => use the function's docstring)
+        if description is None:
+            description = getdoc(run_algorithm_func) or ""
 
         # Resolve the algo name (if None => use algo function name)
         if name is None:
@@ -448,7 +452,7 @@ def algorithm(
     func: Optional[Callable] = None,
     parameters: Optional[Dict[str, Any]] = None,
     name: Optional[str] = None,
-    description: str = "Implementation of an image processing algorithm.",
+    description: Optional[str] = None,
     tags: Optional[List[str]] = None,
     project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
     metadata_file: str = "metadata.yaml",
@@ -462,7 +466,7 @@ def algorithm(
     func : The Python function to convert.
     parameters : A dictionary of annotated parameters.
     name: A name for the algorithm (doesn't accept spaces and special characters).
-    description: A short description to display on the algorithm doc page.
+    description: A short description to display on the algorithm doc page. Defaults to the docstring of the Python function.
     tags: A list of tags (arbitrary).
     project_url: A link to a related, or the original project (gets displayed on the algo doc page).
     metadata_file: A path to a metadata.yaml file with algorithm metadata.

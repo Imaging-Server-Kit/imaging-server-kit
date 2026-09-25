@@ -16,7 +16,6 @@ import imaging_server_kit as sk
 ## Intensity threshold
 @sk.algorithm(
     name="Intensity threshold",
-    description="Segment an image based on an intensity threshold.",
     tags=["Segmentation", "Demo"],
     parameters={
         "image": sk.Image(),
@@ -46,6 +45,7 @@ import imaging_server_kit as sk
     tileable=True,
 )
 def threshold_algo(image, threshold, dark_background):
+    """Segment an image based on an intensity threshold."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -61,7 +61,6 @@ def threshold_algo(image, threshold, dark_background):
 ## Automatic threshold
 @sk.algorithm(
     name="Automatic threshold",
-    description="Implementation of an automatic threshold algorithm.",
     tags=["Segmentation", "Scikit-image", "Demo"],
     parameters={
         "image": sk.Image(),
@@ -84,6 +83,7 @@ def threshold_algo(image, threshold, dark_background):
     ],
 )
 def auto_threshold(image, method):
+    """Implementation of an automatic threshold algorithm."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -98,7 +98,6 @@ def auto_threshold(image, method):
 ## Gaussian filter
 @sk.algorithm(
     name="Gaussian filter",
-    description="Apply a Gaussian filter (blur) to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.gaussian",
     tags=["Filtering", "Scikit-image", "Demo"],
     parameters={
@@ -127,6 +126,7 @@ def auto_threshold(image, method):
     tileable=True,
 )
 def gaussian_algo(image, sigma, mode):
+    """Apply a Gaussian filter (blur) to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -142,13 +142,13 @@ def gaussian_algo(image, sigma, mode):
 ## Sobel filter
 @sk.algorithm(
     name="Sobel filter",
-    description="Apply a Sobel filter to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.sobel",
     tags=["Filtering", "Scikit-image", "Demo"],
     samples=[{"image": skimage.data.camera()}],
     tileable=True,
 )
 def sobel_algo(image):
+    """Apply a Sobel filter to an image."""
     filtered = sobel(image)
     return sk.Image(filtered, name=f"Edges (Sobel)", contrast_limits=[0, 1])
 
@@ -156,7 +156,6 @@ def sobel_algo(image):
 ## Fibonacci sphere
 @sk.algorithm(
     name="Fibonacci sphere",
-    description="Evenly distributes points on a sphere using the Fibonacci sphere algorithm.",
     parameters={
         "N": sk.Integer(name="N Points", min=1, default=100, auto_call=True),
         "r": sk.Float(name="Radius", min=1, default=20, step=2, auto_call=True),
@@ -170,6 +169,7 @@ def sobel_algo(image):
     },
 )
 def fibonacci_sphere(N, r, color, size):
+    """Evenly distributes points on a sphere using the Fibonacci sphere algorithm."""
     golden_angle = np.pi * (3.0 - np.sqrt(5.0))
     i = np.arange(N, dtype=np.float64)
 
@@ -194,7 +194,6 @@ def fibonacci_sphere(N, r, color, size):
 ## Blob detector
 @sk.algorithm(
     name="Blob detector",
-    description="Blob detection algorithm implemented with a Laplacian of Gaussian (LoG) filter.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.feature.html#skimage.feature.blob_log",
     tags=["Scikit-image", "Demo"],
     parameters={
@@ -260,6 +259,7 @@ def blob_detector_algo(
     time_dim: bool,
     min_sigma: int,
 ):
+    """Blob detection algorithm implemented with a Laplacian of Gaussian (LoG) filter."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -318,7 +318,6 @@ def blob_detector_algo(
 ## Non-local means denoising
 @sk.algorithm(
     name="Non-local Means Denoising",
-    description="Non-local means denoising, implementation from Scikit-image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.restoration.html#skimage.restoration.denoise_nl_means",
     tags=["Filtering", "Scikit-image", "Demo"],
     parameters={
@@ -373,6 +372,7 @@ def nl_means_denoise(
     fast_mode,
     sigma,
 ):
+    """Non-local means denoising (implementation from Scikit-image)."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -395,7 +395,6 @@ def nl_means_denoise(
 ## SLIC
 @sk.algorithm(
     name="Superpixels (RGB)",
-    description="SLIC algorithm (Scikit-image implementation). Segment an image using k-means clustering in Color-(x,y,z) space.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.segmentation.html#skimage.segmentation.slic",
     tags=["Segmentation", "Scikit-image", "Demo"],
     samples=[{"image": skimage.data.astronaut()}],
@@ -423,6 +422,7 @@ def nl_means_denoise(
     },
 )
 def slic_algo(image, n_segments, compactness):
+    """SLIC algorithm (Scikit-image implementation). Segment an image using k-means clustering in Color-(x,y,z) space."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -434,7 +434,6 @@ def slic_algo(image, n_segments, compactness):
 ## Notifications
 @sk.algorithm(
     name="Notifications stream",
-    description="Demo of how to send notifications.",
     parameters={
         "time_delay": sk.Integer(name="Time delay (sec)", default=1, min=1, max=5),
         "n_times": sk.Integer(name="Repetitions", default=3, min=1, max=10),
@@ -444,6 +443,7 @@ def slic_algo(image, n_segments, compactness):
     },
 )
 def notif_stream(time_delay, n_times, level):
+    """Demo of how to send notifications."""
     for k in range(n_times):
         time.sleep(time_delay)
         yield sk.Notification(f"Step: {k}", level=level)
@@ -465,6 +465,7 @@ def notif_stream(time_delay, n_times, level):
     samples=[{"image": skimage.data.coins(), "sigma": 10}],
 )
 def background_subtract(image, sigma, method):
+    """Background correction: subtract, or divide the original image by a Gaussian-blurred version of itself."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -494,6 +495,7 @@ def background_subtract(image, sigma, method):
     tileable=True,
 )
 def project(image, method):
+    """Project an image along its first axis, with different methods."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -505,10 +507,10 @@ def project(image, method):
 ## Conway's game of life (inspired by: https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/)
 @sk.algorithm(
     name="Game of Life",
-    description="Conway's game of life.",
     project_url="https://www.geeksforgeeks.org/dsa/conways-game-life-python-implementation/",
 )
 def conway_algo(max_iter=20, delay=0.1):
+    """Conway's game of life."""
     min_val = 0
     max_val = 255
 
