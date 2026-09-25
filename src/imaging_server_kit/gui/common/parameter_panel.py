@@ -105,16 +105,10 @@ class ParameterPanel(QGroupBox):
                 qt_widget.setText(param_values.get("default", ""))
                 qt_widget_setter_func = qt_widget.setText
                 widget_value_recover_func = lambda qt_widget: qt_widget.text()
-            elif param_type == "null":
-                # Ignore Null parameters
-                qt_widget = None
-                qt_widget_setter_func = None
-                widget_value_recover_func = lambda qt_widget: None
             else:
-                # Numpy layers
                 if param_type not in NAPARI_LAYER_TYPES:
+                    # For `null` and `any` layers..
                     qt_widget = None
-                    self.layer_comboboxes[param_type] = []
                 else:
                     qt_widget = QComboBox()
                     if param_type not in self.layer_comboboxes:

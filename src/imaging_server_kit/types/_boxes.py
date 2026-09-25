@@ -23,7 +23,7 @@ class Boxes(Layer):
         self,
         data: Optional[np.ndarray] = None,
         name="Boxes",
-        description="Bounding boxes.",
+        description="Bounding boxes",
         dimensionality: Optional[List[int]] = None,
         **kwargs,
     ):

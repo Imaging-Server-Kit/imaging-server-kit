@@ -166,7 +166,7 @@ class NapariStack(Stack):
 
     def sync_layer_renamed(self, e):
         viewer_layer_names = [l.name for l in self.viewer.layers]
-        new_name = e.source
+        new_name = e.source.name
         for layer in self.layers:
             if layer.name not in viewer_layer_names:
                 layer.name = new_name
@@ -205,7 +205,6 @@ class NapariStack(Stack):
             return
 
         # Keep track of the new Napari layer in the layer stack (without any layer metadata)
-        # TODO: check this
         layer = layer_factory(kind=kind, name=napari_layer.name, data=data)
         self.add(layer)
 
