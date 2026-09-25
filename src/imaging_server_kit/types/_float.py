@@ -24,7 +24,6 @@ class Float(Layer):
         self,
         data: Optional[float] = None,
         name="Float",
-        description="Numeric parameter (floating point)",
         min: float = float(np.finfo(np.float32).min),
         max: float = float(np.finfo(np.float32).max),
         step: float = 0.1,
@@ -35,7 +34,6 @@ class Float(Layer):
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             default=default,
             required=required,

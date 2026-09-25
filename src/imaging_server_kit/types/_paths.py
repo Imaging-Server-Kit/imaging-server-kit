@@ -20,7 +20,7 @@ class Paths(Layer):
         self,
         data: Optional[List] = None,
         name="Paths",
-        description="Input paths shapes (2D, 3D)",
+        description="Input paths (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
         serializer: str = "default",
         **kwargs,

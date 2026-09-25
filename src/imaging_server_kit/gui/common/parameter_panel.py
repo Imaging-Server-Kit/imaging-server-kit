@@ -118,7 +118,12 @@ class ParameterPanel(QGroupBox):
                 widget_value_recover_func = lambda qt_widget: None
 
             if qt_widget is not None:
-                self.layout().addWidget(QLabel(param_values.get("title")), k, 0)
+                label = QLabel(param_values.get("title"))
+                description = param_values.get("description")
+                if description:
+                    label.setToolTip(description)
+                    qt_widget.setToolTip(description)
+                self.layout().addWidget(label, k, 0)
                 self.layout().addWidget(qt_widget, k, 1)
 
             state_item = UIStateItem(

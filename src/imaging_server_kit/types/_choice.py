@@ -32,7 +32,6 @@ class Choice(Layer):
         self,
         data: Optional[str] = None,
         name="Choice",
-        description="Dropdown selection",
         items: Optional[List] = None,
         required: bool = True,
         default: str = "",
@@ -41,7 +40,6 @@ class Choice(Layer):
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             required=required,
             default=default,

@@ -19,7 +19,6 @@ class Bool(Layer):
         self,
         data: Optional[bool] = None,
         name="Bool",
-        description="Boolean parameter",
         default: bool = False,
         required: bool = True,
         auto_call: bool = False,
@@ -27,7 +26,6 @@ class Bool(Layer):
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             default=default,
             required=required,

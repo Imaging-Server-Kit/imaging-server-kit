@@ -29,7 +29,6 @@ class Progress(Layer):
         data: Optional[int] = None,
         max_val: Optional[int] = 1,
         name="Progress",
-        description="Progress bar",
         **kwargs,
     ):
         if data is None:
@@ -38,7 +37,6 @@ class Progress(Layer):
         super().__init__(
             name=name,
             data=data,
-            description=description,
             max_val=max_val,
             **kwargs,
         )

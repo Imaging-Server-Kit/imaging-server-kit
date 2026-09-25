@@ -19,7 +19,6 @@ class String(Layer):
         self,
         data: Optional[str] = None,
         name="String",
-        description="String parameter",
         default: str = "",
         required: bool = True,
         **kwargs,
@@ -27,7 +26,6 @@ class String(Layer):
         super().__init__(
             name=name,
             data=data,
-            description=description,
             default=default,
             required=required,
             **kwargs,

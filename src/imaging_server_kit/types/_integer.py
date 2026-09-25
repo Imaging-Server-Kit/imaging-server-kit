@@ -24,7 +24,6 @@ class Integer(Layer):
         self,
         data: Optional[int] = None,
         name="Int",
-        description="Numeric parameter (integer)",
         default: int = 0,
         required: bool = True,
         auto_call: bool = False,
@@ -35,7 +34,6 @@ class Integer(Layer):
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             default=default,
             required=required,

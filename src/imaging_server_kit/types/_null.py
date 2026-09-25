@@ -17,14 +17,12 @@ class Null(Layer):
         self,
         data: Optional[Any] = None,
         name="None",
-        description="Null (None) type",
         default=None,
         serializer: str = "default",
         **kwargs,
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             default=default,
             serializer=serializer,

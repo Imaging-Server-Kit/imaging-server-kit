@@ -24,14 +24,12 @@ class Notification(Layer):
         data: Optional[str] = None,
         level: Optional[str] = "info",
         name="Notification",
-        description="Text notification",
         required: bool = True,
         default: str = "",
         **kwargs,
     ):
         super().__init__(
             name=name,
-            description=description,
             data=data,
             level=level,
             required=required,
