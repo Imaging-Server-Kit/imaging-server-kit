@@ -56,7 +56,7 @@ class MaskOverrideMerger(DefaultMerger):
 
             # Initialize new data array
             size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
-            new_data = np.zeros(size_with_channel, dtype=np.uint16)
+            new_data = np.zeros(size_with_channel, dtype=np.uint32)
 
             # Get the slice indices where to inpaint RECEIVING LAYER
             cmin_rounded = [
@@ -137,7 +137,9 @@ class InstanceTileTracker:
     def add_N_to_tile(
         self, labels: np.ndarray, features: Optional[Dict] = None
     ) -> np.ndarray:
-        labels = labels.copy()  # Important - to avoid mutating the original array
+        # Important - copy to avoid mutating the original array. We use uint32 so that
+        # offsetting the labels by N cannot overflow the input dtype (e.g. uint16).
+        labels = labels.astype(np.uint32)
         
         if labels.sum() > 0:
             labels[labels != 0] = labels[labels != 0] + self.N
@@ -292,7 +294,11 @@ class InstanceMaskTileMerger(DefaultMerger):
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
-            receiving_layer.data = incoming_layer.data
+            # Labels are registered in the tracker, so that labels from the next tiles don't collide with them
+            receiving_layer.data = self.tile_tracker.add_N_to_tile(
+                incoming_layer.data,
+                features=clean_mask_layer_features(incoming_layer),
+            )
             receiving_layer.meta = incoming_layer.meta
             return
 
@@ -317,7 +323,7 @@ class InstanceMaskTileMerger(DefaultMerger):
 
             # Initialize new data array
             size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
-            new_data = np.zeros(size_with_channel, dtype=np.uint16)
+            new_data = np.zeros(size_with_channel, dtype=np.uint32)
 
             # Get the slice indices where to inpaint RECEIVING LAYER
             cmin_rounded = [
@@ -412,13 +418,16 @@ class InstanceMaskTileMerger(DefaultMerger):
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
         self.tile_tracker = InstanceTileTracker()
 
+        if (receiving_layer is incoming_layer) and (incoming_layer.data is not None):
+            # The layer was just added to the stack (its data is not merged). We register its labels
+            # in the tracker, so that labels from the next tiles don't collide with them.
+            receiving_layer.data = self.tile_tracker.add_N_to_tile(
+                incoming_layer.data,
+                features=clean_mask_layer_features(incoming_layer),
+            )
+
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):
         from imaging_server_kit.merge.layer_merger import LayerMerger
-
-        if incoming_layer.tile_meta.is_first_tile:
-            # We need at least one merge call, otherwise we end up erasing the objects.
-            # So, when `merge_data` is false in layer_merger, we still manually trigger it here.
-            self.merge(receiving_layer, incoming_layer)
 
         old_unique_labels = np.unique(receiving_layer.data)
 

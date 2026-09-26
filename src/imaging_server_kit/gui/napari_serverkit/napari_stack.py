@@ -219,7 +219,7 @@ class NapariStack(Stack):
         if kind == "image":
             napari_layer = self.viewer.add_image(data, name=name)
         elif kind == "mask":
-            napari_layer = self.viewer.add_labels(data.astype(np.uint16), name=name)
+            napari_layer = self.viewer.add_labels(data.astype(np.uint32), name=name)
         elif kind == "points":
             napari_layer = self.viewer.add_points(data, name=name)
         elif kind in ["boxes", "paths"]:

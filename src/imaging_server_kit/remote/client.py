@@ -179,7 +179,11 @@ class Client(AlgorithmRunner):
 
     def _handle_response_errored(self, response):
         if response.status_code == 422:
-            raise InvalidAlgorithmParametersError(response.status_code, response.json())
+            try:
+                response_body = response.json()
+            except ValueError:
+                response_body = response.text
+            raise InvalidAlgorithmParametersError(response.status_code, response_body)
         elif response.status_code == 504:
             raise AlgorithmTimeoutError(response.status_code, response.text)
         else:

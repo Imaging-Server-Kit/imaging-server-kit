@@ -52,11 +52,17 @@ class InvalidAlgorithmParametersError(Exception):
     ):
         self.status_code = status_code
         self.response_text = response_text
-        pydantic_details = response_text.get("detail")[0]
-        pydantic_validation_msg = pydantic_details.get("msg")
-        pydantic_failing_param = pydantic_details.get("loc")[0]
-        pydantic_failing_param_value = pydantic_details.get("input")
-        self.message = f"{message}: Parameter: {pydantic_failing_param}. {pydantic_validation_msg}. Received: {pydantic_failing_param_value}."
+
+        # Pydantic validation errors come as {"detail": [{"loc": [...], "msg": ..., "input": ...}, ...]}
+        detail = response_text.get("detail") if isinstance(response_text, dict) else None
+        if isinstance(detail, list) and detail and isinstance(detail[0], dict):
+            pydantic_details = detail[0]
+            pydantic_validation_msg = pydantic_details.get("msg")
+            pydantic_failing_param = (pydantic_details.get("loc") or [None])[0]
+            pydantic_failing_param_value = pydantic_details.get("input")
+            self.message = f"{message}: Parameter: {pydantic_failing_param}. {pydantic_validation_msg}. Received: {pydantic_failing_param_value}."
+        else:
+            self.message = f"{message}: {response_text}"
         super().__init__(self.message)
 
 

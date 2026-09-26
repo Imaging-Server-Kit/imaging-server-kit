@@ -20,10 +20,5 @@ class TracksDataSerializer(Serializer):
 
     @staticmethod
     def deserialize(serialized_tracks: Optional[str]) -> Optional[np.ndarray]:
-        if serialized_tracks is None:
-            return
-
         if isinstance(serialized_tracks, str):
-            tracks_data = decode_contents(serialized_tracks)
-
-        return tracks_data.astype(float)
+            return decode_contents(serialized_tracks).astype(float)

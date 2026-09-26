@@ -73,7 +73,7 @@ class AlgorithmApp:
     def algorithms(self) -> List[str]:
         return list(self.algorithms_dict.keys())
 
-    def serve(self, host="0.0.0.0", port=8000, reload=False):
+    def serve(self, host="0.0.0.0", port=8000):
         """Run the algorithm server with uvicorn on the specified port for access on http://localhost:<port>."""
         # Check that the `port` is available:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -89,7 +89,7 @@ class AlgorithmApp:
                     return
                 raise
 
-        uvicorn.run(self.app, host=host, port=port, reload=reload)
+        uvicorn.run(self.app, host=host, port=port)
 
     def _register_routes(self):
         @self.app.get(

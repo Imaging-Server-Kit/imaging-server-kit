@@ -1,5 +1,4 @@
 from typing import Optional, Union
-from ._version import version as __version__
 
 try:
     from ._version import version as __version__
@@ -115,4 +114,3 @@ def run(
 def info(runner: AlgorithmRunner, algorithm: Optional[str] = None):
     """Allow the syntax `sk.info(...)` instead of runner.info(...)."""
     return runner.info(algorithm=algorithm)
-    

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import wraps
 from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
 import importlib.util
 
@@ -32,6 +33,7 @@ def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) 
 
 
 def validate_algorithm(func: Callable) -> Callable:
+    @wraps(func)
     def wrapper(self, algorithm: Optional[str] = None, *args, **kwargs):
         algorithm: str = _check_algorithm_available(algorithm, self.algorithms)
         return func(self, algorithm, *args, **kwargs)

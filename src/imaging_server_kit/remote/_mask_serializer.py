@@ -17,7 +17,7 @@ class MaskDataSerializer(Serializer):
         if mask.data is None:
             return
 
-        return encode_contents(mask.data.astype(np.uint16))
+        return encode_contents(mask.data.astype(np.uint32))
 
     @staticmethod
     def deserialize(serialized_mask: Optional[str]) -> Optional[np.ndarray]:
