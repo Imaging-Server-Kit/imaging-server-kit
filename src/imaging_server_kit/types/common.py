@@ -1,6 +1,13 @@
 """Common utilities for data layers (merging and accessing metadata in tiles, for Points, Vectors, Boxes, etc.)"""
-from typing import Dict
+from __future__ import annotations
+
+import math
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 import numpy as np
+
+if TYPE_CHECKING:
+    from imaging_server_kit.core.domain import Domain
+    from imaging_server_kit.types.layer import Layer
 
 
 def _extract_meta(obj, n_objects, tile_filter):
@@ -22,3 +29,60 @@ def select_object_meta(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> D
         )
     
     return {k: _extract_meta(v, n_objects, tile_filter) for k, v in meta.items()}
+
+
+def _get_slices_with_channel(
+    cmin_rounded: Sequence[int], cmax_rounded: Sequence[int], channel_axis: Optional[int]
+) -> Tuple[slice, ...]:
+    """Convenience function to get the slices, accounting for the channel axis."""
+    slices = tuple(
+        [slice(cmin, cmax) for cmin, cmax in zip(cmin_rounded, cmax_rounded)]
+    )
+
+    if channel_axis is not None:
+        slices_with_channel = (
+            slices[:channel_axis] + (slice(None),) + slices[channel_axis:]
+        )
+    else:
+        slices_with_channel = slices
+
+    return slices_with_channel
+
+
+def domain_slices(
+    layer: Layer, domain: Domain
+) -> Optional[Tuple[Tuple[slice, ...], List[int]]]:
+    """Slices selecting the intersection of `domain` (in global coordinates) with an array layer's data.
+
+    Used by array layers (Image, Mask), which must provide a `channel_axis` property.
+
+    Returns
+    -------
+    A tuple (slices_with_channel, cmin_rounded) where `cmin_rounded` is the position of the
+    selection in global coordinates, or None if the domain does not intersect the layer.
+    """
+    extent = layer.extent
+
+    cmin = [max(d, e) for d, e in zip(domain.coords_min, extent.coords_min)]
+    cmax = [min(d, e) for d, e in zip(domain.coords_max, extent.coords_max)]
+
+    csize = [c1 - c0 for c1, c0 in zip(cmax, cmin)]
+    if any(size_i <= 0 for size_i in csize):
+        # No intersection
+        return None
+
+    cmin_rounded = [math.floor(x) for x in cmin]
+
+    starts, stops = [], []
+    for cmin_i, size_i, extent_size_i, extent_cmin_i in zip(
+        cmin_rounded, csize, extent.size, extent.coords_min
+    ):
+        # Make sure not to overflow the data (along the spatial axes)
+        size_i = min(size_i, extent_size_i)
+        s0 = int(cmin_i - extent_cmin_i)
+        starts.append(s0)
+        stops.append(s0 + int(size_i))
+
+    slices_with_channel = _get_slices_with_channel(starts, stops, layer.channel_axis)
+
+    return slices_with_channel, cmin_rounded

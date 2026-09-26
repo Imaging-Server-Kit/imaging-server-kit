@@ -47,11 +47,10 @@ class Paths(Layer):
         if self.data is None:
             return
         if self.n_objects > 0:
-            path_bounds = []
-            for path in self.data:
-                path_bounds.append(list(np.max(path, axis=0)))
-            bounds_min = tuple(np.min(np.asarray(path_bounds), axis=0).tolist())
-            bounds_max = tuple(np.max(np.asarray(path_bounds), axis=0).tolist())
+            paths_min = [np.min(path, axis=0) for path in self.data]
+            paths_max = [np.max(path, axis=0) for path in self.data]
+            bounds_min = tuple(np.min(np.asarray(paths_min), axis=0).tolist())
+            bounds_max = tuple(np.max(np.asarray(paths_max), axis=0).tolist())
 
             return (bounds_min, bounds_max)
 

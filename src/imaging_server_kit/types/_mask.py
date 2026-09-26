@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
@@ -16,6 +15,7 @@ from shapely.geometry.base import BaseGeometry
 
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.types.common import domain_slices
 
 # Largest mask (in pixels) for which the number of labels is shown in `repr`
 MAX_SIZE_COUNT_LABELS = 2**24
@@ -264,62 +264,24 @@ class Mask(Layer):
 
     def select(self, domain: Domain) -> Mask:
         """Select data in a given domain."""
+        _meta = self.meta.copy() if self.meta is not None else self.meta
+
         if (self.data is None) or (domain.size is None):
             return Mask(
                 data=None,
                 name=self.name,
-                meta=self.meta.copy() if self.meta is not None else self.meta,
+                meta=_meta,
                 tile_meta=self.tile_meta.copy(),
             )
 
-        # Get the slice indices
-        cmin = [
-            max([domain_cmin, this_cmin])
-            for domain_cmin, this_cmin in zip(domain.coords_min, self.extent.coords_min)
-        ]
-
-        cmax = [
-            min([domain_cmax, this_cmax])
-            for domain_cmax, this_cmax in zip(domain.coords_max, self.extent.coords_max)
-        ]
-
-        csize = np.asarray([c1 - c0 for c1, c0 in zip(cmax, cmin)])
-
-        if np.any(csize <= 0):
+        selection = domain_slices(self, domain)
+        if selection is None:
             # No intersection
             _data = None
+            position = domain.coords_min
         else:
-            cmin_rounded = [math.floor(x) for x in cmin]
-
-            slices = []
-            for cmin_i, size_i, shape_i, this_cmin in zip(
-                cmin_rounded,
-                csize,
-                self.shape,
-                self.extent.coords_min,
-            ):
-                # Make sure not to overflow..
-                size_i = min(size_i, shape_i)
-                s0 = int(cmin_i - this_cmin)
-                s1 = s0 + int(size_i)
-                slices.append(slice(s0, s1))
-            slices = tuple(slices)
-
-            # Account for the channel_axis
-            if self.channel_axis:
-                slices_with_channel = (
-                    slices[: self.channel_axis]
-                    + (slice(None),)
-                    + slices[self.channel_axis :]
-                )
-            else:
-                slices_with_channel = slices
-
-            # Select the data via indexing
+            slices_with_channel, position = selection
             _data = self.data[slices_with_channel]
-
-        # Create a new layer
-        _meta = self.meta.copy() if self.meta is not None else self.meta
 
         mask_selection = Mask(
             data=_data,
@@ -328,7 +290,7 @@ class Mask(Layer):
             tile_meta=self.tile_meta.copy(),
         )
 
-        mask_selection.position = cmin_rounded
+        mask_selection.position = position
 
         return mask_selection
 
@@ -336,52 +298,19 @@ class Mask(Layer):
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
             if domain.size is not None:
-                return np.zeros(domain.size, dtype=np.uint16)
+                return np.zeros(domain.size, dtype=np.uint32)
 
     def _reinitialize(self, domain: Domain) -> None:
         """Remove data in a given domain."""
-        # Get the slice indices
-        cmin = [
-            max([domain_cmin, this_cmin])
-            for domain_cmin, this_cmin in zip(domain.coords_min, self.extent.coords_min)
-        ]
+        if self.data is None:
+            return
 
-        cmax = [
-            min([domain_cmax, this_cmax])
-            for domain_cmax, this_cmax in zip(domain.coords_max, self.extent.coords_max)
-        ]
-
-        csize = np.asarray([c1 - c0 for c1, c0 in zip(cmax, cmin)])
-
-        if np.any(csize <= 0):
+        selection = domain_slices(self, domain)
+        if selection is None:
             # No intersection
             return
 
-        cmin_rounded = [math.floor(x) for x in cmin]
-
-        slices = []
-        for cmin_i, size_i, shape_i, this_cmin in zip(
-            cmin_rounded,
-            csize,
-            self.shape,
-            self.extent.coords_min,
-        ):
-            # Make sure not to overflow..
-            size_i = min(size_i, shape_i)
-            s0 = int(cmin_i - this_cmin)
-            s1 = s0 + int(size_i)
-            slices.append(slice(s0, s1))
-        slices = tuple(slices)
-
-        # Account for the channel_axis
-        if self.channel_axis:
-            slices_with_channel = (
-                slices[: self.channel_axis]
-                + (slice(None),)
-                + slices[self.channel_axis :]
-            )
-        else:
-            slices_with_channel = slices
+        slices_with_channel, _ = selection
 
         new_data = self.data.copy()
         new_data[slices_with_channel] = 0

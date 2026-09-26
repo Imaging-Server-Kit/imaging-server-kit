@@ -68,9 +68,15 @@ class Boxes(Layer):
 
     def select(self, domain: Domain) -> Boxes:
         """Select data in a given domain."""
-        if (self.data is None) or (domain.size is None):
-            _data = self.data
-            _meta = self.meta.copy() if self.meta is not None else self.meta
+        if domain.size is None:
+            # Undefined domain: nothing to select, the data is kept as-is
+            return Boxes(
+                data=self.data,
+                name=self.name,
+                meta=self.meta.copy() if self.meta is not None else self.meta,
+                tile_meta=self.tile_meta.copy(),
+            )
+
         if self.n_objects == 0:
             _data = self._zeros_in(domain=domain)
             _meta = self.meta.copy() if self.meta is not None else self.meta
