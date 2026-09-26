@@ -1,15 +1,18 @@
-from functools import partial, update_wrapper
+from functools import partial, update_wrapper, wraps
 from inspect import _empty, getdoc, isgeneratorfunction, signature
 from typing import (
     Any,
     Callable,
     Dict,
     Generator,
+    Generic,
     List,
     Optional,
+    ParamSpec,
     Tuple,
     Type,
     Union,
+    overload,
 )
 
 import numpy as np
@@ -26,6 +29,7 @@ from imaging_server_kit.core.errors import AlgorithmRuntimeError
 import imaging_server_kit.core._etc as etc
 import imaging_server_kit.types as skt
 from imaging_server_kit.core.stack import Stack
+from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.core.runner import (
     AlgorithmRunner,
     validate_algorithm,
@@ -214,8 +218,11 @@ def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
 
 ### Algorithm implementation ###
 
+# Parameters of the wrapped function, so that IDEs can autocomplete them on the Algorithm
+P = ParamSpec("P")
 
-class Algorithm(AlgorithmRunner):
+
+class Algorithm(AlgorithmRunner, Generic[P]):
     """An algorithm built by wrapping a Python function. Usually created via the `@sk.algorithm(...)` decorator rather than instantiated directly.
 
     Parameters
@@ -260,7 +267,7 @@ class Algorithm(AlgorithmRunner):
 
     def __init__(
         self,
-        run_algorithm_func: Callable,
+        run_algorithm_func: Callable[P, Any],
         parameters: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
         description: Optional[str] = None,
@@ -288,7 +295,7 @@ class Algorithm(AlgorithmRunner):
         self._name = name
 
         # Algorithm's run function from the user
-        self._run_algorithm_func = run_algorithm_func
+        self._run_algorithm_func: Callable[..., Any] = run_algorithm_func
         update_wrapper(self, self._run_algorithm_func)  # improve function emulation
 
         # Samples
@@ -331,7 +338,33 @@ class Algorithm(AlgorithmRunner):
             raise TypeError(f"Value must be bool, got {type(value).__name__}")
         self._tileable = value
 
-    def __call__(self, *args, **kwargs) -> Any:
+    # Overloads only give IDEs the wrapped function's parameters along with the run options
+    # (keep the second overload in sync with `AlgorithmRunner.run`)
+    @overload
+    def run(
+        self, *args: P.args, **kwargs: P.kwargs
+    ) -> Union[Stack, "napari.Viewer"]: ...  # type: ignore
+
+    @overload
+    def run(
+        self,
+        *args: Any,
+        algorithm: Optional[str] = None,
+        tiled: bool = False,
+        tile_size: int = 64,
+        tile_overlap: float = 0.0,
+        tile_delay: float = 0.0,
+        tile_randomize: bool = False,
+        stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
+        domain: Optional[Domain] = None,
+        **algo_params: Any,
+    ) -> Union[Stack, "napari.Viewer"]: ...  # type: ignore
+
+    @wraps(AlgorithmRunner.run)  # keeps the base signature and docstring at runtime
+    def run(self, *args, **kwargs):
+        return super().run(*args, **kwargs)
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
         # Get a Stack object
         stack = self.run(*args, **kwargs)
 
@@ -448,6 +481,25 @@ class Algorithm(AlgorithmRunner):
                 raise AlgorithmRuntimeError(algorithm=algorithm, error=e)
 
 
+@overload
+def algorithm(func: Callable[P, Any]) -> Algorithm[P]: ...
+
+
+@overload
+def algorithm(
+    func: None = None,
+    *,
+    parameters: Optional[Dict[str, Any]] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    project_url: str = "https://github.com/Imaging-Server-Kit/imaging-server-kit",
+    metadata_file: str = "metadata.yaml",
+    samples: Optional[List[Dict[str, Any]]] = None,
+    tileable: bool = False,
+) -> Callable[[Callable[P, Any]], Algorithm[P]]: ...
+
+
 def algorithm(
     func: Optional[Callable] = None,
     parameters: Optional[Dict[str, Any]] = None,
@@ -458,7 +510,7 @@ def algorithm(
     metadata_file: str = "metadata.yaml",
     samples: Optional[List[Dict[str, Any]]] = None,
     tileable: bool = False,
-) -> Union[Algorithm, Callable]:
+) -> Union[Algorithm[P], Callable[[Callable[P, Any]], Algorithm[P]]]:
     """Wrap a Python function as an algorithm (sk.Algorithm). Typically used as the `@sk.algorithm(...)` decorator.
 
     Parameters
@@ -478,9 +530,9 @@ def algorithm(
     An algorithm instance (sk.Algorithm).
     """
 
-    def _decorate(run_aglorithm_func: Callable) -> Algorithm:
+    def _decorate(run_algorithm_func: Callable[P, Any]) -> Algorithm[P]:
         return Algorithm(
-            run_algorithm_func=run_aglorithm_func,
+            run_algorithm_func=run_algorithm_func,
             parameters=parameters,
             name=name,
             description=description,
