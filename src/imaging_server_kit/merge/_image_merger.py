@@ -1,12 +1,10 @@
-import math
 from typing import Optional
 
 import numpy as np
 
 from imaging_server_kit.types._image import Image
-from imaging_server_kit.merge.layer_merger import DefaultMerger
-from imaging_server_kit.core.domain import merge_domains
-from imaging_server_kit.merge.common import _get_slices_with_channel
+from imaging_server_kit.merge.merger import DefaultMerger
+from imaging_server_kit.merge.common import prepare_canvas, update_meta
 
 
 def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
@@ -73,94 +71,15 @@ class ImageTileOverlapMerger(DefaultMerger):
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
-        channel_axis = incoming_layer.channel_axis
-        if channel_axis is not None:
-            n_channels = incoming_layer.shape[channel_axis]
-
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
             receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
             return
 
-        merged_extent = merge_domains(
-            domains=[receiving_layer.extent, incoming_layer.extent]
+        new_data, slices_with_channel = prepare_canvas(
+            receiving_layer, incoming_layer, dtype=np.float32, copy_data=True
         )
-
-        if merged_extent.size != receiving_layer.size:
-            # Case where the extent has changed
-
-            new_position = merged_extent.coords_min
-
-            # Size with channel (not equivalent to .zeros_in() - TODO: but could it be implemented there?)
-            if channel_axis is not None:
-                size_with_channel = (
-                    merged_extent.size[:channel_axis]
-                    + (n_channels,)
-                    + merged_extent.size[channel_axis:]
-                )
-            else:
-                size_with_channel = merged_extent.size
-
-            # Initialize new data array
-            size_with_channel = tuple([math.ceil(v) for v in size_with_channel])
-            new_data = np.zeros(size_with_channel, dtype=np.float32)
-
-            # Get the slice indices where to inpaint RECEIVING LAYER
-            cmin_rounded = [
-                math.floor(v - p)
-                for v, p in zip(receiving_layer.coords_min, new_position)
-            ]
-            
-            cmax_rounded = [
-                math.ceil(v - p)
-                for v, p in zip(receiving_layer.coords_max, new_position)
-            ]
-
-            slices_with_channel = _get_slices_with_channel(
-                cmin_rounded, cmax_rounded, channel_axis
-            )
-
-            # Inpaint RECEIVING LAYER
-            new_data[slices_with_channel] = receiving_layer.data
-
-            # Update position
-            receiving_layer.position = new_position
-
-            # Get the slice indices where to inpaint INCOMING LAYER
-            cmin_rounded = [
-                math.floor(v - p)
-                for v, p in zip(incoming_layer.coords_min, new_position)
-            ]
-            
-            cmax_rounded = [
-                math.ceil(v - p)
-                for v, p in zip(incoming_layer.coords_max, new_position)
-            ]
-
-            slices_with_channel = _get_slices_with_channel(
-                cmin_rounded, cmax_rounded, channel_axis
-            )
-
-        else:
-            # (Shortcut) The extent has not changed (incoming layer is fully contained in receiving layer)
-
-            new_data = receiving_layer.data.astype(np.float32)
-
-            # Get the slice indices where to inpaint incoming_layer
-            cmin_rounded = [
-                math.floor(v - p)
-                for v, p in zip(incoming_layer.coords_min, receiving_layer.coords_min)
-            ]
-            
-            cmax_rounded = [
-                math.ceil(v - p)
-                for v, p in zip(incoming_layer.coords_max, receiving_layer.coords_min)
-            ]
-
-            slices_with_channel = _get_slices_with_channel(
-                cmin_rounded, cmax_rounded, channel_axis
-            )
 
         _overlap_count_map = overlap_count_map(incoming_layer)
 
@@ -173,6 +92,4 @@ class ImageTileOverlapMerger(DefaultMerger):
         receiving_layer.data = new_data
 
         # Meta becomes incoming layer's meta (except from position; we don't want to move the receiving layer)
-        for k, v in incoming_layer.meta.items():
-            if k != "position":
-                receiving_layer.meta[k] = v
+        update_meta(receiving_layer, incoming_layer)
