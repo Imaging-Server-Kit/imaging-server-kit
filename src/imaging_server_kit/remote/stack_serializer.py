@@ -8,18 +8,9 @@ class StackSerializer:
     @staticmethod
     def serialize(stack: Stack) -> List[Dict]:
         """Serialize a layer stack to JSON-compatible representation."""
-        layer_serializer = LayerSerializer()
-        serialized_stack = []
-        for layer in stack.layers:
-            serialized_layer = layer_serializer.serialize(layer)
-            serialized_stack.append(serialized_layer)
-        return serialized_stack
+        return [LayerSerializer.serialize(layer) for layer in stack.layers]
 
     @staticmethod
     def deserialize(serialized_stack: List[Dict]) -> Stack:
-        layer_serializer = LayerSerializer()
-        layers = []
-        for serialized_layer in serialized_stack:
-            layer = layer_serializer.deserialize(serialized_layer)
-            layers.append(layer)
+        layers = [LayerSerializer.deserialize(l) for l in serialized_stack]
         return Stack(layers=layers)

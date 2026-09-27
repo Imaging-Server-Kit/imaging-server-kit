@@ -27,10 +27,8 @@ LAYER_DATA_SERIALIZERS: Dict[str, Type[Serializer]] = {
 }
 
 
-def find_layer_serializer(layer_kind: str) -> Serializer:
-    serializer_cls = LAYER_DATA_SERIALIZERS.get(layer_kind, DefaultDataSerializer)
-
-    return serializer_cls()
+def find_layer_serializer(layer_kind: str) -> Type[Serializer]:
+    return LAYER_DATA_SERIALIZERS.get(layer_kind, DefaultDataSerializer)
 
 
 class LayerSerializer(Serializer):
@@ -38,14 +36,9 @@ class LayerSerializer(Serializer):
     def serialize(layer: Layer) -> Dict[str, Any]:
         """Serialize a layer."""
 
-        data_serializer = find_layer_serializer(layer.kind)
-        serialized_data = data_serializer.serialize(layer)
-
-        meta_serializer = MetaSerializer()
-        serialized_meta = meta_serializer.serialize(layer)
-
-        tile_serializer = TileMetaSerializer()
-        serialized_tile_meta = tile_serializer.serialize(layer)
+        serialized_data = find_layer_serializer(layer.kind).serialize(layer)
+        serialized_meta = MetaSerializer.serialize(layer)
+        serialized_tile_meta = TileMetaSerializer.serialize(layer)
 
         return {
             "kind": layer.kind,
@@ -65,14 +58,9 @@ class LayerSerializer(Serializer):
         encoded_tile_meta = serialized_layer["tile_meta"]
 
         cls: Type[Layer] = DATA_TYPES[kind]
-        layer_serializer = find_layer_serializer(kind)
-        data = layer_serializer.deserialize(encoded_data)
-
-        meta_serializer = MetaSerializer()
-        meta = meta_serializer.deserialize(encoded_meta)
-
-        tile_serializer = TileMetaSerializer()
-        tile_meta = tile_serializer.deserialize(encoded_tile_meta)
+        data = find_layer_serializer(kind).deserialize(encoded_data)
+        meta = MetaSerializer.deserialize(encoded_meta)
+        tile_meta = TileMetaSerializer.deserialize(encoded_tile_meta)
 
         return cls(
             data=data,

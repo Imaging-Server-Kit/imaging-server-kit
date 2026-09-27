@@ -21,6 +21,10 @@ from imaging_server_kit.remote.stack_serializer import StackSerializer
 # Unlimited input size - Implies trusted input. TODO: should this be made more clear (or configurable)?
 MAX_BUFFER_SIZE = 0
 
+# Timeout (in seconds) for the requests to the metadata endpoints (not for running algorithms),
+# so that an unresponsive server raises an error instead of hanging forever.
+GET_TIMEOUT = 60
+
 
 class ServerRequestError(Exception):
     """Exception raised when HTTP requests fail."""
@@ -104,14 +108,13 @@ class Client(AlgorithmRunner):
     @validate_algorithm
     def get_sample(self, algorithm: Optional[str] = None, idx: int = 0) -> Stack:
         n_samples = self.get_n_samples(algorithm)
-        if (idx < 0) | (idx > n_samples - 1):
+        if (idx < 0) or (idx > n_samples - 1):
             raise ValueError(
                 f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!"
             )
         endpoint = f"{self.server_url}/{algorithm}/sample/{idx}"
         serialized_sample_stack = self._access_algo_get_endpoint(endpoint)
-        stack_serializer = StackSerializer()
-        sample_stack = stack_serializer.deserialize(serialized_sample_stack)
+        sample_stack = StackSerializer.deserialize(serialized_sample_stack)
         return sample_stack
 
     @validate_algorithm
@@ -134,13 +137,12 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     def _stream(self, algorithm, params_stack: Stack):
-        stack_serializer = StackSerializer()
         endpoint = f"{self.server_url}/{algorithm}/process"
         with requests.Session() as client:
             try:
                 response = client.post(
                     endpoint,
-                    json=stack_serializer.serialize(params_stack),
+                    json=StackSerializer.serialize(params_stack),
                     headers={
                         "Content-Type": "application/json",
                         "accept": "application/msgpack",
@@ -162,14 +164,14 @@ class Client(AlgorithmRunner):
                     unpacker.feed(chunk)
 
                     for serialized_stack in unpacker:
-                        yield stack_serializer.deserialize([serialized_stack])
+                        yield StackSerializer.deserialize([serialized_stack])
             else:
                 self._handle_response_errored(response)
 
     def _access_algo_get_endpoint(self, endpoint: str):
         with requests.Session() as client:
             try:
-                response = client.get(endpoint)
+                response = client.get(endpoint, timeout=GET_TIMEOUT)
             except requests.RequestException as e:
                 raise ServerRequestError(endpoint, e)
         if response.status_code == 200:

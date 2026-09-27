@@ -1,3 +1,4 @@
+import warnings
 from typing import List, Optional
 from geojson import Feature, LineString
 
@@ -28,7 +29,7 @@ class VectorsDataSerializer(Serializer):
                     Feature(geometry=geom, properties={"Detection ID": i})
                 )
             except ValueError:
-                print("Invalid line string geometry.")
+                warnings.warn("Invalid line string geometry.", stacklevel=2)
 
         return serialized_vectors
 

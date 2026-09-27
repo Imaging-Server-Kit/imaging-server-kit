@@ -181,8 +181,7 @@ class AlgorithmApp:
             algorithm = find_algorithm(algorithm_name, self.algorithms_dict)
             sample = algorithm.get_sample(algorithm=algorithm_name, idx=idx)
             if sample is not None:
-                stack_serializer = StackSerializer()
-                return stack_serializer.serialize(sample)
+                return StackSerializer.serialize(sample)
 
         @self.app.get(
             "/{algorithm_name}/n_samples",
@@ -229,8 +228,7 @@ class AlgorithmApp:
             encoded_params = await request.json()
 
             # Reconstruct the algo parameters as a `Stack` object
-            stack_serializer = StackSerializer()
-            params_stack = stack_serializer.deserialize(encoded_params)
+            params_stack = StackSerializer.deserialize(encoded_params)
 
             # Validate the parameters `manually` with Pydantic...
             try:
@@ -253,7 +251,6 @@ class AlgorithmApp:
             return StreamingResponse(stream, media_type="application/msgpack")
 
     def _stream_msgpack(self, stream_generator: Iterable[Stack]):
-        stack_serializer = StackSerializer()
         for result_tile, params_tile in stream_generator:
-            for r in stack_serializer.serialize(result_tile):
+            for r in StackSerializer.serialize(result_tile):
                 yield msgpack.packb(r)

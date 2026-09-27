@@ -1,3 +1,4 @@
+import warnings
 from typing import List, Optional, Union
 
 from geojson import Feature, Point
@@ -28,7 +29,7 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
                 Feature(geometry=geom, properties={"Detection ID": detection_id})
             )
         except Exception:
-            print("⚠️ Invalid point geometry.")
+            warnings.warn("Invalid point geometry.", stacklevel=2)
     return point_features
 
 

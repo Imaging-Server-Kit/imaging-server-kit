@@ -1,3 +1,4 @@
+import warnings
 from typing import List, Optional
 
 from geojson import Feature, Polygon
@@ -24,8 +25,9 @@ class BoxesDataSerializer(Serializer):
                 geom = Polygon(coordinates=[coords], validate=True)
                 features.append(Feature(geometry=geom, properties={"Detection ID": i}))
             except ValueError:
-                print(
-                    "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box."
+                warnings.warn(
+                    "Invalid box polygon geometry. Expected an array of shape (N, 4, D) representing the corners of the box.",
+                    stacklevel=2,
                 )
 
         return features
