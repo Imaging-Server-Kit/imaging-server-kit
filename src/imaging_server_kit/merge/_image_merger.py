@@ -63,6 +63,19 @@ def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
     return overlap_count_arr
 
 
+def weighted_tile_data(layer: Image) -> np.ndarray:
+    """Tile data divided by the number of overlapping tiles at each pixel.
+
+    Summing the weighted tiles gives the average image intensity in overlapping regions.
+    Tiles without overlap are returned as-is (their dtype is kept).
+    """
+    overlap_px = layer.tile_meta.overlap_px
+    if (overlap_px is None) or not any(overlap_px):
+        return layer.data
+
+    return (layer.data / overlap_count_map(layer)).astype(np.float32)
+
+
 class ImageTileOverlapMerger(DefaultMerger):
     """Merge images while averaging image intensities in overlapping regions."""
 
@@ -73,7 +86,7 @@ class ImageTileOverlapMerger(DefaultMerger):
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
-            receiving_layer.data = incoming_layer.data
+            receiving_layer.data = weighted_tile_data(incoming_layer)
             receiving_layer.meta = incoming_layer.meta
             return
 
@@ -81,15 +94,20 @@ class ImageTileOverlapMerger(DefaultMerger):
             receiving_layer, incoming_layer, dtype=np.float32, copy_data=True
         )
 
-        _overlap_count_map = overlap_count_map(incoming_layer)
-
-        # We `add` the incoming image data to merge it cleanly with the overlap map
-        new_data[slices_with_channel] = (
-            new_data[slices_with_channel] + incoming_layer.data / _overlap_count_map
-        )
+        # We `add` the weighted incoming image data (average in overlapping regions)
+        new_data[slices_with_channel] = new_data[
+            slices_with_channel
+        ] + weighted_tile_data(incoming_layer)
 
         # Update the data of receiving layer
         receiving_layer.data = new_data
 
         # Meta becomes incoming layer's meta (except from position; we don't want to move the receiving layer)
         update_meta(receiving_layer, incoming_layer)
+
+    @staticmethod
+    def on_first_merge(receiving_layer: Image, incoming_layer: Image) -> None:
+        if (receiving_layer is incoming_layer) and (incoming_layer.data is not None):
+            # The layer was just added to the stack (its data is not merged),
+            # so its data must be weighted like that of the next tiles.
+            receiving_layer.data = weighted_tile_data(incoming_layer)
