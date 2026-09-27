@@ -5,6 +5,7 @@ import numpy as np
 
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.core._fmt import fmt_tuple, truncate
+from imaging_server_kit.types.common import copy_meta
 
 from imaging_server_kit.core.tiling import (
     TileMeta,
@@ -120,8 +121,7 @@ class Layer:
                 find_layer_validator,
             )
 
-            v = find_layer_validator(self)
-            v.validate(self)
+            find_layer_validator(self).validate(self)
 
     @property
     def data(self) -> Any:
@@ -273,7 +273,7 @@ class Layer:
         if self.meta:
             required=self.meta.get("required", True)
             
-        _meta = self.meta.copy() if self.meta is not None else self.meta
+        _meta = copy_meta(self)
         
         layer_selection = cls(
             data=self.data,

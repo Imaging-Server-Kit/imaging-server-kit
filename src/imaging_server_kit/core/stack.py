@@ -106,8 +106,8 @@ class Stack:
             for dim, k in enumerate(key[1:]):
                 if (
                     isinstance(k, slice)
-                    & (self.coords_max is not None)
-                    & (self.coords_min is not None)
+                    and (self.coords_max is not None)
+                    and (self.coords_min is not None)
                 ):
                     start = (
                         self.coords_min[dim]
@@ -263,7 +263,7 @@ class Stack:
                 receiving_layer = self.add(incoming_layer)
             else:
                 # First tiles reinitialize the domain:
-                if (incoming_layer.tile_meta.is_first_tile) & isinstance(
+                if (incoming_layer.tile_meta.is_first_tile) and isinstance(
                     reinitialize_domain, Domain
                 ):
                     receiving_layer._reinitialize(reinitialize_domain)

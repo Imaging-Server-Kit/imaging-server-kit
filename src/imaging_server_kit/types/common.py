@@ -31,6 +31,20 @@ def select_object_meta(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> D
     return {k: _extract_meta(v, n_objects, tile_filter) for k, v in meta.items()}
 
 
+
+def copy_meta(layer: Layer) -> Optional[Dict]:
+    """Shallow copy of a layer's meta dictionary (None if the layer has no meta)."""
+    return layer.meta.copy() if layer.meta is not None else None
+
+
+def objects_in_domain(coords: np.ndarray, domain: Domain) -> np.ndarray:
+    """Boolean filter (N,) of objects whose coordinates (N, ..., D) all lie in [coords_min, coords_max) of the domain.
+
+    The upper bound is excluded (like tiles), so that objects on the border between two tiles are selected only once.
+    """
+    inside = (coords >= domain.coords_min) & (coords < domain.coords_max)
+    return inside.reshape((len(coords), -1)).all(axis=1)
+
 def _get_slices_with_channel(
     cmin_rounded: Sequence[int], cmax_rounded: Sequence[int], channel_axis: Optional[int]
 ) -> Tuple[slice, ...]:

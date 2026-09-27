@@ -5,7 +5,7 @@ import numpy as np
 
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core.domain import Domain
-from imaging_server_kit.types.common import domain_slices
+from imaging_server_kit.types.common import copy_meta, domain_slices
 
 
 class Image(Layer):
@@ -91,7 +91,7 @@ class Image(Layer):
 
     def select(self, domain: Domain) -> Image:
         """Select data in a given domain."""
-        _meta = self.meta.copy() if self.meta is not None else self.meta
+        _meta = copy_meta(self)
 
         if (self.data is None) or (domain.size is None):
             return Image(

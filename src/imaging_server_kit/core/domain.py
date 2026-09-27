@@ -34,7 +34,7 @@ class Domain:
         self._size = size
 
         # Position defaults to zero if only a size is specified
-        if (size is not None) & (position is None):
+        if (size is not None) and (position is None):
             self._coords_min = tuple([0] * len(size))
         else:
             self._coords_min = position

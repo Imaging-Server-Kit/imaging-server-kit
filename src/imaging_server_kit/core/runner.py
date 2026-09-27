@@ -195,7 +195,7 @@ class AlgorithmRunner(ABC):
         # Convert the resolved parameters to a Stack object
         params_stack = Stack()
         for name, data in resolved_params.items():
-            kw = algo_param_defs[name]
+            kw = dict(algo_param_defs[name])  # Copy, to avoid mutating the parameters schema
             kind = kw.pop("param_type")
             if "anyOf" in kw:
                 kw.pop("anyOf")  # added by Pydantic - we don't need it.
@@ -235,6 +235,9 @@ class AlgorithmRunner(ABC):
         if domain:
             params_stack = params_stack.select(domain)
 
+        # The parameters extent doesn't change during the run (computed once)
+        params_extent = params_stack.extent
+
         # Run the algorithm and assemble the stack
         try:
             for result_tile, params_tile in self.run_generator(
@@ -253,11 +256,12 @@ class AlgorithmRunner(ABC):
 
                 # We assume that reinitializing the parameters domain on first tile
                 # will be the correct behaviour most of the time.
-                if params_stack.extent is None:
+                if params_extent is None:
                     # If inputs don't have an extent, we clear up the whole output
+                    # (re-evaluated, since the output grows as results are merged)
                     domain_to_erase = stack.extent
                 else:
-                    domain_to_erase = params_stack.extent
+                    domain_to_erase = params_extent
 
                 # Merge the result tile into the stack
                 stack.merge(result_tile, domain_to_erase)

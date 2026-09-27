@@ -1,8 +1,9 @@
-from typing import Callable, Dict, List, Optional
+import warnings
+from typing import Dict, List, Optional
 
 from imaging_server_kit.core.stack import Stack
-from imaging_server_kit.core.runner import AlgorithmRunner
-from imaging_server_kit.core.algorithm import Algorithm, validate_algorithm
+from imaging_server_kit.core.runner import AlgorithmRunner, validate_algorithm
+from imaging_server_kit.core.algorithm import Algorithm
 
 
 class MultiAlgorithm(AlgorithmRunner):
@@ -28,13 +29,22 @@ class MultiAlgorithm(AlgorithmRunner):
         self.sk_algorithms = algorithms
         self._name = name
 
+        self._algorithms_dict: Dict[str, Algorithm] = {}
+        for sk_algo in algorithms:
+            if sk_algo.name in self._algorithms_dict:
+                warnings.warn(
+                    f"Several algorithms are named `{sk_algo.name}`; only the last one is kept.",
+                    stacklevel=2,
+                )
+            self._algorithms_dict[sk_algo.name] = sk_algo
+
     @property
     def name(self) -> str:
         return self._name
 
     @property
     def algorithms_dict(self) -> Dict[str, Algorithm]:
-        return {sk_algo.name: sk_algo for sk_algo in self.sk_algorithms}
+        return self._algorithms_dict
 
     @property
     def algorithms(self) -> List[str]:
@@ -91,8 +101,11 @@ def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgor
     parsed_algorithms = []
     for algorithm in algorithms:
         try:
-            if not isinstance(algorithm, Callable):
-                print(f"{algorithm} is not a valid algorithm instance. Skipping it.")
+            if not callable(algorithm):
+                warnings.warn(
+                    f"{algorithm} is not a valid algorithm instance. Skipping it.",
+                    stacklevel=2,
+                )
                 continue
             if not isinstance(algorithm, Algorithm):
                 # We assume the user has passed a regular Python function.
@@ -100,6 +113,9 @@ def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgor
                 algorithm = Algorithm(algorithm)
             parsed_algorithms.append(algorithm)
         except Exception as e:
-            print(f"Could not parse this algorithm: {algorithm}. Reason: {e}")
+            warnings.warn(
+                f"Could not parse this algorithm: {algorithm}. Reason: {e}",
+                stacklevel=2,
+            )
 
     return MultiAlgorithm(algorithms=parsed_algorithms, name=name)

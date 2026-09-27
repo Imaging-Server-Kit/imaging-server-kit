@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from imaging_server_kit.core.tiling import Domain
-from imaging_server_kit.types.common import select_object_meta
+from imaging_server_kit.types.common import copy_meta, objects_in_domain, select_object_meta
 from imaging_server_kit.types.layer import Layer
 
 
@@ -62,8 +62,9 @@ class Points(Layer):
         if self.n_objects == 0:
             return
 
+        # The upper bound is exclusive (+1), like an image extent is its shape
         bounds_min = tuple(np.min(self.data, axis=0).tolist())
-        bounds_max = tuple(np.max(self.data, axis=0).tolist())
+        bounds_max = tuple((np.max(self.data, axis=0) + 1).tolist())
 
         return (bounds_min, bounds_max)
 
@@ -74,21 +75,16 @@ class Points(Layer):
             return Points(
                 data=self.data,
                 name=self.name,
-                meta=self.meta.copy() if self.meta is not None else self.meta,
+                meta=copy_meta(self),
                 tile_meta=self.tile_meta.copy(),
             )
 
         if self.n_objects == 0:
             _data = self._zeros_in(domain=domain)
-            _meta = self.meta.copy() if self.meta is not None else self.meta
+            _meta = copy_meta(self)
         else:
             # Select points via global coordinates
-            points_in_domain = (self.data_global_coords >= domain.coords_min) & (
-                self.data_global_coords < domain.coords_max
-            )
-
-            # All coordinates must be in the tile bounds
-            filt = points_in_domain.all(axis=1)  # (N,)
+            filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
 
             selected_points = self.data_global_coords[filt]
 
@@ -128,12 +124,8 @@ class Points(Layer):
         if self.n_objects == 0:
             return
 
-        objects_in_domain = (self.data_global_coords >= domain.coords_min) & (
-            self.data_global_coords <= domain.coords_max
-        )
+        filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
 
-        filt = objects_in_domain.all(axis=1)  # (N,)
-
-        if len(self.data[filt]) > 0:
+        if filt.any():
             self.data = self.data[~filt]
-            self.meta = select_object_meta(self.meta, len(~filt), ~filt)
+            self.meta = select_object_meta(self.meta, len(filt), ~filt)

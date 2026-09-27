@@ -1,3 +1,4 @@
+import warnings
 from functools import partial, update_wrapper, wraps
 from inspect import _empty, getdoc, isgeneratorfunction, signature
 from typing import (
@@ -21,7 +22,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    ValidationError,
     create_model,
     field_validator,
 )
@@ -68,10 +68,11 @@ class Parameters(BaseModel):
 
 def _layer_from_type(hinted_type, default, param_name: str) -> Layer:
     if hinted_type not in TYPE_MAPPINGS:
-        print(
-            f"⚠️ Parameter `{param_name}` is of an unrecognized type "
+        warnings.warn(
+            f"Parameter `{param_name}` is of an unrecognized type "
             f"(`Hinted: {hinted_type}` ; Default: `{default}`). "
-            "It will be treated as a `sk.Any` type and the default value will be ignored."
+            "It will be treated as a `sk.Any` type and the default value will be ignored.",
+            stacklevel=2,
         )
         return skt.Any(name=param_name)
 
@@ -141,13 +142,12 @@ def _parse_pydantic_params_schema(
 ):
     parsed_params = _parse_run_func_signature(run_algorithm_func, params_from_decorator)
 
-    layer_validator = LayerValidator()  # stateless — hoist out of the loop
     fields, validators = {}, {}
 
     for param_name, layer in parsed_params.items():
         validators[f"validate_{param_name}"] = field_validator(
             param_name, mode="after"
-        )(partial(layer_validator.validate, layer=layer))
+        )(partial(LayerValidator.validate, layer=layer))
         fields[param_name] = (layer.type, Field(**_field_constraints_from_layer(layer)))
 
     return create_model(
@@ -187,33 +187,14 @@ def _parse_user_func_output(payload: Any) -> Stack:
     return Stack(layers=layers)
 
 
-### AlgoStream utility ###
+### Generator utility ###
 
 
-class AlgoStream:
-    def __init__(self, gen):
-        self._it = iter(gen)
-        self.value = None
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            return next(self._it)
-        except (StopIteration, AlgorithmRuntimeError) as e:
-            if isinstance(e, StopIteration):
-                self.value = e.value
-                raise
-            elif isinstance(e, AlgorithmRuntimeError):
-                raise e
-
-
-def algo_stream_gen(algo_stream: AlgoStream) -> Generator[Any, None, None]:
-    for x in algo_stream:
-        yield x
-    if algo_stream.value is not None:
-        yield algo_stream.value
+def _yields_then_return(gen: Generator) -> Generator[Any, None, None]:
+    """Yield a generator's values, then its return value (if not None)."""
+    value = yield from gen
+    if value is not None:
+        yield value
 
 
 ### Algorithm implementation ###
@@ -423,7 +404,7 @@ class Algorithm(AlgorithmRunner, Generic[P]):
         sample_stack = Stack()
         for param_name, param_value in resolved_params.items():
             kind = algo_params_defs.get(param_name).get("param_type")
-            if (kind in ["image", "mask"]) & (not isinstance(param_value, np.ndarray)):
+            if (kind in ["image", "mask"]) and (not isinstance(param_value, np.ndarray)):
                 param_value = skimage.io.imread(param_value)
 
             # Set Min/Max contrast limits for images, by default
@@ -456,15 +437,12 @@ class Algorithm(AlgorithmRunner, Generic[P]):
         """Generator that runs an algorithm using given parameters."""
         algo_params = {l.name: l.data for l in params_stack.layers}
 
-        # Validate parameters `manually` with Pydantic:
-        try:
-            self.parameters_model(**algo_params)
-        except ValidationError as e:
-            raise e
+        # Validate parameters `manually` with Pydantic (raises a ValidationError)
+        self.parameters_model(**algo_params)
 
         # If user-defined run function has `yield` statements:
         if isgeneratorfunction(self._run_algorithm_func):
-            gen = algo_stream_gen(AlgoStream(self._run_algorithm_func(**algo_params)))
+            gen = _yields_then_return(self._run_algorithm_func(**algo_params))
             try:
                 for payload in gen:
                     yield _parse_user_func_output(payload)

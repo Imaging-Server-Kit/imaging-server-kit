@@ -17,10 +17,8 @@ LAYER_VALIDATORS: Dict[str, Type[Validator]] = {
 }
 
 
-def find_layer_validator(layer: Layer) -> Validator:
-    validator_cls = LAYER_VALIDATORS.get(layer.kind, DefaultValidator)
-    
-    return validator_cls()
+def find_layer_validator(layer: Layer) -> Type[Validator]:
+    return LAYER_VALIDATORS.get(layer.kind, DefaultValidator)
 
 
 class LayerValidator:
@@ -30,5 +28,4 @@ class LayerValidator:
         if layer.data is None:
             return
 
-        validator = find_layer_validator(layer)
-        validator.validate(layer)
+        find_layer_validator(layer).validate(layer)
