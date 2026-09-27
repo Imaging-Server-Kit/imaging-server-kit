@@ -1,6 +1,8 @@
 from typing import Dict, List, Type
 
+from imaging_server_kit.core.tiling import TileMeta
 from imaging_server_kit.types import Layer, layer_factory
+from imaging_server_kit.types.common import copy_meta
 from imaging_server_kit.merge.merger import Merger, DefaultMerger
 from imaging_server_kit.merge._image_merger import ImageTileOverlapMerger
 from imaging_server_kit.merge._mask_merger import (
@@ -102,8 +104,18 @@ def merge_layers(layers: List[Layer]) -> Layer:
 
     merged_layer = layer_factory(kind=kind, name=name, **meta)
 
+    # The layers are merged as a series of tiles (first => last) of a single merge run,
+    # so that e.g. instance labels from different layers don't collide.
+    # We merge copies, not to modify the tile metadata of the provided layers.
+    n_layers = len(layers)
     merger = LayerMerger()
-    for l in layers:
-        merger.merge(merged_layer, l)
+    for idx, l in enumerate(layers):
+        incoming_layer = type(l)(
+            data=l.data,
+            name=l.name,
+            meta=copy_meta(l),
+            tile_meta=TileMeta(tile_idx=idx, n_tiles=n_layers),
+        )
+        merger.merge(merged_layer, incoming_layer)
 
     return merged_layer
