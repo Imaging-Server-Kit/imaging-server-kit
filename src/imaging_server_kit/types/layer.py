@@ -258,6 +258,12 @@ class Layer:
         """Refresh the layer's state."""
         pass
 
+    def _display(self) -> None:
+        """Show the layer in the terminal, once each time it is merged into a Stack (e.g. notifications, progress bars).
+
+        Meant to be implemented by subclasses; does nothing by default."""
+        pass
+
     def select(self, domain: Domain) -> Layer:
         """Selection based on a domain in *global* coordinates."""
         cls = type(self)

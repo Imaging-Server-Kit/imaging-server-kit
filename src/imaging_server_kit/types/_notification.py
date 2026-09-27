@@ -41,5 +41,6 @@ class Notification(Layer):
         level = self.meta.get("level", "info")
         return f"{self.name} ({level}): {self.data}"
 
-    def _refresh(self):
-        print(self)
+    def _display(self) -> None:
+        if self.data is not None:
+            print(self)

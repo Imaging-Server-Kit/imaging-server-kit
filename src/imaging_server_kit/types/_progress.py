@@ -45,7 +45,7 @@ class Progress(Layer):
         max_val = self.meta.get("max_val", 1)
         return f"Progress (current: {self.data}/{max_val})"
 
-    def _refresh(self):
+    def _display(self) -> None:
         max_val = self.meta.get("max_val", 1)
         # Only show the progress bar if there is more than 1 step.
         if (max_val > 1) and (self.data is not None):

@@ -68,3 +68,37 @@ def test_multi_stream():
 ### Streamed vectors
 
 ### Streamed boxes
+
+
+# Notifications are printed once per message
+@sk.algorithm
+def notifying_stream():
+    yield sk.Notification("Starting")
+    yield sk.Notification("Halfway"), sk.Integer(1)
+    return sk.Notification("Done")
+
+def test_notifications_are_printed_once(capsys):
+    notifying_stream.run()
+    lines = [l for l in capsys.readouterr().out.splitlines() if l.startswith("Notification")]
+    assert lines == [
+        "Notification (info): Starting",
+        "Notification (info): Halfway",
+        "Notification (info): Done",
+    ]
+
+
+# Progress bars are updated once per step
+@sk.algorithm
+def progress_stream(n: int = 5):
+    for k in range(1, n + 1):
+        yield sk.Progress(k, max_val=n)
+
+def test_progress_is_updated_once_per_step(monkeypatch):
+    from imaging_server_kit.core import _progress_display
+
+    updates = []
+    monkeypatch.setattr(
+        _progress_display, "update", lambda key, completed, total: updates.append((key, completed, total))
+    )
+    progress_stream.run(n=5)
+    assert updates == [("Progress", k, 5) for k in range(1, 6)]

@@ -280,7 +280,10 @@ class Stack:
 
     def _post_merge(self, receiving_layers: List[Layer]):
         """Event triggered after a layer is merged into the stack."""
-        pass
+        # Layers such as notifications and progress bars are shown in the terminal here,
+        # once per merged result (subclasses, e.g. for Napari, display them differently).
+        for layer in receiving_layers:
+            layer._display()
 
     def delete(self, name: str) -> None:
         """Delete a layer by name."""
