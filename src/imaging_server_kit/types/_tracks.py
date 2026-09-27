@@ -34,7 +34,8 @@ class Tracks(Layer):
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
-            return np.zeros((1, self.ndim + 2), dtype=np.float32)
+            # Empty tracks: an ID column followed by the coordinates [T, (Z), Y, X]
+            return np.zeros((0, domain.ndim + 1), dtype=np.float32)
 
     def _summary(self) -> str:
         if self.data is None:

@@ -14,6 +14,30 @@ from imaging_server_kit.core.tiling import (
 )
 
 
+def _build_meta(
+    meta: Optional[Dict],
+    description: str,
+    merger: str,
+    position: Optional[Tuple],
+    meta_kwargs: Dict,
+) -> Dict:
+    """Merge the `meta` dictionary with the layer's keyword arguments (explicit `meta` keys take precedence)."""
+    meta = dict(meta) if meta is not None else {}  # Copy: the caller's dict is not modified
+
+    meta.setdefault("description", description)
+    meta.setdefault("merger", merger)
+    meta.setdefault("position", position)
+
+    for k, v in meta_kwargs.items():
+        if (k == "dimensionality") and (v is None):
+            v = list(range(6))  # Convert dimensionality=None to the default 6-dims
+        meta.setdefault(k, v)
+
+    meta.setdefault("required", False)
+
+    return meta
+
+
 class Layer:
     """Base class for a single piece of data — an image, a mask, a numeric parameter, etc.
     
@@ -68,40 +92,17 @@ class Layer:
     ):
         self._name = name
 
-        # Prepare the meta attribute
-        if meta is None:
-            meta = {}
-        
-        meta["description"] = meta.get("description", description)
-        meta["merger"] = meta.get("merger", merger)
-        meta["position"] = meta.get("position", position)
+        # NOTE: this is important - only parameters stored in meta get serialized
+        self._meta = _build_meta(meta, description, merger, position, meta_kwargs)
 
-        # Convert dimensionality=None to the default 6-dims
-        if "dimensionality" in meta_kwargs:
-            if meta_kwargs.get("dimensionality") is None:
-                meta_kwargs["dimensionality"] = np.arange(6).tolist()
-
-        if "required" not in meta_kwargs:
-            meta_kwargs["required"] = False
-
-        # Add the meta kwargs
-        # NOTE: this is important - only parameters passed to meta here get serialized
-        for k, v in meta_kwargs.items():
-            if not k in meta:
-                meta[k] = v
-
-        self._meta = meta
-
-        # Handle required / default logic
-        if meta_kwargs["required"] is True:
-            if "default" in meta_kwargs:
-                if data is None:
-                    data = meta_kwargs["default"]
-            else:
-                if data is None:
-                    raise ValueError(
-                        f"`{name}` is required, but data is None and no defaults were given. \nEither set `required=False`, `default=...`, or `data=` to solve this issue.."
-                    )
+        # Handle required / default logic. The default is read from the merged meta,
+        # so that the data and meta always agree.
+        if (data is None) and (meta_kwargs.get("required", False) is True):
+            if "default" not in self._meta:
+                raise ValueError(
+                    f"`{name}` is required, but data is None and no defaults were given. \nEither set `required=False`, `default=...`, or `data=` to solve this issue.."
+                )
+            data = self._meta["default"]
 
         self._data = data
 
@@ -109,14 +110,14 @@ class Layer:
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
 
         # Set the position attribute
-        self._position = meta["position"]
+        self._position = self._meta["position"]
 
-        # Merger
+        # Merger instance used while merging tiles into this layer (set by `LayerMerger`)
         self._merger_instance = None
 
         # Run validation (`post-init`)
         if self.data is not None:
-            # We can't do the import earlier.. is that a problem?
+            # Deferred import: the validation module imports the layer types (circular import)
             from imaging_server_kit.validation.layer_validator import (
                 find_layer_validator,
             )
@@ -221,14 +222,6 @@ class Layer:
     @property
     def _bounds(self) -> Optional[Tuple]:
         return None
-
-    @property
-    def _merger_instance(self):
-        return self._merger
-
-    @_merger_instance.setter
-    def _merger_instance(self, value):
-        self._merger = value
 
     def __repr__(self) -> str:
         parts = [self._summary()]

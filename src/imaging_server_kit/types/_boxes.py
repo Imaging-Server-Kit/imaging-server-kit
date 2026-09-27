@@ -82,8 +82,9 @@ class Boxes(Layer):
             _data = self._zeros_in(domain=domain)
             _meta = copy_meta(self)
         else:
-            # All box corners must be in the domain
-            filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
+            # Boxes are selected based on their center (each box goes to a single tile);
+            # the selected boxes keep their full coordinates, which may extend beyond the domain.
+            filt = objects_in_domain(self.data_global_coords.mean(axis=1), domain)  # (N,)
 
             selected_boxes = self.data_global_coords[filt]
 
@@ -122,7 +123,7 @@ class Boxes(Layer):
         if self.n_objects == 0:
             return
 
-        filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
+        filt = objects_in_domain(self.data_global_coords.mean(axis=1), domain)  # (N,)
 
         if filt.any():
             self.data = self.data[~filt]
