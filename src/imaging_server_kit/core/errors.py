@@ -84,6 +84,8 @@ class AlgorithmRuntimeError(Exception):
         error: Optional[Exception] = None,
         message="Algorithm did not run successfully. ",
     ):
+        self.algorithm_name = algorithm
+        self.error = error  # The original error (if any)
         self.message = message + f"{algorithm=}"
         if error is not None:
             self.message = self.message + f", Error: {error}"

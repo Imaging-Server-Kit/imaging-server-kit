@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 from imaging_server_kit.types import Layer
 
+# Key identifying the (last) message streamed by the server when an algorithm fails,
+# e.g. {"__error__": {"type": "RuntimeError", "message": "..."}}
+ERROR_FRAME_KEY = "__error__"
+
 
 class Serializer(ABC):
     """

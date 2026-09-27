@@ -17,9 +17,10 @@ class MaskDataSerializer(Serializer):
         if mask.data is None:
             return
 
-        return encode_contents(mask.data.astype(np.uint32))
+        # Masks are sent in their own dtype (TIFF preserves it)
+        return encode_contents(np.asarray(mask.data))
 
     @staticmethod
     def deserialize(serialized_mask: Optional[str]) -> Optional[np.ndarray]:
         if isinstance(serialized_mask, str):
-            return decode_contents(serialized_mask).astype(int)
+            return decode_contents(serialized_mask)

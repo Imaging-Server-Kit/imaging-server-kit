@@ -11,12 +11,14 @@ import msgpack
 
 from imaging_server_kit.core.runner import AlgorithmRunner, validate_algorithm
 from imaging_server_kit.core.errors import (
+    AlgorithmRuntimeError,
     AlgorithmServerError,
     AlgorithmTimeoutError,
     InvalidAlgorithmParametersError,
 )
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.remote.stack_serializer import StackSerializer
+from imaging_server_kit.remote.serializer import ERROR_FRAME_KEY
 
 # Unlimited input size - Implies trusted input. TODO: should this be made more clear (or configurable)?
 MAX_BUFFER_SIZE = 0
@@ -164,6 +166,13 @@ class Client(AlgorithmRunner):
                     unpacker.feed(chunk)
 
                     for serialized_stack in unpacker:
+                        if ERROR_FRAME_KEY in serialized_stack:
+                            error = serialized_stack[ERROR_FRAME_KEY]
+                            raise AlgorithmRuntimeError(
+                                algorithm=algorithm,
+                                error=RuntimeError(f"{error['type']}: {error['message']}"),
+                                message="Algorithm did not run successfully on the server. ",
+                            )
                         yield StackSerializer.deserialize([serialized_stack])
             else:
                 self._handle_response_errored(response)

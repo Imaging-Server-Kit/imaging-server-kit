@@ -1,5 +1,6 @@
 import errno
 import importlib.resources
+import logging
 import os
 import pathlib
 import socket
@@ -20,6 +21,9 @@ from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.remote.stack_serializer import StackSerializer
+from imaging_server_kit.remote.serializer import ERROR_FRAME_KEY
+
+logger = logging.getLogger(__name__)
 
 templates_dir = pathlib.Path(
     importlib.resources.files("imaging_server_kit.core").joinpath("templates")  # type: ignore
@@ -251,6 +255,15 @@ class AlgorithmApp:
             return StreamingResponse(stream, media_type="application/msgpack")
 
     def _stream_msgpack(self, stream_generator: Iterable[Stack]):
-        for result_tile, params_tile in stream_generator:
-            for r in StackSerializer.serialize(result_tile):
-                yield msgpack.packb(r)
+        try:
+            for result_tile, params_tile in stream_generator:
+                for r in StackSerializer.serialize(result_tile):
+                    yield msgpack.packb(r)
+        except Exception as e:
+            # The response has already started, so the error can't be an HTTP status code anymore.
+            # Instead, we send it as a last message, which the client raises as an error.
+            logger.exception("Algorithm failed while streaming results.")
+            error = getattr(e, "error", None) or e  # Unwrap AlgorithmRuntimeError
+            yield msgpack.packb(
+                {ERROR_FRAME_KEY: {"type": type(error).__name__, "message": str(error)}}
+            )

@@ -13,11 +13,11 @@ class ImageDataSerializer(Serializer):
         if image is not None:
             image_data = image.data
             if image_data is not None:
-                return encode_contents(image_data.astype(np.float32))
+                # Images are sent in their own dtype (TIFF preserves it)
+                return encode_contents(np.asarray(image_data))
 
     @staticmethod
     def deserialize(serialized_data: Optional[str]) -> Optional[np.ndarray]:
         if serialized_data is not None:
             if isinstance(serialized_data, str):
-                data = decode_contents(serialized_data)
-                return data.astype(float)
+                return decode_contents(serialized_data)

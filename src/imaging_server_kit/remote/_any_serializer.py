@@ -6,7 +6,50 @@ import numpy as np
 from imaging_server_kit.remote.serializer import Serializer
 from imaging_server_kit.types._any import Any
 
-from imaging_server_kit.remote.encoding import decode_contents, encode_contents
+from imaging_server_kit.remote.encoding import (
+    decode_array,
+    encode_array,
+    is_encoded_array,
+)
+
+
+def _serialize_value(value: typing.Any) -> typing.Any:
+    # Common types: None, str, int, float, bool are returned directly
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    # Numpy scalars are converted to Python scalars
+    if isinstance(value, np.generic):
+        return value.item()
+
+    # Numpy arrays are encoded (tagged, to be told apart from strings)
+    if isinstance(value, np.ndarray):
+        return encode_array(value)
+
+    if isinstance(value, dict):
+        return {key: _serialize_value(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(item) for item in value]
+
+    # If unsuccessful with any of the previous approaches, we raise:
+    raise ValueError(f"Cannot serialize this object: {value}")
+
+
+def _deserialize_value(value: typing.Any) -> typing.Any:
+    if is_encoded_array(value):
+        return decode_array(value)
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, dict):
+        return {key: _deserialize_value(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return [_deserialize_value(item) for item in value]
+
+    raise ValueError(f"Cannot deserialize this object: {value}")
 
 
 class AnyDataSerializer(Serializer):
@@ -15,53 +58,8 @@ class AnyDataSerializer(Serializer):
         if any is None:
             return None
 
-        if any.data is None:
-            return None
-
-        value = any.data
-
-        # If any.data is a common type; int, str, float, bool, we return it directly
-        if isinstance(value, (str, int, float, bool)):
-            return value
-
-        # Numpy arrays are encoded normally;
-        elif isinstance(value, np.ndarray):
-            return encode_contents(value)
-
-        # Dictionary case:
-        elif isinstance(value, dict):
-            return {
-                key: AnyDataSerializer.serialize(Any(data=item))
-                for key, item in value.items()
-            }
-
-        # List/Tuple case:
-        elif isinstance(value, (list, tuple)):
-            return [AnyDataSerializer.serialize(Any(data=item)) for item in value]
-
-        else:
-            # If unsuccessful with any of the previous approaches, we raise:
-            raise ValueError(f"Cannot serialize this object: {value}")
+        return _serialize_value(any.data)
 
     @staticmethod
     def deserialize(serialized_data: typing.Any) -> typing.Any:
-        if isinstance(serialized_data, str):
-            try:
-                return decode_contents(serialized_data)
-            except Exception:
-                return serialized_data
-
-        elif isinstance(serialized_data, (int, float, bool)):
-            return serialized_data
-
-        elif isinstance(serialized_data, list):
-            return [AnyDataSerializer.deserialize(item) for item in serialized_data]
-
-        elif isinstance(serialized_data, dict):
-            return {
-                key: AnyDataSerializer.deserialize(item)
-                for key, item in serialized_data.items()
-            }
-
-        else:
-            raise ValueError(f"Cannot deserialize this object: {serialized_data}")
+        return _deserialize_value(serialized_data)
