@@ -16,7 +16,11 @@ import pytest
 import uvicorn
 
 import imaging_server_kit as sk
-from imaging_server_kit.core.errors import InvalidAlgorithmParametersError
+from imaging_server_kit.core.errors import (
+    AlgorithmNotFoundError,
+    AlgorithmRuntimeError,
+    InvalidAlgorithmParametersError,
+)
 from imaging_server_kit.remote.app import AlgorithmApp
 from imaging_server_kit.remote.client import Client
 
@@ -39,6 +43,17 @@ def double_int(x):
     return sk.Integer(x * 2)
 
 
+@sk.algorithm(name="fails", parameters={"x": sk.Integer(default=1)})
+def fails(x):
+    raise RuntimeError("boom")
+
+
+@sk.algorithm(name="fails_after_yield", parameters={"x": sk.Integer(default=1)})
+def fails_after_yield(x):
+    yield sk.Integer(x)
+    raise RuntimeError("boom")
+
+
 def _free_port() -> int:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
@@ -49,7 +64,9 @@ def _free_port() -> int:
 
 @pytest.fixture(scope="module")
 def server_url():
-    algo_app = AlgorithmApp(algorithms=[add_offset, double_int], name="Test server")
+    algo_app = AlgorithmApp(
+        algorithms=[add_offset, double_int, fails, fails_after_yield], name="Test server"
+    )
     port = _free_port()
 
     config = uvicorn.Config(algo_app.app, host="127.0.0.1", port=port, log_level="error")
@@ -74,7 +91,7 @@ def client(server_url):
 
 
 def test_connect_lists_algorithms(client):
-    assert set(client.algorithms) == {"add_offset", "double_int"}
+    assert set(client.algorithms) == {"add_offset", "double_int", "fails", "fails_after_yield"}
 
 
 def test_run_scalar_algorithm_matches_local(client):
@@ -120,3 +137,17 @@ def test_invalid_params_raise_client_side_error(client):
     image = np.zeros((2, 2), dtype=np.uint8)
     with pytest.raises(InvalidAlgorithmParametersError):
         client.run(algorithm="add_offset", image=image, offset=999)
+
+
+@pytest.mark.parametrize("algorithm", ["fails", "fails_after_yield"])
+def test_server_side_error_is_raised_by_client(client, algorithm):
+    """The original error message reaches the client, and the server keeps working."""
+    with pytest.raises(AlgorithmRuntimeError, match="RuntimeError: boom"):
+        client.run(algorithm=algorithm)
+
+    assert client.run(algorithm="double_int", x=2)[0].data == 4
+
+
+def test_unknown_algorithm_raises(client):
+    with pytest.raises(AlgorithmNotFoundError):
+        client.run(algorithm="does_not_exist")

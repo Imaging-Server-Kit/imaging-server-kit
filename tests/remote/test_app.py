@@ -34,9 +34,14 @@ def double_int(x):
     return sk.Integer(x * 2)
 
 
+@sk.algorithm(name="fails", parameters={"x": sk.Integer(default=1)})
+def fails(x):
+    raise RuntimeError("boom")
+
+
 @pytest.fixture
 def client():
-    algo_app = AlgorithmApp(algorithms=[add_offset, double_int], name="Test server")
+    algo_app = AlgorithmApp(algorithms=[add_offset, double_int, fails], name="Test server")
     return TestClient(algo_app.app)
 
 
@@ -63,7 +68,7 @@ def _post_process(client, algorithm_name, params_stack):
 def test_list_algorithms(client):
     resp = client.get("/algorithms")
     assert resp.status_code == 200
-    assert set(resp.json()["algorithms"]) == {"add_offset", "double_int"}
+    assert set(resp.json()["algorithms"]) == {"add_offset", "double_int", "fails"}
 
 
 def test_version(client):
@@ -136,3 +141,17 @@ def test_process_invalid_params_returns_422(client):
     assert resp.status_code == 422
     detail = resp.json()["detail"][0]
     assert detail["loc"][0] == "offset"
+
+
+def test_process_error_is_streamed_as_last_message(client):
+    """Errors happen after the response started: they are sent as a final error frame."""
+    params_stack = sk.Stack()
+    params_stack.add(sk.Integer(1, name="x"))
+    resp = _post_process(client, "fails", params_stack)
+    assert resp.status_code == 200
+
+    unpacker = msgpack.Unpacker(raw=False)
+    unpacker.feed(resp.content)
+    messages = list(unpacker)
+
+    assert messages[-1] == {"__error__": {"type": "RuntimeError", "message": "boom"}}
