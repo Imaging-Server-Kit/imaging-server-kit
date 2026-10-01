@@ -46,7 +46,7 @@ class ParameterPanel(QGroupBox):
         # Generate the new dynamic UI state and layout
         self.ui_state: Dict[str, UIStateItem] = {}
         for k, (param_name, param_values) in enumerate(schema["properties"].items()):
-            # Add the right UI element based on the retreived parameter type.
+            # Add the right UI element based on the retrieved parameter type.
             param_type = param_values.get("param_type")
 
             if param_type == "choice":

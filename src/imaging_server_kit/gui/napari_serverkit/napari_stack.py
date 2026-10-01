@@ -288,7 +288,7 @@ class NapariStack(Stack):
                     if isinstance(layer, layer_type):
 
                         # Napari layers data are not always in the format expected by serverkit, so we do the conversion here
-                        # and assign serverkit-formatted data to the combobox data attributes, which get retreived later as parameters
+                        # and assign serverkit-formatted data to the combobox data attributes, which get retrieved later as parameters
 
                         # For boxes, extract the rectangle data from shapes layers (and convert them to Numpy)
                         if kind == "boxes":

@@ -363,7 +363,7 @@ class QuPathBridge:
             max_x = self.server.metadata.width
             max_y = self.server.metadata.height
 
-        # Get a sk.Domain from QuBalab's retreived annotation
+        # Get a sk.Domain from QuBalab's retrieved annotation
         domain = sk.Domain(position=(min_y, min_x), size=(max_y - min_y, max_x - min_x))
         if domain.size is None:
             return

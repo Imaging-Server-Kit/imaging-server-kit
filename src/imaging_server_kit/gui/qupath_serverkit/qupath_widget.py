@@ -190,7 +190,7 @@ class QuPathWidget(QWidget):
             return
 
         try:
-            # Check for algo compatibility - if so, retreive the QuPath-modified schema
+            # Check for algo compatibility - if so, retrieve the QuPath-modified schema
             schema, _ = if_compatible_get_qupath_schema(
                 self.runner_widget.runner, selected_algo
             )
