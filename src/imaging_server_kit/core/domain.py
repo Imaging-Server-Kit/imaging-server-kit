@@ -134,3 +134,73 @@ def merge_domains(domains: List[Optional[Domain]]) -> Optional[Domain]:
                 merged_domain._merge(d)
 
     return merged_domain
+
+
+def index_frame(origin: Optional[Tuple], extent: Optional[Domain]) -> Optional[Domain]:
+    """Frame in which numpy-like indices are counted: from `origin` (e.g. a layer's position) to the end of `extent`.
+
+    For object layers (Points, Boxes...) the extent is the bounding box of the data,
+    so indices must be counted from the layer's position rather than from the extent's minimum.
+    """
+    if (origin is None) or (extent is None) or (extent.coords_max is None):
+        return
+    size = [max(cmax - o, 0) for cmax, o in zip(extent.coords_max, origin)]
+    return Domain(size=size, position=origin)
+
+def domain_from_key(key, extent: Optional[Domain]) -> Domain:
+    """Domain (in global coordinates) selected by a numpy-like key (ints, slices, Ellipsis), relative to `extent`.
+
+    Integer indices keep their dimension (size 1). Stepped slices are not supported.
+    """
+    if (extent is None) or (extent.size is None) or (extent.coords_min is None):
+        raise IndexError("Cannot index spatially: undefined extent")
+
+    if not isinstance(key, tuple):
+        key = (key,)
+
+    ndim = extent.ndim
+
+    n_ellipsis = sum(k is Ellipsis for k in key)
+    if n_ellipsis > 1:
+        raise IndexError("An index can only have a single ellipsis ('...')")
+    if n_ellipsis == 1:
+        idx = key.index(Ellipsis)
+        n_fill = ndim - (len(key) - 1)
+        key = key[:idx] + (slice(None),) * max(n_fill, 0) + key[idx + 1 :]
+
+    if len(key) > ndim:
+        raise IndexError(
+            f"Too many indices: extent is {ndim}-dimensional, but {len(key)} were indexed"
+        )
+
+    position = []
+    size = []
+    for dim, (cmin, n) in enumerate(zip(extent.coords_min, extent.size)):
+        k = key[dim] if dim < len(key) else slice(None)
+        if isinstance(k, slice):
+            if k.step not in (None, 1):
+                raise ValueError("Stepped slicing is not supported")
+            start = _normalize_bound(k.start, n, default=0)
+            stop = _normalize_bound(k.stop, n, default=n)
+            stop = max(stop, start)
+            position.append(cmin + start)
+            size.append(stop - start)
+        else:
+            idx = k + n if k < 0 else k
+            if not (0 <= idx < n):
+                raise IndexError(
+                    f"Index {k} is out of bounds for axis {dim} with size {n:g}"
+                )
+            position.append(cmin + idx)
+            size.append(1)
+
+    return Domain(size=size, position=position)
+
+
+def _normalize_bound(value, n: float, default: float) -> float:
+    """Normalize a slice bound like numpy: negative values count from the end, then clamp to [0, n]."""
+    if value is None:
+        return default
+    if value < 0:
+        value = value + n
+    return min(max(value, 0), n)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Generator, Optional, Tuple, Union
 import numpy as np
 
-from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.core.domain import Domain, domain_from_key, index_frame
 from imaging_server_kit.core._fmt import fmt_tuple, truncate
 from imaging_server_kit.types.common import copy_meta
 
@@ -288,33 +288,12 @@ class Layer:
         return layer_selection
 
     def __getitem__(self, key):
-        """Selection based on a domain in *local* coordinates."""
-        if not isinstance(key, tuple):
-            key = (key,)
+        """Selection based on a numpy-like key in *local* coordinates (counted from the layer's position).
 
-        position = []
-        size = []
-        for dim, k in enumerate(key):
-            if isinstance(k, slice):
-                start = 0 if k.start is None else k.start
-                stop = self.size[dim] if k.stop is None else k.stop
-                start_global = self.coords_min[dim] + start
-                position.append(start_global)
-                size.append(stop - start)
-            else:
-                # k is an `int`
-                position.append(self.coords_min[dim] + k)
-                size.append(0)
-
-        if self.ndim is not None:
-            if len(size) < self.ndim:
-                for dim in range(len(size), self.ndim):
-                    size.append(self.size[dim])
-                    position.append(self.coords_min[dim])
-
-        domain = Domain(position=position, size=size)
-
-        return self.select(domain=domain)
+        Objects at negative local coordinates cannot be reached by indexing.
+        """
+        frame = index_frame(self.position, self.extent)
+        return self.select(domain=domain_from_key(key, frame))
 
     def _reinitialize(self, domain: Domain) -> None:
         """Reinitialize the specified domain in the layer; meant to be implemented by subclasses."""

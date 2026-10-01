@@ -4,7 +4,7 @@ from typing import Generator, List, Optional, Tuple, Union
 
 from imaging_server_kit.merge.layer_merger import LayerMerger
 from imaging_server_kit.types import Layer
-from imaging_server_kit.core.domain import Domain, merge_domains
+from imaging_server_kit.core.domain import Domain, domain_from_key, index_frame, merge_domains
 from imaging_server_kit.core._fmt import fmt_slices
 from imaging_server_kit.core.tiling import (
     TileMeta,
@@ -91,61 +91,27 @@ class Stack:
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, key) -> List[Layer]:
+    def __getitem__(self, key) -> Union[Layer, List[Layer]]:
         # Stacks have a `layers` dimension (first dimension)
         # so we index as [Layer, Dim0, Dim1, .., DimN]
         if not isinstance(key, tuple):
             key = (key,)
 
         layer_key = key[0]
+        if layer_key is Ellipsis:
+            raise IndexError("Ellipsis ('...') is not supported for the `layers` dimension")
 
         if len(key) > 1:
-            position = []
-            size = []
-            # We are selecting in the layers; we skip the `layers` dimension
-            for dim, k in enumerate(key[1:]):
-                if (
-                    isinstance(k, slice)
-                    and (self.coords_max is not None)
-                    and (self.coords_min is not None)
-                ):
-                    start = (
-                        self.coords_min[dim]
-                        if k.start is None
-                        else self.coords_min[dim] + k.start
-                    )
-                    stop = (
-                        self.coords_max[dim]
-                        if k.stop is None
-                        else self.coords_min[dim] + k.stop
-                    )
-                    position.append(start)
-                    size.append(stop - start)
-                else:
-                    position.append(self.coords_min[dim] + k)
-                    size.append(1)
-
-            if self.ndim is not None:
-                if len(size) < self.ndim:
-                    for dim in range(len(size), self.ndim):
-                        position.append(self.coords_min[dim])
-                        size.append(self.size[dim])
-
-            domain = Domain(size=size, position=position)
-
-            extract = self.select(domain=domain)
+            # Spatial indices are counted from the smallest layer position
+            positions = [l.position for l in self.layers if l.position is not None]
+            origin = tuple(map(min, zip(*positions))) if positions else None
+            frame = index_frame(origin, self.extent)
+            extract = self.select(domain=domain_from_key(key[1:], frame))
         else:
             extract = self
 
-        if isinstance(layer_key, slice):
-            start = 0 if layer_key.start is None else layer_key.start
-            stop = len(self.layers) if layer_key.stop is None else layer_key.stop
-            layer_selection = extract.layers[start:stop]
-        else:
-            # Layer_key is an int
-            layer_selection = extract.layers[layer_key]
-
-        return layer_selection
+        # The first key indexes the `layers` dimension (int or slice)
+        return extract.layers[layer_key]
 
     @property
     def layers(self) -> List[Layer]:
