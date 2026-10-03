@@ -12,3 +12,4 @@ chapters:
   - file: sections/08_python
   - file: sections/09_layers
   - file: sections/10_examples
+  - file: sections/11_qupath

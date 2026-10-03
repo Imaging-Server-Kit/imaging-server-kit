@@ -23,7 +23,7 @@ Most algorithms require an input image. You can **load a sample image** from the
 Some algorithms automatically re-run when you change a parameters; for example, *Intensity threshold* updates the output directly when you adjust the threshold value.
 
 ```{admonition} Algo docs
-You can access a **documentation page** for an algorithm in a web browser by clickin the **🌐 Doc** button. The documentation page provides a description of the algorithm as well as detailed information about its parameters. 
+You can access a **documentation page** for an algorithm in a web browser by clicking the **🌐 Doc** button. The documentation page provides a description of the algorithm as well as detailed information about its parameters. 
 ```
 
 ## Run the server demo
