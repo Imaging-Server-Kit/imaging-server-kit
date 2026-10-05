@@ -1,0 +1,11 @@
+/* Videos scale with their container (content area or grid card). */
+.md-typeset video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.2rem;
+}
+
+.md-typeset .grid.cards video {
+  margin-top: 0.6rem;
+}

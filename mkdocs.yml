@@ -1,0 +1,151 @@
+site_name: Imaging Server Kit
+site_description: Turn Python image processing functions into algorithms that run in Napari, QuPath, web servers, and more.
+site_author: EPFL Center for Imaging
+site_url: https://imaging-server-kit.github.io/imaging-server-kit/
+copyright: By EPFL Center for Imaging
+
+repo_url: https://github.com/Imaging-Server-Kit/imaging-server-kit
+repo_name: imaging-server-kit
+edit_uri: edit/main/docs/
+
+# Keep `.html` page URLs (as with the former Jupyter Book site). This also lets raw
+# HTML <video> tags use the same relative paths as Markdown links.
+use_directory_urls: false
+
+theme:
+  name: material
+  favicon: logo.ico
+  icon:
+    logo: material/orbit
+    repo: fontawesome/brands/github
+  features:
+    - navigation.sections
+    - navigation.footer
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+extra_css:
+  - assets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Try the demos: getting-started/demos.md
+  - "Tutorial: your first algorithm":
+      - 1. Create an algorithm: tutorial/create-algorithm.md
+      - 2. Add samples and metadata: tutorial/samples-and-metadata.md
+      - 3. Serve an algorithm: tutorial/serve.md
+      - 4. Usage from Python: tutorial/python.md
+  - How-to guides:
+      - Combine algorithms: how-to/combine.md
+      - Stream live updates: how-to/live-updates.md
+      - Run algorithms tile-by-tile: how-to/tiling.md
+      - Restrict computation to a region: how-to/regions.md
+      - Usage with Napari: how-to/napari.md
+      - Usage with QuPath: how-to/qupath.md
+      - Serve an algorithm: how-to/deploy-server.md
+  - Concepts:
+      - Algorithms: concepts/algorithms.md
+      - Data layers: concepts/layers-and-stacks.md
+      - Pixel space: concepts/coordinates.md
+  - Reference:
+      - Python API:
+          - Algorithms: reference/api/algorithms.md
+          - Data layers: reference/api/layers.md
+          - Stacks and domains: reference/api/stack.md
+          - Servers and clients: reference/api/remote.md
+          - User interfaces: reference/api/gui.md
+      - Command line: reference/cli.md
+      - HTTP endpoints: reference/http.md
+  - Examples: examples.md
+  - Citing: citing.md
+  - Developers:
+      - AI policy: developers/ai_policy.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.magiclink
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+
+hooks:
+  - docs/hooks/redirects.py
+
+exclude_docs: |
+  hooks/
+
+extra:
+  # Former Jupyter Book URLs, redirected by docs/hooks/redirects.py
+  redirects:
+    sections/00_getting_started.html: getting-started/demos.md
+    sections/01_algorithm.html: tutorial/create-algorithm.md
+    sections/02_samples.html: tutorial/samples-and-metadata.md
+    sections/03_metadata.html: tutorial/samples-and-metadata.md
+    sections/04_multialgo.html: how-to/combine.md
+    sections/05_streams.html: how-to/live-updates.md
+    sections/06_tiled.html: how-to/tiling.md
+    sections/07_server.html: tutorial/serve.md
+    sections/08_python.html: tutorial/python.md
+    sections/09_layers.html: reference/layers.md
+    sections/10_examples.html: examples.md
+    sections/11_qupath.html: how-to/qupath.md
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn

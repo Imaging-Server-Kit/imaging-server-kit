@@ -1,99 +1,83 @@
-# Welcome to the Imaging Server Kit's documentation!
+# Imaging Server Kit
 
-The **Imaging Server Kit** lets you turn Python-based image processing workflows into **algorithms** that gain extra functionalities.
+The **Imaging Server Kit** turns Python image processing functions into **algorithms**: objects that you can run in Napari or QuPath, serve over HTTP, run tile-by-tile, and more.
 
 ```python
+import imaging_server_kit as sk
+
 @sk.algorithm  # <- Turn your function into an algorithm
 def my_algo(image, parameter):
-  (...)
+    ...
 ```
 
-Server Kit algorithms are versatile objects that allow you run computations in a variety of ways.
+<div class="grid cards" markdown>
 
-For example, you can
+-   :material-server-network: **Serve algorithms over HTTP**
 
-- [**Turn your algorithm into a web server**](./sections/07_server.md), connect to it and run computations from [Napari](https://napari.org/stable/), [QuPath](https://qupath.github.io/), or [Python](./sections/08_python) via HTTP requests.
+    ---
 
-<video width=512 controls loop autoplay>
-  <source src="./_static/cellpose_example.mp4" type="video/mp4">
-</video>
+    Turn an algorithm into a web server, then run it from [Napari](https://napari.org/stable/), [QuPath](https://qupath.github.io/), or [Python](tutorial/python.md).
 
-- [**Generate a dock widget**](./sections/01_algorithm) to run your algorithm interactively in Napari or QuPath.
+    <video controls loop autoplay muted playsinline>
+      <source src="assets/videos/cellpose_example.mp4" type="video/mp4">
+    </video>
 
-<video width=512 controls loop autoplay>
-  <source src="./_static/oripy_threshold.mp4" type="video/mp4">
-</video>
+    [:octicons-arrow-right-24: Serving algorithms](tutorial/serve.md)
 
-- Run your algorithm [**tile-by-tile**](./sections/06_tiled) on the input image.
+-   :material-dock-left: **Generate dock widgets**
 
-<video width=512 controls loop autoplay>
-  <source src="./_static/tiles.mp4" type="video/mp4">
-</video>
+    ---
 
-- [**Stream results**](./sections/05_streams) to inspect them in real-time.
+    Run your algorithm interactively in Napari or QuPath with a parameters panel.
 
-<video width=512 controls loop autoplay>
-  <source src="./_static/yolo-stream.mp4" type="video/webm">
-</video>
+    <video controls loop autoplay muted playsinline>
+      <source src="assets/videos/oripy_threshold.mp4" type="video/mp4">
+    </video>
 
-On top of that, you can provide [**samples**](./sections/02_samples) and automatically generate a [**documentation**](./sections/03_metadata) page for your algorithm that you can share with users.
+    [:octicons-arrow-right-24: Create an algorithm](tutorial/create-algorithm.md)
 
-This documentation will give you a conceptual overview of the package, and walk you through the steps to learn [how to create an algorithm](./sections/01_algorithm), and give you some [suggestions of use cases](./sections/10_examples).
+-   :material-grid: **Run tile-by-tile**
 
-## Contents
+    ---
 
-```{tableofcontents}
-```
+    Process images in tiles and progressively assemble the results.
 
-## Installation
+    <video controls loop autoplay muted playsinline>
+      <source src="assets/videos/tiles.mp4" type="video/mp4">
+    </video>
 
-Install the `imaging-server-kit` package with `pip`:
+    [:octicons-arrow-right-24: Tiled inference](how-to/tiling.md)
 
-```
-pip install imaging-server-kit
-```
+-   :material-play-speed: **Stream results**
 
-or clone the project and install the development version:
+    ---
 
-```
-git clone https://github.com/Imaging-Server-Kit/imaging-server-kit.git
-cd imaging-server-kit
-pip install -e .
-```
+    Send results while the algorithm runs and inspect them in real time.
 
-To use the **Napari-related functionalities**, you additionally have to install [`napari`](https://github.com/napari/napari) and [`napari-toolkit`](https://github.com/MIC-DKFZ/napari_toolkit) which are not included by default. Install the package with:
+    <video controls loop autoplay muted playsinline>
+      <source src="assets/videos/yolo-stream.mp4" type="video/mp4">
+    </video>
 
-```sh
-pip install "imaging-server-kit[napari]"
-```
+    [:octicons-arrow-right-24: Live updates](how-to/live-updates.md)
 
-To use the **QuPath-related functionalities**, you additionally have to install [`qubalab>=0.2.0`](https://pypi.org/project/qubalab/#history), which is not included by default. Install the package with:
+</div>
 
-```sh
-pip install "imaging-server-kit[qupath]"
-```
+On top of that, you can provide [**samples**](tutorial/samples-and-metadata.md#samples) and automatically generate a [**documentation page**](tutorial/samples-and-metadata.md#metadata) for your algorithm.
+
+## Next steps
+
+- New to the package? [Install it](getting-started/installation.md) and [try the demos](getting-started/demos.md).
+- Follow the main tutorial, starting with [creating an algorithm](tutorial/create-algorithm.md).
+- Browse the how-to guides, for example [using algorithms in Napari](how-to/napari.md).
+- See the [Python API reference](reference/api/algorithms.md).
+
+!!! warning "Development status"
+    The Imaging Server Kit is being actively developed and is iterating rapidly. Expect **compatibility-breaking changes** in future versions.
 
 ## License
 
 This software is distributed under the terms of the [BSD-3](http://opensource.org/licenses/BSD-3-Clause) license.
 
-## Citing
-
-If you use `imaging-server-kit` in the context of scientific publication, you can cite it as below.
-
-BibTeX:
-
-```
-@software{mallory_wittwer_2025_15673152,
-  author       = {Mallory Wittwer and Edward Andò and Maud Barthélemy and Florian Aymanns},
-  title        = {Imaging-Server-Kit/imaging-server-kit: v0.0.14},
-  url          = {https://doi.org/10.5281/zenodo.15673152},
-  doi          = {10.5281/zenodo.15673152},
-  version      = {v0.0.14},
-  year         = 2025,
-}
-```
-
 ## Acknowledgements
 
-We thank the [Personalized Health and Related Technologies](https://www.sfa-phrt.ch/) for funding this project.
+We thank the [Personalized Health and Related Technologies](https://www.sfa-phrt.ch/) for initially funding this project.
