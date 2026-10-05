@@ -63,7 +63,7 @@ The algorithm works, but there is room for improvement. For example, nothing pre
 
 ## Annotating parameters
 
-Annotating parameters tells *Imaging Server Kit* how to interpret the function arguments. Each parameter is matched with a [data layer](../reference/layers.md), which is used to validate its value and to display it in user interfaces.
+Annotating parameters tells *Imaging Server Kit* how to interpret the function arguments. Each parameter is matched with a [data layer](../reference/api/layers.md), which is used to validate its value and to display it in user interfaces.
 
 Here is an improved version of the Gaussian filter, where `sigma` is annotated through `parameters={}` in the decorator, with a minimum and a default value:
 
@@ -85,7 +85,7 @@ In Napari, `sigma` can no longer be set to a negative value.
     - `step` (for UI sliders and spin boxes)
     - `name` (the label shown next to the parameter)
 
-    See [Data layers](../reference/layers.md) for the full list of layers.
+    See [Data layers](../reference/api/layers.md) for the full list of layers.
 
 `parameters={}` is the most explicit annotation method, but type hints, default values, and even variable names also work. All the following are valid:
 
@@ -106,7 +106,7 @@ def gaussian_algo(img: sk.Image, sigma: float):
     ...
 ```
 
-When several methods apply to the same parameter, explicit annotations take priority. See [Parameter resolution](../concepts/algorithms.md#parameter-resolution) for a full review of the rules.
+When several methods apply to the same parameter, explicit annotations take priority. See [Matching parameters with data layers](../concepts/algorithms.md#matching-parameters-with-data-layers) for a full review of the rules.
 
 ## Annotating return values
 

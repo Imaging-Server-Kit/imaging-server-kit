@@ -140,7 +140,7 @@ extra:
     sections/06_tiled.html: how-to/tiling.md
     sections/07_server.html: tutorial/serve.md
     sections/08_python.html: tutorial/python.md
-    sections/09_layers.html: reference/layers.md
+    sections/09_layers.html: reference/api/layers.md
     sections/10_examples.html: examples.md
     sections/11_qupath.html: how-to/qupath.md
 

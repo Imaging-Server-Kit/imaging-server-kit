@@ -78,4 +78,4 @@ Here, the algorithm notifies the user that processing has started, then yields a
 - `sk.Notification` is used to show a message to the user. In Napari, it appears as a notification. You can set its level with `level="info"` (default), `"warning"`, or `"error"`.
 - `sk.Progress` updates a progress bar, up to `max_val`.
 
-See [Data layers](../reference/layers.md) for the other layer types.
+See [Data layers](../reference/api/layers.md) for the other layer types.

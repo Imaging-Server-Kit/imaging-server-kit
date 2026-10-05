@@ -77,7 +77,7 @@ def merge_layers(layers: List[Layer]) -> Layer:
     """Merge a list of data layers of the same kind into a new layer.
 
     The layers are merged as successive tiles, following the merging strategy of the
-    layer type (see the "Tile merging" section of the documentation). The input layers
+    layer type (see the "Merging tiles" section of the documentation). The input layers
     are not modified.
 
     Parameters

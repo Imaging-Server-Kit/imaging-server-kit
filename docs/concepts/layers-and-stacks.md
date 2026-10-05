@@ -2,7 +2,7 @@
 
 ## Data layers
 
-A **data layer** holds a single piece of data, such as an image, a segmentation mask, a set of points, or a numeric value, together with information about what that data means. All data layers derive from `sk.Layer`, and the available types are listed in [Data layers](../reference/layers.md).
+A **data layer** holds a single piece of data, such as an image, a segmentation mask, a set of points, or a numeric value, together with information about what that data means. All data layers derive from `sk.Layer`, and the available types are listed in [Data layers](../reference/api/layers.md).
 
 Data layers play two roles:
 

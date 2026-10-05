@@ -80,4 +80,4 @@ def label_objects(image, threshold=128):
     return sk.Mask(labels, merger="instances")
 ```
 
-See [Tile merging](../concepts/coordinates.md#tile-merging) for how each layer type is assembled from tiles.
+See [Merging tiles](../concepts/coordinates.md#merging-tiles) for how each layer type is assembled from tiles.

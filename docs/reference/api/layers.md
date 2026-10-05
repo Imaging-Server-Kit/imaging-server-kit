@@ -1,6 +1,6 @@
 # Data layers
 
-See [Data layers](../layers.md) for an overview of the available layers.
+See [Data layers](../../concepts/layers-and-stacks.md) for an introduction to data layers.
 
 ::: imaging_server_kit.Layer
     options:
