@@ -4,12 +4,19 @@ from imaging_server_kit.types.layer import Layer
 
 
 class String(Layer):
-    """Data layer used to represent strings of text.
+    """Data layer for strings of text.
 
     Parameters
     ----------
-    data: A string value.
-    default: Default value used when `data` is not provided.
+    data : str, optional
+        The text.
+    name : str, default="String"
+        Name of the layer.
+    default : str, default=""
+        Default value, used when `data` is not provided.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "str"

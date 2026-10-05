@@ -10,19 +10,29 @@ from imaging_server_kit.core._fmt import truncate
 
 
 class Choice(Layer):
-    """Data layer used to represent a choice of `items`. Can be used to represent labels for classification.
+    """Data layer for a choice among `items`, shown as a dropdown in user interfaces.
 
-    The available choices are rendered as a dropdown selector in user interfaces.
+    Can be used to represent labels for classification.
 
     Parameters
     ----------
-    data: The selected choice.
-    items: List of available choices.
-    default: Default value used when `data` is not provided.
+    data : str, optional
+        The selected item.
+    name : str, default="Choice"
+        Name of the layer.
+    items : list of str, optional
+        The available items.
+    default : str, default=""
+        Default item, used when `data` is not provided.
+    auto_call : bool, default=False
+        Re-run the algorithm when the selection changes in user interfaces.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
 
     Examples
     --------
-    >>> choice = sk.Choice(items=["reflect", "constant"], default="reflect")
+    >>> mode = sk.Choice(items=["reflect", "constant"], default="reflect")
     """
 
     kind = "choice"

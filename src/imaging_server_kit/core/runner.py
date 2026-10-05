@@ -42,56 +42,122 @@ def validate_algorithm(func: Callable) -> Callable:
 
 
 class AlgorithmRunner(ABC):
-    """Abstract base class shared by `sk.Algorithm`, `sk.MultiAlgorithm`, and `sk.Client` — the common interface that lets the same code run an algorithm locally, remotely, or as part of a collection.
+    """Interface shared by `sk.Algorithm`, `sk.MultiAlgorithm`, and `sk.Client`.
 
-    Subclasses provide `_stream()` (how to execute or request one parameter tile) and
-    inherit `run()`, which handles parameter resolution, tiling, domain restriction, and
-    result merging identically across all three.
+    The same code can run an algorithm locally, as part of a collection, or remotely
+    on an algorithm server. Subclasses provide `_stream()` (how to execute, or request,
+    the computation for one tile of parameters) and inherit `run()`, which handles
+    parameter resolution, tiling, domain restriction, and result merging identically
+    across all three.
+
+    In collections and clients, methods take an `algorithm` argument to select an
+    algorithm by name. When it is omitted, the first available algorithm is used.
 
     Attributes
     ----------
-    name: A name identifying the runner.
-    algorithms: A list of available algorithm names.
-
-    Methods
-    ----------
-    run(): Execute an algorithm with a set of parameters.
-        Set `tiled=True` for tiled inference.
-        Raises a ValidationError when parameters are invalidated.
-    run_generator(): Lower-level generator variant of run(), yielding one (result_tile, params_tile) pair per tile.
-    get_n_samples(): Get the number of samples available.
-    get_sample(): Get a sample by index.
-    info(): Access algorithm documentation.
-    get_parameters(): Get the algorithm parameters schema.
-    is_tileable(): Whether the algorithm can be run tile-by-tile.
-    get_signature_params(): List parameter names of the algorithm's run function.
+    name : str
+        A name identifying the runner.
+    algorithms : list of str
+        The names of the available algorithms.
     """
 
     @property  # type: ignore
     @abstractmethod
-    def name() -> str: ...
+    def name() -> str:
+        """A name identifying the runner."""
 
     @property  # type: ignore
     @abstractmethod
-    def algorithms() -> Union[List[str], Tuple[str, ...]]: ...
+    def algorithms() -> Union[List[str], Tuple[str, ...]]:
+        """The names of the available algorithms."""
 
     @abstractmethod
-    def info(self, algorithm: Optional[str]) -> None: ...
+    def info(self, algorithm: Optional[str]) -> None:
+        """Open the documentation page of an algorithm in a web browser.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+        """
 
     @abstractmethod
-    def get_parameters(self, algorithm: Optional[str]) -> Dict: ...
+    def get_parameters(self, algorithm: Optional[str]) -> Dict:
+        """Get the JSON schema of the parameters of an algorithm.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+
+        Returns
+        -------
+        dict
+            The JSON schema of the algorithm parameters.
+        """
 
     @abstractmethod
-    def get_sample(self, algorithm: Optional[str], idx: int = 0) -> Stack: ...
+    def get_sample(self, algorithm: Optional[str], idx: int = 0) -> Stack:
+        """Get a sample of an algorithm.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+        idx : int, default=0
+            Index of the sample.
+
+        Returns
+        -------
+        Stack
+            The sample, as a stack of parameter layers, or `None` if the algorithm
+            has no samples.
+        """
 
     @abstractmethod
-    def get_n_samples(self, algorithm: Optional[str]) -> int: ...
+    def get_n_samples(self, algorithm: Optional[str]) -> int:
+        """Get the number of samples of an algorithm.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+
+        Returns
+        -------
+        int
+            The number of samples.
+        """
 
     @abstractmethod
-    def is_tileable(self, algorithm: Optional[str]) -> bool: ...
+    def is_tileable(self, algorithm: Optional[str]) -> bool:
+        """Whether an algorithm can be run tile-by-tile.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+
+        Returns
+        -------
+        bool
+            `True` if the algorithm was defined with `tileable=True`.
+        """
 
     @abstractmethod
-    def get_signature_params(self, algorithm: Optional[str]) -> List[str]: ...
+    def get_signature_params(self, algorithm: Optional[str]) -> List[str]:
+        """Get the parameter names of the function of an algorithm, in order.
+
+        Parameters
+        ----------
+        algorithm : str, optional
+            Name of the algorithm (only needed with collections and clients).
+
+        Returns
+        -------
+        list of str
+            The parameter names.
+        """
 
     @abstractmethod
     def _stream(
@@ -104,6 +170,22 @@ class AlgorithmRunner(ABC):
         params_stack: Stack,
         tiling_ctx: Optional[TilingSpecs] = None,
     ):
+        """Lower-level generator variant of `run()`.
+
+        Parameters
+        ----------
+        algorithm : str
+            Name of the algorithm to run.
+        params_stack : Stack
+            The algorithm parameters, as a stack of layers.
+        tiling_ctx : TilingSpecs, optional
+            Tiling specifications. If `None`, the parameters are processed as a single tile.
+
+        Yields
+        ------
+        tuple of (Stack, Stack)
+            One `(result_tile, params_tile)` pair per tile and per yielded result.
+        """
         tile_progress_needed = tiling_ctx is not None
 
         if tiling_ctx is None:
@@ -145,20 +227,49 @@ class AlgorithmRunner(ABC):
         domain: Optional[Domain] = None,
         **algo_params,
     ) -> Union[Stack, "napari.Viewer"]:  # type: ignore
-        """
-        Execute an algorithm with a set of parameters.
+        """Run an algorithm with a set of parameters.
 
         Parameters
         ----------
-        *args, **algo_params: The algorithm parameters matching its function signature (e.g. `algo.run(image, threshold=100)`).
-        algorithm: The algorithm to run (only used with algorithm collections).
-        tiled: Set to True for tiled inference.
-        tile_size: Tile size in pixels.
-        tile_overlap: Relative overlap between tiles.
-        tile_delay: Extra delay time in seconds between tiles.
-        tile_randomize: Process tiles in a random order.
-        stack: An optional layer stack object to collect results into.
-        domain: An optional domain in which to restrict the computation.
+        *args
+            Algorithm parameters, passed by position, matching the signature of the
+            algorithm's function (e.g. `algo.run(image, threshold=100)`).
+        algorithm : str, optional
+            Name of the algorithm to run (only needed with collections and clients).
+        tiled : bool, default=False
+            Run the algorithm tile-by-tile. Requires an algorithm defined with
+            `tileable=True`.
+        tile_size : int or tuple of int, default=64
+            Tile size in pixels: a single value, or one value per axis.
+        tile_overlap : float, default=0.0
+            Overlap between neighbouring tiles, relative to the tile size.
+        tile_delay : float, default=0.0
+            Extra delay between tiles, in seconds.
+        tile_randomize : bool, default=False
+            Process the tiles in a random order.
+        stack : Stack or napari.Viewer, optional
+            A stack, or a Napari viewer, to collect the results into. By default, a
+            new stack is created.
+        domain : Domain, optional
+            A region to which the computation is restricted.
+        **algo_params
+            Algorithm parameters, passed by name.
+
+        Returns
+        -------
+        Stack or napari.Viewer
+            The results, as a stack of layers. If a Napari viewer was passed as
+            `stack`, the viewer is returned.
+
+        Raises
+        ------
+        pydantic.ValidationError
+            If parameter values are invalid.
+        TypeError
+            If unknown parameters are passed.
+        AlgorithmRuntimeError
+            If `tiled=True` is used with an algorithm that is not tileable, or if the
+            algorithm raises an error.
         """
         algorithm = _check_algorithm_available(algorithm, self.algorithms)
 

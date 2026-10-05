@@ -9,12 +9,25 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Boxes(Layer):
-    """Data layer used to represent rectangular bounding boxes (2D, 3D).
+    """Data layer for bounding boxes (2D, 3D).
+
+    Boxes can be oriented (OBB).
 
     Parameters
     ----------
-    data: A Numpy array of shape (N, 4, D) containing the coordinates of the four corners of the box.
-    dimensionality: list of accepted dimensionalities, for example [2, 3].
+    data : numpy.ndarray, optional
+        The coordinates of the four corners of each box, as an array of shape
+        `(N, 4, D)`, where `D` is the number of dimensions.
+    name : str, default="Boxes"
+        Name of the layer.
+    description : str, default="Bounding boxes"
+        Description of the layer, displayed on the algorithm documentation page.
+    dimensionality : list of int, optional
+        Accepted numbers of dimensions, for example `[2, 3]`. By default, any number
+        of dimensions is accepted.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "boxes"
@@ -68,7 +81,18 @@ class Boxes(Layer):
         return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Boxes:
-        """Select data in a given domain."""
+        """Select the part of the layer inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Boxes
+            A new layer with the selected data, positioned in global coordinates.
+        """
         if domain.size is None:
             # Undefined domain: nothing to select, the data is kept as-is
             return Boxes(

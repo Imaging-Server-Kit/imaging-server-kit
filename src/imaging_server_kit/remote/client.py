@@ -39,30 +39,32 @@ class ServerRequestError(Exception):
 
 
 class Client(AlgorithmRunner):
-    """Client to connect to and interact with algorithm servers.
+    """Client to connect to algorithm servers.
 
-    A `Client` exposes the same interface as `sk.Algorithm` so the same code can run an algorithm locally or remotely.
+    A client implements the shared
+    [`AlgorithmRunner`][imaging_server_kit.AlgorithmRunner] interface, so the same
+    code can run an algorithm locally or on a server. Computations requested with
+    `run()` are executed on the server.
 
     Parameters
     ----------
-    server_url: Address of the algorithm server. If provided, `connect()` is called immediately.
-    name: A name identifying the client.
+    server_url : str, optional
+        Address of the algorithm server, e.g. `"http://localhost:8000"`. If provided,
+        the client connects to the server immediately.
+    name : str, default="client"
+        A name identifying the client.
 
     Attributes
     ----------
-    server_url: Address of the algorithm server.
-    algorithms: A list of available algorithms.
+    server_url : str
+        Address of the algorithm server.
+    algorithms : list of str
+        The names of the algorithms available on the server.
 
-    Methods
-    ----------
-    connect(): Connect to an algorithm server.
-    run(): Execute the algorithm with a set of parameters.
-        Set `tiled=True` for tiled inference.
-        Raises a ValidationError when parameters are invalidated.
-    get_n_samples(): Get the number of samples available.
-    get_sample(): Get a sample by index.
-    info(): Access algorithm documentation.
-    get_parameters(): Get the algorithm parameters schema.
+    Examples
+    --------
+    >>> client = sk.Client("http://localhost:8000")
+    >>> results = client.run(image, threshold=100)
     """
 
     def __init__(self, server_url: Optional[str] = None, name: str = "client") -> None:
@@ -93,6 +95,13 @@ class Client(AlgorithmRunner):
         self._server_url = server_url
 
     def connect(self, server_url: str) -> None:
+        """Connect to an algorithm server and list its algorithms.
+
+        Parameters
+        ----------
+        server_url : str
+            Address of the algorithm server, e.g. `"http://localhost:8000"`.
+        """
         self.server_url = server_url.rstrip("/")
         endpoint = urljoin(self.server_url + "/", "algorithms")
         json_response = self._access_algo_get_endpoint(endpoint)

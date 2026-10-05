@@ -184,16 +184,34 @@ def features2instance_mask(
 
 
 class Mask(Layer):
-    """Data layer used to represent segmentation masks: label images where integer values encode either object classes or object instances.
+    """Data layer for segmentation masks.
+
+    Masks are label images, where integer values encode either object classes (e.g.
+    for pixel classification) or object instances.
 
     Parameters
     ----------
-    data: Numpy arrays, integer type. Integers can represent object classes (e.g. pixel classification) or object instances.
-    dimensionality: list of accepted dimensionalities, for example [2, 3].
-    channel_axis: Optional index of the channel axis.
-      - The channel axis does not affect the `bounds`, `ndim`, and `domain` attributes.
-      - The channel axis is set to `2` if rgb is True and there is no time axis.
-      - tile_size along the channel axis defaults to the length of this axis.
+    data : numpy.ndarray, optional
+        The label image. Boolean arrays are accepted for binary masks.
+    name : str, default="Mask"
+        Name of the layer.
+    description : str, default="Segmentation mask"
+        Description of the layer, displayed on the algorithm documentation page.
+    dimensionality : list of int, optional
+        Accepted numbers of dimensions, for example `[2, 3]`. By default, any number
+        of dimensions is accepted.
+    channel_axis : int, optional
+        Index of the channel axis, if any. The channel axis is not counted as a
+        spatial dimension, and it is never split into tiles.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties. Use `merger="instances"` for
+        instance segmentation masks, so that labels stay unique when the mask is
+        assembled from tiles.
+
+    Examples
+    --------
+    >>> mask = sk.Mask(labels, name="Nuclei", merger="instances")
     """
 
     kind = "mask"
@@ -263,7 +281,18 @@ class Mask(Layer):
         return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Mask:
-        """Select data in a given domain."""
+        """Select the part of the layer inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Mask
+            A new layer with the selected data, positioned in global coordinates.
+        """
         _meta = copy_meta(self)
 
         if (self.data is None) or (domain.size is None):

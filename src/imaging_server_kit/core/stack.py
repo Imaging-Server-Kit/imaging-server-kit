@@ -16,28 +16,38 @@ from imaging_server_kit.core.tiling import (
 class Stack:
     """An ordered collection of data layers.
 
-    Access layers by index: `layer = stack[0]` or name: `layer = stack.read("Layer Name")`.
+    Access layers by index (`stack[0]`) or by name (`stack.read("Layer name")`).
+    Further indices are spatial, as with NumPy arrays: `stack[:, 50:150]` selects rows
+    50 to 150 of all layers.
+
+    Parameters
+    ----------
+    layers : list of Layer, optional
+        Initial layers of the stack.
+    tile_meta : TileMeta, optional
+        Metadata about the stack's position and role in a set of tiles.
+    position : tuple, optional
+        Position of the stack in global pixel coordinates.
 
     Attributes
     ----------
-    layers: Layers in the stack.
-    ndim: Dimensionality of the stack, inferred from the domain.
-    position: Position of the stack in global pixel space.
-    extent: Extent of the stack expressed as a Domain object.
-    size: Size of the extent of the stack.
-    coords_min: Minimum (World) coordinates of the stack.
-    coords_max: Maximum (World) coordinates of the stack.
-    tile_meta: Metadata about the stack's position and role in a tile set.
-
-    Methods
-    ----------
-    select(): Select a subset of the stack at a given spatial domain.
-    add(): Add a layer to the stack.
-    read(): Read a layer by name.
-    delete(): Delete a layer by name.
-    merge(): Merge another stack. 
-        Incoming layers with the same kind and name as existing layers will update the later.
-        Other layers will be added to the stack.
+    layers : list of Layer
+        The layers in the stack.
+    position : tuple
+        Position of the stack in global pixel coordinates. Setting it offsets the
+        positions of all layers.
+    extent : Domain
+        Smallest region containing all layers, in global pixel coordinates.
+    size : tuple
+        Size of the extent.
+    coords_min : tuple
+        Lower corner of the extent.
+    coords_max : tuple
+        Upper corner of the extent.
+    ndim : int
+        Number of spatial dimensions of the extent.
+    tile_meta : TileMeta
+        Metadata about the stack's position and role in a set of tiles.
     """
 
     def __init__(
@@ -177,11 +187,18 @@ class Stack:
                     l.position = tuple([p + q for p, q in zip(l.position, value)])
 
     def add(self, layer: Layer) -> Layer:
-        """Add a new layer to the layer stack.
+        """Add a layer to the stack.
 
         Parameters
         ----------
-        layer: Layer to add to the stack. If a layer with that name already exists, its name will be changed with a suffix (e.g. Image-01).
+        layer : Layer
+            The layer to add. If a layer with the same name already exists, a suffix
+            is appended to the name of the new layer (e.g. `Image-01`).
+
+        Returns
+        -------
+        Layer
+            The added layer.
         """
         new_name = self._resolve_layer_name(layer.kind, layer.name)
         if new_name != layer.name:
@@ -201,20 +218,19 @@ class Stack:
         stack: Optional[Stack],
         reinitialize_domain: Optional[Domain] = None,
     ) -> None:
-        """Merge another layer stack.
+        """Merge another stack into this one, in place.
 
-        Notes
-        ----------
-        - Layers with the same name are merged, while layers with a different name are added.
-        - Ends by triggering a `post_merge` event (empty by default).
+        Incoming layers with the same name as an existing layer are merged into that
+        layer, following the merging strategy of the layer type. Other incoming layers
+        are added to the stack.
 
         Parameters
         ----------
-        stack: Layer stack to be merged.
-            Layers from this stack of the same kind, with the same name as instance layers (self.layers)
-            will update corresponding meta and data attributes.
-            Other layers from layer_stack will be added via the create() method.
-        reinitialize_domain: Optional domain to reinitialize before merging the incoming stack.
+        stack : Stack, optional
+            The stack to merge. If `None`, nothing happens.
+        reinitialize_domain : Domain, optional
+            A region of the existing layers to reinitialize before merging the first
+            tile of the incoming stack.
         """
         if stack is None:
             return
@@ -252,7 +268,13 @@ class Stack:
             layer._display()
 
     def delete(self, name: str) -> None:
-        """Delete a layer by name."""
+        """Delete a layer by name.
+
+        Parameters
+        ----------
+        name : str
+            Name of the layer to delete.
+        """
         for idx, layer in enumerate(self.layers):
             if layer.name == name:
                 self._layers.pop(idx)
@@ -264,13 +286,35 @@ class Stack:
         pass
 
     def read(self, name: str) -> Optional[Layer]:
-        """Read a layer by name."""
+        """Get a layer by name.
+
+        Parameters
+        ----------
+        name : str
+            Name of the layer.
+
+        Returns
+        -------
+        Layer or None
+            The layer, or `None` if there is no layer with that name.
+        """
         for layer in self.layers:
             if layer.name == name:
                 return layer
 
     def select(self, domain: Domain) -> Stack:
-        """Selet a sub-stack in the given domain."""
+        """Select the part of the stack inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Stack
+            A new stack with the selected part of each layer.
+        """
         return Stack(layers=[l.select(domain=domain._copy()) for l in self.layers])
 
     def _resolve_layer_name(self, kind: str, name: Optional[str] = None) -> str:

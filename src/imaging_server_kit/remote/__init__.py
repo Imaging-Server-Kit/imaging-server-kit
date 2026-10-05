@@ -10,14 +10,24 @@ from .client import Client
 def serve(
     algorithm: Union[Algorithm, MultiAlgorithm, Callable], *args, **kwargs
 ) -> None:
-    """
-    Serve an algorithm, algorithm collection, or plain Python function as an HTTP server.
+    """Serve an algorithm, algorithm collection, or plain Python function over HTTP.
+
+    Starts a FastAPI server (with uvicorn) and blocks until it is stopped. Run it from
+    a Python script, not from a Jupyter notebook.
 
     Parameters
     ----------
-    algorithm : The algorithm object to serve.
-    host : The IP of the host (default: "0.0.0.0")
-    port : The network port (default: 8000)
+    algorithm : Algorithm, MultiAlgorithm, or callable
+        The algorithm or collection to serve. A plain Python function is converted to
+        an algorithm.
+    *args, **kwargs
+        Passed to the server: `host` (default `"0.0.0.0"`, all network interfaces)
+        and `port` (default `8000`).
+
+    Examples
+    --------
+    >>> if __name__ == "__main__":
+    ...     sk.serve(threshold_algo, port=8000)
     """
     from imaging_server_kit.remote.app import AlgorithmApp
 

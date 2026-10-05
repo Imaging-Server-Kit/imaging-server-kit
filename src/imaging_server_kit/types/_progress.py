@@ -7,12 +7,20 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Progress(Layer):
-    """Data layer used to render a progress bar in user interfaces.
+    """Data layer for progress bars.
+
+    Progress is shown in the terminal, or as a progress bar in user interfaces.
 
     Parameters
     ----------
-    data: Number of completed steps.
-    max_val: Total number of steps.
+    data : int, optional
+        Number of completed steps.
+    max_val : int, default=1
+        Total number of steps.
+    name : str, default="Progress"
+        Name of the layer.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer].
 
     Examples
     --------

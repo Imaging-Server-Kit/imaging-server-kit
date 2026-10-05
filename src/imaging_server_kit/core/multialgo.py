@@ -7,22 +7,27 @@ from imaging_server_kit.core.algorithm import Algorithm
 
 
 class MultiAlgorithm(AlgorithmRunner):
-    """A collection of algorithms exposed under a single interface, with the target algorithm selected by name at call time. Usually created via the `sk.combine()` function rather than instantiated directly.
+    """A collection of algorithms exposed under a single interface.
+
+    Collections are usually created with `sk.combine()` rather than instantiated
+    directly. They implement the shared
+    [`AlgorithmRunner`][imaging_server_kit.AlgorithmRunner] interface, where methods
+    take an `algorithm` argument to select an algorithm by name.
 
     Parameters
     ----------
-    algorithms: A list of algorithm instances in the collection.
-    name: A name for the algorithm collection.
+    algorithms : list of Algorithm
+        The algorithms in the collection. If several algorithms have the same name,
+        only the last one is kept.
+    name : str, default="algorithms"
+        A name for the collection.
 
     Attributes
     ----------
-    algorithms_dict: A dictionary mapping algorithm names to instances in the collection.
-    algorithms: A list of algorithm names in the collection.
-
-    Methods
-    ----------
-    This class implements the same methods as the Algorithm class (via AlgorithmRunner),
-    but methods take an extra argument `algorithm` to identify the algorithm to use.
+    algorithms_dict : dict
+        A dictionary mapping algorithm names to algorithms.
+    algorithms : list of str
+        The names of the algorithms in the collection.
     """
 
     def __init__(self, algorithms: List[Algorithm], name: str = "algorithms"):
@@ -86,17 +91,23 @@ class MultiAlgorithm(AlgorithmRunner):
 
 
 def combine(algorithms: List[Algorithm], name: str = "algorithms") -> MultiAlgorithm:
-    """
-    Combine multiple algorithms, or plain Python functions, into a single algorithm collection.
+    """Combine algorithms, or plain Python functions, into a collection.
 
     Parameters
     ----------
-    algorithms : A list of algorithm objects, or python functions. Python functions are converted to algorithms directly.
-    name : The name of the algorithm collection.
+    algorithms : list of Algorithm or callable
+        The algorithms to combine. Plain Python functions are converted to algorithms.
+    name : str, default="algorithms"
+        A name for the collection.
 
     Returns
     -------
-    An algorithm collection (sk.MultiAlgorithm).
+    MultiAlgorithm
+        The algorithm collection.
+
+    Examples
+    --------
+    >>> multi_algo = sk.combine([threshold_algo, gaussian_algo], name="my-algorithms")
     """
     parsed_algorithms = []
     for algorithm in algorithms:

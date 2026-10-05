@@ -4,12 +4,21 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Notification(Layer):
-    """Data layer used to represent a text notification.
+    """Data layer for text notifications.
+
+    Notifications are printed to the terminal, or shown in user interfaces (as Napari
+    notifications, for example).
 
     Parameters
     ----------
-    data: The notification text.
-    level: Notification level (`info`, `warning`, or `error`).
+    data : str, optional
+        The notification text.
+    level : str, default="info"
+        Notification level: `"info"`, `"warning"`, or `"error"`.
+    name : str, default="Notification"
+        Name of the layer.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer].
 
     Examples
     --------

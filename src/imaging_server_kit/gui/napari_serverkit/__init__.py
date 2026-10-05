@@ -12,16 +12,23 @@ def napari_available() -> bool:
 def to_qwidget(
     runner: Union[AlgorithmRunner, Callable], viewer: "napari.Viewer"
 ) -> "QWidget":
-    """Convert an algorithm, algorithm collection, or remote client to a QWidget. Used when packaging a Napari plugin.
+    """Create the Napari widget of an algorithm, collection, or client, without adding it to a viewer.
+
+    Useful to ship an algorithm as a Napari plugin of its own. Requires the `napari`
+    extra.
 
     Parameters
     ----------
-    runner: A server kit algorithm, multi-algorithm, or client object. A plain Python function is also accepted and converted to an algorithm.
-    viewer: The Napari viewer the widget will interact with.
+    runner : AlgorithmRunner or callable
+        An algorithm, an algorithm collection, or a client. A plain Python function is
+        converted to an algorithm.
+    viewer : napari.Viewer
+        The Napari viewer the widget interacts with.
 
     Returns
     -------
-    A QWidget exposing the runner's parameters and results.
+    QWidget
+        The widget, exposing the parameters and results of the runner.
     """
     if not napari_available():
         raise ImportError(
@@ -43,17 +50,26 @@ def to_napari(
     runner: Union[AlgorithmRunner, Callable],
     viewer: Optional["napari.Viewer"] = None,
 ) -> "napari.Viewer":
-    """
-    Convert an algorithm, algorithm collection, or remote client into a dock widget and add it to a Napari viewer.
+    """Add the dock widget of an algorithm, collection, or client to a Napari viewer.
+
+    Requires the `napari` extra.
 
     Parameters
     ----------
-    runner : A server kit algorithm, multi-algorithm, or client object to add to Napari as a dock widget. A plain Python function is also accepted and converted to an algorithm.
-    viewer : An existing Napari viewer to add the dock widget to. If none is passed, a new Napari viewer is created.
+    runner : AlgorithmRunner or callable
+        An algorithm, an algorithm collection, or a client. A plain Python function is
+        converted to an algorithm.
+    viewer : napari.Viewer, optional
+        The viewer to add the widget to. By default, a new viewer is created.
 
     Returns
     -------
-    The Napari viewer with the dock widget added.
+    napari.Viewer
+        The viewer with the dock widget.
+
+    Examples
+    --------
+    >>> viewer = sk.to_napari(threshold_algo)
     """
     if not napari_available():
         raise ImportError(

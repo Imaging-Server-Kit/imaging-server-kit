@@ -1,9 +1,14 @@
+from __future__ import annotations
 import sys
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, TYPE_CHECKING
 import importlib.util
 
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import Algorithm
+
+if TYPE_CHECKING:
+    from qtpy.QtWidgets import QWidget
+    from napari import Viewer
 
 
 def qubalab_available() -> bool:
@@ -15,8 +20,26 @@ def to_qwidget(
     port: int = 25333,
     token: str = "",
     viewer=None,
-) -> "QWidget":
-    """Convert an algorithm to a QWidget (QuPath version)."""
+) -> QWidget:
+    """Create the QuPath panel of an algorithm, collection, or client, as a QWidget.
+
+    Parameters
+    ----------
+    runner : AlgorithmRunner or callable
+        An algorithm, an algorithm collection, or a client. A plain Python function is
+        converted to an algorithm.
+    port : int, default=25333
+        Port of the Py4J gateway started from QuPath.
+    token : str, default=""
+        Token of the Py4J gateway started from QuPath.
+    viewer : napari.Viewer, optional
+        A Napari viewer to collect results that cannot be displayed in QuPath.
+
+    Returns
+    -------
+    QWidget
+        The QuPath panel.
+    """
     if not qubalab_available():
         raise ImportError(
                 """
@@ -37,20 +60,33 @@ def to_qupath(
     runner: Union[AlgorithmRunner, Callable],
     port: int = 25333,
     token: str = "",
-    viewer: Optional["napari.Viewer"] = None,
-) -> None:
-    """
-    Convert an algorithm, algorithm collection, or remote client into a QuPath-side user interface, via QuBaLab. Experimental.
+    viewer: Optional[Viewer] = None,
+) -> Optional[Viewer]:
+    """Open a panel to run an algorithm, collection, or client on QuPath images. Experimental.
 
-    Computations can be restricted to a selected QuPath annotation (e.g., a rectangular region).
-    Only algorithms that take a single image as input are compatible; that image is interpreted as the current QuPath image.
+    The panel connects to QuPath through QuBaLab and a Py4J gateway started from
+    QuPath. Computations run inside a selected QuPath annotation (e.g. a rectangular
+    region). Only algorithms that take a single image as input are compatible; that
+    image is interpreted as the current QuPath image. Requires the `qupath` extra.
 
     Parameters
     ----------
-    runner: A server kit algorithm, multi-algorithm, or client object.
-    port: Port from the Py4J extension.
-    token: Token from the Py4J extension.
-    viewer: An optional Napari Viewer to use to collect results from the compuatations that cannot be displayed in QuPath.
+    runner : AlgorithmRunner or callable
+        An algorithm, an algorithm collection, or a client. A plain Python function is
+        converted to an algorithm.
+    port : int, default=25333
+        Port of the Py4J gateway started from QuPath.
+    token : str, default=""
+        Token of the Py4J gateway started from QuPath.
+    viewer : napari.Viewer, optional
+        A Napari viewer to collect results that cannot be displayed in QuPath. If
+        given, the panel is added to the viewer as a dock widget, and the viewer is
+        returned. Otherwise, the panel opens in its own window.
+
+    Returns
+    -------
+    napari.Viewer or None
+        The viewer, if one was given.
     """
     if not qubalab_available():
         raise ImportError(

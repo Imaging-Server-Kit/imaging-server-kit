@@ -6,11 +6,22 @@ from imaging_server_kit.core.tiling import Domain
 
 
 class Tracks(Layer):
-    """Data layer used to represent object tracks: point detections linked over time by a shared track ID.
+    """Data layer for object tracks: point detections linked over time by a track ID.
 
     Parameters
     ----------
-    data: A Numpy array of shape (N, D+1) where the dimensions (D) are [ID, T, (Z), Y, X].
+    data : numpy.ndarray, optional
+        An array of shape `(N, D+1)`, with columns `[ID, T, (Z), Y, X]`.
+    name : str, default="Tracks"
+        Name of the layer.
+    description : str, default="Input tracks (2D, 3D)"
+        Description of the layer, displayed on the algorithm documentation page.
+    dimensionality : list of int, optional
+        Accepted numbers of dimensions, for example `[2, 3]`. By default, any number
+        of dimensions is accepted.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "tracks"

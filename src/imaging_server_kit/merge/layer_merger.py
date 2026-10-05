@@ -34,14 +34,10 @@ def find_layer_merger(layer: Layer) -> Merger:
 
 
 class LayerMerger:
-    """Dispatches layer merging to the appropriate `Merger` strategy based on layer kind and `meta["merger"]`.
+    """Dispatches layer merging to the strategy matching the layer kind and `meta["merger"]`.
 
-    Used internally by `Stack.merge()` to merge one tile's result layers into an
-    accumulating stack; also used by `merge_layers()` to merge a list of layers directly.
-
-    Methods
-    ----------
-    merge(): Merge an incoming layer into a receiving layer, in place.
+    Used internally by `Stack.merge()` to merge the result layers of one tile into an
+    accumulating stack, and by `merge_layers()` to merge a list of layers.
     """
 
     @staticmethod
@@ -52,10 +48,13 @@ class LayerMerger:
 
         Parameters
         ----------
-        receiving_layer: The layer to merge into. Modified in place.
-        incoming_layer: The layer being merged in.
-        merge_data: Whether to merge the layers' data. If False, only the first/last-tile
-            merger lifecycle hooks (`on_first_merge`/`on_last_merge`) are run.
+        receiving_layer : Layer
+            The layer to merge into. Modified in place.
+        incoming_layer : Layer
+            The layer being merged in.
+        merge_data : bool, default=True
+            Whether to merge the data of the layers. If `False`, only the first- and
+            last-tile hooks of the merger (`on_first_merge`, `on_last_merge`) are run.
         """
         if incoming_layer.tile_meta.is_first_tile:
             merger = find_layer_merger(receiving_layer)
@@ -77,16 +76,25 @@ class LayerMerger:
 def merge_layers(layers: List[Layer]) -> Layer:
     """Merge a list of data layers of the same kind into a new layer.
 
-    Note: unlike `LayerMerger.merge()`, which merges in place into an existing layer,
-    this creates a new layer and merges the data from all `layers` into it.
+    The layers are merged as successive tiles, following the merging strategy of the
+    layer type (see the "Tile merging" section of the documentation). The input layers
+    are not modified.
 
     Parameters
     ----------
-    layers: Layers to merge. Must all be of the same kind.
+    layers : list of Layer
+        The layers to merge. They must all be of the same kind.
 
     Returns
     -------
-    A new layer containing the merged data.
+    Layer
+        A new layer containing the merged data. If a single layer is given, it is
+        returned as is.
+
+    Raises
+    ------
+    ValueError
+        If `layers` is empty, or if the layers are not all of the same kind.
     """
     if len(layers) == 0:
         raise ValueError("There should be at least one layer to merge.")

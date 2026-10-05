@@ -9,12 +9,23 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Points(Layer):
-    """Data layer used to represent a set of coordinate points (2D, 3D).
+    """Data layer for sets of points (2D, 3D).
 
     Parameters
     ----------
-    data: A Numpy array of shape (N, D) representing point coordinates, where D is the dimensionality (2, 3..).
-    dimensionality: list of accepted dimensionalities, for example [2, 3].
+    data : numpy.ndarray, optional
+        Point coordinates, as an array of shape `(N, D)`, where `D` is the number of
+        dimensions.
+    name : str, default="Points"
+        Name of the layer.
+    description : str, default="Input points (2D, 3D)"
+        Description of the layer, displayed on the algorithm documentation page.
+    dimensionality : list of int, optional
+        Accepted numbers of dimensions, for example `[2, 3]`. By default, any number
+        of dimensions is accepted.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "points"
@@ -69,7 +80,18 @@ class Points(Layer):
         return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Points:
-        """Select data in a given domain."""
+        """Select the part of the layer inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Points
+            A new layer with the selected data, positioned in global coordinates.
+        """
         if domain.size is None:
             # Undefined domain: nothing to select, the data is kept as-is
             return Points(

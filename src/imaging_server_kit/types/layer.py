@@ -39,41 +39,61 @@ def _build_meta(
 
 
 class Layer:
-    """Base class for a single piece of data — an image, a mask, a numeric parameter, etc.
-    
-    Used to represent both an algorithm's inputs and its outputs.
+    """Base class of data layers.
+
+    A data layer holds a single piece of data (an image, a mask, a numeric value,
+    etc.) together with metadata. Layers represent both the inputs and the outputs of
+    algorithms.
 
     Parameters
     ----------
-    name: Name of the layer.
-    data: Data held by the layer (type depends on the sublass).
-    meta: Metadata dictionary. If not provided, it is built from extra keyword arguments (e.g., `description`, `merger`, `position`).
-    position: Position of the layer in World coordinates.
-    tile_meta: Metadata about the layer's position and role in a tile set.
-    description: Description of the layer.
-    merger: A merging strategy for the layer (only used with Mask).
+    name : str, default=""
+        Name of the layer.
+    data : object, optional
+        Data held by the layer. Its type depends on the subclass.
+    meta : dict, optional
+        Metadata dictionary. It is merged with `description`, `merger`, `position`,
+        and extra keyword arguments (explicit `meta` keys take precedence).
+    position : tuple, optional
+        Position of the layer in global pixel coordinates.
+    tile_meta : TileMeta, optional
+        Metadata about the layer's position and role in a set of tiles.
+    description : str, default=""
+        Description of the layer, displayed on the algorithm documentation page.
+    merger : str, default="default"
+        Strategy used to merge the layer when it is assembled from tiles. Only `Mask`
+        supports another strategy: `"instances"`.
+    **meta_kwargs
+        Extra metadata, added to `meta`. In Napari, metadata keys are applied as
+        properties of the displayed layer (e.g. `colormap="viridis"`).
 
     Attributes
     ----------
-    data : Data in the layer.
-    name : Name of the layer.
-    meta : Metadata about the layer.
-    ndim : Dimensionality of the layer data.
-    kind : A short string identifying the layer type.
-    type : Type of data stored in the layer.
-    shape : Data shape if it is array-like.
-    description: Description of the layer.
-    position: Position of the layer in World coordinates.
-    extent : Extent of the layer expressed as a Domain object.
-    size : Size of the extent of the layer.
-    coords_min : Minimum (World) coordinates of the data.
-    coords_max : Maximum (World) coordinates of the data.
-    merger: A merging strategy for the layer (only used with Mask).
-    tile_meta : Metadata about the layer's position and role in a tile set.
-
-    Methods
-    ----------
-    select() : Select a subset of data in the layer at a given spatial domain.
+    data
+        Data held by the layer.
+    name : str
+        Name of the layer.
+    meta : dict
+        Metadata about the layer.
+    kind : str
+        A short string identifying the layer type, e.g. `"mask"`.
+    position : tuple
+        Position of the layer in global pixel coordinates.
+    extent : Domain
+        Region covered by the data in global pixel coordinates. For objects such as
+        points, it is the bounding box of the objects.
+    size : tuple
+        Size of the extent.
+    coords_min : tuple
+        Lower corner of the extent.
+    coords_max : tuple
+        Upper corner of the extent.
+    ndim : int
+        Number of spatial dimensions.
+    shape : tuple
+        Shape of the data, if it is array-like.
+    tile_meta : TileMeta
+        Metadata about the layer's position and role in a set of tiles.
     """
 
     kind: str = ""
@@ -265,7 +285,18 @@ class Layer:
         pass
 
     def select(self, domain: Domain) -> Layer:
-        """Selection based on a domain in *global* coordinates."""
+        """Select the part of the layer inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Layer
+            A new layer with the selected data, positioned in global coordinates.
+        """
         cls = type(self)
         
         required = True

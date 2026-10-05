@@ -6,15 +6,31 @@ from imaging_server_kit.core._fmt import fmt_num
 
 
 class Integer(Layer):
-    """Data layer used to represent integer values.
+    """Data layer for integer values.
 
     Parameters
     ----------
-    data: An integer value.
-    min: Minimum accepted value.
-    max: Maximum accepted value.
-    step: Step size used by interactive sliders/spinboxes.
-    default: Default value used when `data` is not provided.
+    data : int, optional
+        The value.
+    name : str, default="Int"
+        Name of the layer.
+    min : int, optional
+        Minimum accepted value.
+    max : int, optional
+        Maximum accepted value.
+    step : int, default=1
+        Step size of the spin box in user interfaces.
+    default : int, default=0
+        Default value, used when `data` is not provided.
+    auto_call : bool, default=False
+        Re-run the algorithm when the value changes in user interfaces.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
+
+    Examples
+    --------
+    >>> threshold = sk.Integer(name="Threshold", min=0, max=255, default=128)
     """
 
     kind = "int"

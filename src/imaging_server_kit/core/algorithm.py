@@ -204,46 +204,54 @@ P = ParamSpec("P")
 
 
 class Algorithm(AlgorithmRunner, Generic[P]):
-    """An algorithm built by wrapping a Python function. Usually created via the `@sk.algorithm(...)` decorator rather than instantiated directly.
+    """An algorithm built by wrapping a Python function.
+
+    Algorithms are usually created with the `@sk.algorithm` decorator rather than
+    instantiated directly. They can still be called like the wrapped function, and
+    also implement the shared [`AlgorithmRunner`][imaging_server_kit.AlgorithmRunner]
+    interface (`run()`, `get_sample()`, `info()`, etc.).
 
     Parameters
     ----------
-    run_algorithm_func: The Python function to convert.
-    parameters: A dictionary of annotated parameters.
-    name: A name for the algorithm (doesn't accept spaces and special characters).
-    description: A short description to display on the algorithm doc page. Defaults to the docstring of the Python function.
-    tags: A list of tags (arbitrary).
-    project_url: A link to a related, or the original project (gets displayed on the algo doc page).
-    metadata_file: A path to a metadata.yaml file with algorithm metadata.
-    samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimage.io.imread`.
-    tileable: Whether to allow running the algorithm tile-by-tile.
-
-    Notes
-    ----------
-    - Algorithms can be converted to FastAPI servers or PyQt widgets for Napari or QuPath.
-    - Algorithms are associated with a Pydantic Schema that can be used to validate input parameters.
-    - Algorithms can be run tile-by-tile (in most cases).
-    - Algorithms can be run on a subset of the spatial domain defined by their inputs.
-    - Algorithms can provide `samples` (example inputs).
-    - Algorithm metadata can populate an `info` page.
+    run_algorithm_func : callable
+        The Python function to convert.
+    parameters : dict, optional
+        Parameter annotations, mapping parameter names to data layers (e.g.
+        `{"sigma": sk.Float(min=0, default=1.0)}`). Parameters that are not annotated
+        are resolved from type hints, default values, or variable names.
+    name : str, optional
+        A name for the algorithm. Defaults to the name of the function.
+    description : str, optional
+        A short description, displayed on the algorithm documentation page. Defaults
+        to the docstring of the function.
+    tags : list of str, optional
+        A list of tags (arbitrary), displayed on the algorithm documentation page.
+    project_url : str, optional
+        A link to a related project, or to the original project, displayed on the
+        algorithm documentation page.
+    metadata_file : str, default="metadata.yaml"
+        A path to a YAML file with algorithm metadata.
+    samples : list of dict, optional
+        Samples for the algorithm. Each sample is a dictionary mapping parameter
+        names to example values. Sample images can be NumPy arrays, URLs, or paths to
+        local files readable by `skimage.io.imread`.
+    tileable : bool, default=False
+        Whether the algorithm can be run tile-by-tile.
 
     Attributes
     ----------
-    name: A name for the algorithm.
-    parameters_model: A JSON schema representation of algorithm parameters.
-    samples: A list of sample parameters, mapping parameter names to parameter values.
-    algo_info: A dictionary of metadata about the algorithm.
-    algorithms: A list containing the algorithm's name.
-
-    Methods
-    ----------
-    run(): Execute the algorithm with a set of parameters.
-        Set `tiled=True` for tiled inference.
-        Raises a ValidationError when parameters are invalidated.
-    get_n_samples(): Get the number of samples available.
-    get_sample(): Get a sample by index.
-    info(): Access algorithm documentation.
-    get_parameters(): Get the algorithm parameters schema.
+    name : str
+        The name of the algorithm.
+    parameters_model : pydantic.BaseModel
+        A Pydantic model used to validate the algorithm parameters.
+    samples : list of dict
+        The samples of the algorithm.
+    algo_info : dict
+        Metadata about the algorithm.
+    algorithms : list of str
+        A list containing the name of the algorithm.
+    tileable : bool
+        Whether the algorithm can be run tile-by-tile.
     """
 
     def __init__(
@@ -489,23 +497,49 @@ def algorithm(
     samples: Optional[List[Dict[str, Any]]] = None,
     tileable: bool = False,
 ) -> Union[Algorithm[P], Callable[[Callable[P, Any]], Algorithm[P]]]:
-    """Wrap a Python function as an algorithm (sk.Algorithm). Typically used as the `@sk.algorithm(...)` decorator.
+    """Convert a Python function into an algorithm.
+
+    Typically used as a decorator, with or without arguments: `@sk.algorithm` or
+    `@sk.algorithm(...)`.
 
     Parameters
     ----------
-    func : The Python function to convert.
-    parameters : A dictionary of annotated parameters.
-    name: A name for the algorithm (doesn't accept spaces and special characters).
-    description: A short description to display on the algorithm doc page. Defaults to the docstring of the Python function.
-    tags: A list of tags (arbitrary).
-    project_url: A link to a related, or the original project (gets displayed on the algo doc page).
-    metadata_file: A path to a metadata.yaml file with algorithm metadata.
-    samples: A list of sample parameters for the algorithm, each represented as a dictionary mapping parameter_name to example_value. Sample images can be a Numpy array, a URL, or a local path to a file readable by `skimag.io.imread`.
-    tileable: Whether to allow running the algorithm tile-by-tile.
+    func : callable, optional
+        The Python function to convert. Passed implicitly when used as a decorator.
+    parameters : dict, optional
+        Parameter annotations, mapping parameter names to data layers (e.g.
+        `{"sigma": sk.Float(min=0, default=1.0)}`). Parameters that are not annotated
+        are resolved from type hints, default values, or variable names.
+    name : str, optional
+        A name for the algorithm. Defaults to the name of the function.
+    description : str, optional
+        A short description, displayed on the algorithm documentation page. Defaults
+        to the docstring of the function.
+    tags : list of str, optional
+        A list of tags (arbitrary), displayed on the algorithm documentation page.
+    project_url : str, optional
+        A link to a related project, or to the original project, displayed on the
+        algorithm documentation page.
+    metadata_file : str, default="metadata.yaml"
+        A path to a YAML file with algorithm metadata.
+    samples : list of dict, optional
+        Samples for the algorithm. Each sample is a dictionary mapping parameter
+        names to example values. Sample images can be NumPy arrays, URLs, or paths to
+        local files readable by `skimage.io.imread`.
+    tileable : bool, default=False
+        Whether the algorithm can be run tile-by-tile.
 
     Returns
     -------
-    An algorithm instance (sk.Algorithm).
+    Algorithm
+        The algorithm. When called with keyword arguments only, a decorator
+        returning the algorithm.
+
+    Examples
+    --------
+    >>> @sk.algorithm(parameters={"threshold": sk.Integer(min=0, max=255, default=128)})
+    ... def threshold_algo(image, threshold):
+    ...     return sk.Mask(image > threshold)
     """
 
     def _decorate(run_algorithm_func: Callable[P, Any]) -> Algorithm[P]:

@@ -6,15 +6,31 @@ from imaging_server_kit.core._fmt import fmt_num
 
 
 class Float(Layer):
-    """Data layer used to represent floating-point (decimal) values.
+    """Data layer for floating-point values.
 
     Parameters
     ----------
-    data: A floating-point value.
-    min: Minimum accepted value.
-    max: Maximum accepted value.
-    step: Step size used by interactive sliders/spinboxes.
-    default: Default value used when `data` is not provided.
+    data : float, optional
+        The value.
+    name : str, default="Float"
+        Name of the layer.
+    min : float, optional
+        Minimum accepted value.
+    max : float, optional
+        Maximum accepted value.
+    step : float, default=0.1
+        Step size of the spin box in user interfaces.
+    default : float, default=0.0
+        Default value, used when `data` is not provided.
+    auto_call : bool, default=False
+        Re-run the algorithm when the value changes in user interfaces.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
+
+    Examples
+    --------
+    >>> sigma = sk.Float(name="Sigma", min=0, default=1.0, step=0.5)
     """
 
     kind = "float"

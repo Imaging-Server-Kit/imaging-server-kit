@@ -47,19 +47,25 @@ from .gui import to_napari, to_qwidget, to_qupath
 
 
 def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
-    """
-    Convert a result object into a different representation.
+    """Convert a stack into another representation.
 
     Parameters
     ----------
-    stack : The result object to convert.
-    to : The target representation to convert to. Supported values: ["stack", "napari"]
+    stack : Stack
+        The stack to convert.
+    to : {"stack", "napari"}, default="stack"
+        The target representation.
 
     Returns
     -------
-    The converted result object.
-    - If `to == "stack"`, a Stack() object containing copies of the input layers.
-    - If `to == "napari"` the napari.Viewer associated with the converted stack.
+    Stack or napari.Viewer
+        With `to="stack"`, a new stack with the same layers. With `to="napari"`, a new
+        Napari viewer displaying the layers (requires the `napari` extra).
+
+    Raises
+    ------
+    ValueError
+        If `to` is not supported.
     """
     supported = ["stack", "napari"]
     if not to in supported:
@@ -96,7 +102,21 @@ def run(
     domain: Optional[Domain] = None,
     **algo_params,
 ) -> Union[Stack, "napari.Viewer"]:  # type: ignore
-    """Allows the syntax `sk.run(...)` instead of runner.run(...)."""
+    """Run an algorithm. Equivalent to `runner.run(...)`.
+
+    See [`AlgorithmRunner.run`][imaging_server_kit.AlgorithmRunner.run] for the
+    description of the parameters.
+
+    Parameters
+    ----------
+    runner : AlgorithmRunner
+        An algorithm, an algorithm collection, or a client.
+
+    Returns
+    -------
+    Stack or napari.Viewer
+        The results, as returned by `runner.run(...)`.
+    """
     return runner.run(
         *args,
         algorithm=algorithm,
@@ -112,5 +132,13 @@ def run(
 
 
 def info(runner: AlgorithmRunner, algorithm: Optional[str] = None):
-    """Allow the syntax `sk.info(...)` instead of runner.info(...)."""
+    """Open the documentation page of an algorithm. Equivalent to `runner.info(...)`.
+
+    Parameters
+    ----------
+    runner : AlgorithmRunner
+        An algorithm, an algorithm collection, or a client.
+    algorithm : str, optional
+        Name of the algorithm (only needed with collections and clients).
+    """
     return runner.info(algorithm=algorithm)

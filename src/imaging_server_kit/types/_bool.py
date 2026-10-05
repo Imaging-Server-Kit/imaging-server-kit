@@ -4,12 +4,21 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Bool(Layer):
-    """Data layer used to represent boolean values.
+    """Data layer for boolean values, shown as a checkbox in user interfaces.
 
     Parameters
     ----------
-    data: A boolean value.
-    default: Default value used when `data` is not provided.
+    data : bool, optional
+        The value.
+    name : str, default="Bool"
+        Name of the layer.
+    default : bool, default=False
+        Default value, used when `data` is not provided.
+    auto_call : bool, default=False
+        Re-run the algorithm when the value changes in user interfaces.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "bool"

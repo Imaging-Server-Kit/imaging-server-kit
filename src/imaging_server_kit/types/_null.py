@@ -3,11 +3,17 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Null(Layer):
-    """Data layer used to represent None or the absence of data.
+    """Data layer for `None`, or the absence of data.
 
     Parameters
     ----------
-    data: Always None; accepted for interface consistency with other layers.
+    data : None, optional
+        Always `None`; accepted for consistency with other layers.
+    name : str, default="None"
+        Name of the layer.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "null"

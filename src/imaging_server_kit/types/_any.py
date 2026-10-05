@@ -5,16 +5,25 @@ from imaging_server_kit.types.layer import Layer
 
 
 class Any(Layer):
-    """Data layer used to represent "any" kind of data, such as custom Python objects.
-    
-    Note: Since this type is made to encapsulate arbitrary custom classes, it is generally 
-    *not* serializable (only usable locally). Excepthions: if `data` is a simple json-compiant 
-    type (int, float, bool, str, np.ndarray) or a list, tuple, or dictionary of these types, 
-    the remote functions (which need serialization) still work.
+    """Data layer for any other kind of data, such as custom Python objects.
+
+    Parameters with types that cannot be resolved, and outputs of unrecognized types,
+    are represented by this layer. They are not shown in user interfaces.
+
+    Since this layer can hold arbitrary objects, it is generally *not* serializable,
+    and only works locally (not with servers). Exceptions are simple JSON-compatible
+    types (`int`, `float`, `bool`, `str`, `numpy.ndarray`), and lists, tuples, or
+    dictionaries of these types.
 
     Parameters
     ----------
-    data: Any kind of data.
+    data : object, optional
+        Any kind of data.
+    name : str, default="Any"
+        Name of the layer.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
     """
 
     kind = "any"

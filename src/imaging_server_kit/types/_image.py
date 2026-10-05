@@ -9,17 +9,33 @@ from imaging_server_kit.types.common import copy_meta, domain_slices
 
 
 class Image(Layer):
-    """Data layer used to represent images: 2D or 3D arrays, optionally multichannel or RGB.
+    """Data layer for images: 2D or 3D arrays, optionally multichannel or RGB.
 
     Parameters
     ----------
-    data: Numpy arrays.
-    dimensionality: list of accepted dimensionalities, for example [2, 3].
-    rgb: Set to True for RGB images.
-    channel_axis: Optional index of the channel axis.
-      - The channel axis does not affect the `bounds`, `ndim`, and `domain` attributes.
-      - The channel axis is set to `2` if rgb is True and there is no time axis.
-      - tile_size along the channel axis defaults to the length of this axis.
+    data : numpy.ndarray, optional
+        The image array.
+    name : str, default="Image"
+        Name of the layer.
+    description : str, default="Input image"
+        Description of the layer, displayed on the algorithm documentation page.
+    dimensionality : list of int, optional
+        Accepted numbers of dimensions, for example `[2, 3]`. By default, any number
+        of dimensions is accepted.
+    rgb : bool, default=False
+        Set to `True` for RGB images.
+    channel_axis : int, optional
+        Index of the channel axis, for multichannel images. The channel axis is not
+        counted as a spatial dimension (it doesn't affect `ndim` and `extent`), and
+        it is never split into tiles. With `rgb=True`, the last axis is always the
+        channel axis.
+    **kwargs
+        Passed to [`Layer`][imaging_server_kit.Layer], e.g. `position`, `meta`, or
+        extra metadata such as display properties (`colormap="viridis"`).
+
+    Examples
+    --------
+    >>> image = sk.Image(np.zeros((100, 200)), name="Blurred", colormap="viridis")
     """
 
     kind = "image"
@@ -90,7 +106,18 @@ class Image(Layer):
         return (bounds_min, bounds_max)
 
     def select(self, domain: Domain) -> Image:
-        """Select data in a given domain."""
+        """Select the part of the layer inside a domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Image
+            A new layer with the selected data, positioned in global coordinates.
+        """
         _meta = copy_meta(self)
 
         if (self.data is None) or (domain.size is None):

@@ -5,25 +5,35 @@ from imaging_server_kit.core._fmt import fmt_tuple
 
 
 class Domain:
-    """A nD-domain defined by a size and position in global pixel space. Used to represent tile extents, and to restrict an algorithm's computation to a specific region.
+    """An n-D box defined by a size and a position in global pixel coordinates.
+
+    Domains represent regions of interest and tile extents, and are used to restrict
+    the computation of an algorithm to a region.
 
     Parameters
     ----------
-    size: Size of the domain in pixels, one value per dimension.
-    position: Position of the domain's top-left corner in global pixel space. Defaults to the origin (all zeros) if only `size` is provided.
+    size : tuple, optional
+        Size of the domain in pixels, one value per dimension.
+    position : tuple, optional
+        Position of the lower corner of the domain (top-left in 2D), in global pixel
+        coordinates. Defaults to the origin if only `size` is provided.
 
     Attributes
     ----------
-    size: Size of the domain in pixels.
-    coords_min: The position of the top-left corner of the domain.
-    coords_max: The position of the bottom-right corner of the domain.
-    ndim: Number of dimensions.
+    size : tuple
+        Size of the domain in pixels.
+    coords_min : tuple
+        Lower corner of the domain (top-left in 2D).
+    coords_max : tuple
+        Upper corner of the domain (bottom-right in 2D).
+    ndim : int
+        Number of dimensions.
 
-    Methods
-    ----------
-    serialize(): Convert the domain to a dictionary format.
-    copy(): Copy the domain.
-    merge(): Merge another domain.
+    Examples
+    --------
+    >>> roi = sk.Domain(position=(20, 30), size=(60, 80))
+    >>> roi.coords_max
+    (80.0, 110.0)
     """
 
     def __init__(
