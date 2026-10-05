@@ -17,7 +17,7 @@ eggs/
 .coverage
 .coverage.*
 .cache
-docs/_build/
+site/
 .idea/
 venv/
 .vscode/
