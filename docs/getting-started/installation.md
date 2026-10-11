@@ -23,6 +23,23 @@ The Napari and QuPath integrations rely on extra packages that are not installed
 !!! note
     The `qupath` extra requires Python 3.11 or later, because of QuBaLab.
 
+## Agent skills
+
+The package includes two skills for AI coding agents such as [Claude Code](https://claude.com/claude-code). They help the agent write algorithms with `@sk.algorithm` and build Napari or QuPath interfaces for them. Agents do not pick up skills from installed Python packages, so install them with:
+
+```sh
+serverkit install-skills
+```
+
+This copies the skills to `.claude/skills/` in the current directory, which makes them available in that project. To make them available in all projects, use `serverkit install-skills --user` (installs to `~/.claude/skills/`).
+
+| Skill | Helps with |
+|---|---|
+| `isk-write-algorithm` | Turning a function into an algorithm: parameters, outputs, samples, tiling, and servers |
+| `isk-napari-qupath-gui` | Running algorithms in Napari or QuPath, and troubleshooting the widgets |
+
+Existing skills are not overwritten unless you pass `--force`, so after upgrading the package, run `serverkit install-skills --force` to get the updated skills. See [Command line](../reference/cli.md) for all options.
+
 ## Development version
 
 Clone the repository and install the package in editable mode:

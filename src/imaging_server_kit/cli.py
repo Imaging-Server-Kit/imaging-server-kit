@@ -1,4 +1,6 @@
 import argparse
+import shutil
+from pathlib import Path
 
 
 def cmd_demo_napari(args):
@@ -57,6 +59,19 @@ def cmd_qupath(with_napari: bool = False):
         napari.run()
 
 
+def cmd_install_skills(args):
+    skills_src = Path(__file__).parent / "skills"
+    skills_dir = Path.home() / ".claude" / "skills" if args.user else Path(args.dir)
+
+    for src in sorted(p for p in skills_src.iterdir() if (p / "SKILL.md").is_file()):
+        dest = skills_dir / src.name
+        if dest.exists() and not args.force:
+            print(f"Skipped {dest} (already exists, use --force to overwrite)")
+            continue
+        shutil.copytree(src, dest, dirs_exist_ok=True)
+        print(f"Installed {dest}")
+
+
 def main(
         # argv=None
     ):
@@ -94,6 +109,26 @@ def main(
         action="store_true",
         help="Use this flag to integrate a Napari viewer and see results in it along with the QuPath GUI.",
     )
+
+    # serverkit install-skills
+    p_skills = subparsers.add_parser(
+        "install-skills",
+        help="Install the Imaging Server Kit agent skills (for Claude Code)",
+    )
+    p_skills.add_argument(
+        "--user",
+        action="store_true",
+        help="Install in ~/.claude/skills (all projects) instead of the current project.",
+    )
+    p_skills.add_argument(
+        "--dir",
+        default=".claude/skills",
+        help="Target skills directory (default: .claude/skills in the current directory).",
+    )
+    p_skills.add_argument(
+        "--force", action="store_true", help="Overwrite skills that already exist."
+    )
+    p_skills.set_defaults(func=cmd_install_skills)
 
     args = parser.parse_args()
     

@@ -67,6 +67,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml"]
+"imaging_server_kit" = ["skills/*/SKILL.md"]
 "imaging_server_kit.core" = [
     "templates/*.html",
     "static/css/*",

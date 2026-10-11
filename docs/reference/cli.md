@@ -10,5 +10,6 @@ Installing the package adds a `serverkit` command.
 | `serverkit tools serve` | Serve the built-in algorithms at http://localhost:8000. |
 | `serverkit qupath` | Open the [QuPath](../how-to/qupath.md) connection panel. Requires the `qupath` extra. |
 | `serverkit qupath --with-napari` | Same as `serverkit qupath`, with a Napari viewer to collect results that cannot be displayed in QuPath. |
+| `serverkit install-skills` | Install the agent skills for writing algorithms and building Napari/QuPath interfaces into `.claude/skills/` of the current directory (Claude Code). Use `--user` to install in `~/.claude/skills/` instead, `--dir` for another location, and `--force` to overwrite existing skills. |
 
 Run `serverkit --help` (or `serverkit <command> --help`) to list the commands and options.
