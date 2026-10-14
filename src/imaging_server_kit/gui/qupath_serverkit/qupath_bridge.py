@@ -147,7 +147,8 @@ def _mask2detections(mask: sk.Mask) -> List[Feature]:
     # Features => Detections
     detections = []
     for f in features:
-        f["object_type"] = "detection"
+        f["object_type"] = "detection"  # TODO: this doesn't work, objects are actually sent as annotations..
+        
         detection_id = f["properties"]["Detection ID"]
 
         if (feature_df is not None) and (detection_id in feature_df.index):
@@ -156,7 +157,7 @@ def _mask2detections(mask: sk.Mask) -> List[Feature]:
                 feature_row = feature_row.iloc[0]
 
             if "class" in feature_row:
-                f["classification"] = {
+                f["properties"]["classification"] = {
                     "name": feature_row["class"],
                     "color": (0, 255, 0),
                 }
