@@ -488,7 +488,7 @@ def background_subtract(image, sigma, method):
     parameters={
         "image": sk.Image(name="3D image", dimensionality=[3]),
         "method": sk.Choice(
-            name="Method", items=["max", "min", "mean"], default="max", auto_call=True
+            name="Method", items=["max", "min", "mean", "std", "median"], default="max", auto_call=True
         ),
     },
     samples=[{"image": skimage.data.brain()}],
@@ -499,7 +499,7 @@ def project(image, method):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    proj_func = {"max": np.max, "min": np.min, "mean": np.mean}
+    proj_func = {"max": np.max, "min": np.min, "mean": np.mean, "std": np.std, "median": np.median}
     proj = proj_func[method](image, axis=0, keepdims=True)
     return sk.Image(proj, name="Projection", colormap="viridis")
 

@@ -441,18 +441,30 @@ def label_algo(mask):
             min=1,
             max=100_000,
         ),
+        "mask_is_binary": sk.Bool(name="Mask is binary", default=False),
     },
     name="Mask - Remove small objects",
     description="Remove objects of size below a predetermined threshold.",
     tags=["Mask", "Scikit-image"],
 )
-def remove_small_objects_algo(mask, min_size):
+def remove_small_objects_algo(mask, min_size, mask_is_binary):
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
+    if mask_is_binary:
+        # We first label the mask
+        mask = label(mask)
+        mask_dtype = mask.dtype
+    
     new_mask = remove_small_objects(mask, min_size)
+    merger = "instances"
+    
+    if mask_is_binary:
+        # Back to a binary mask, with original dtype
+        new_mask = (new_mask > 0).astype(mask_dtype)
+        merger = "default"
 
-    return sk.Mask(new_mask, name="Mask (small objects removed)")
+    return sk.Mask(new_mask, name="Mask (small objects removed)", merger=merger)
 
 
 # - Keep biggest objects
@@ -654,18 +666,18 @@ def logial_operators_masks(mask1, mask2, operation):
     return sk.Mask(new_mask, name=f"Mask ({operated})")
 
 
-# - Between an image and a mask (set to value)
+# - Between a grayscale image and a mask (set to value)
 @sk.algorithm(
     parameters={
-        "image": sk.Image(),
+        "image": sk.Image(name="Gray image", rgb=False),
         "mask": sk.Mask(),
         "value": sk.Float(name="Set value", default=0, min=-1e9, max=1e9),
     },
     name="Math - Image masking",
-    description="Set the value of an image inside a mask.",
     tags=["Math"],
 )
 def image_masking_algo(image, mask, value):
+    """Set the value of an image inside a mask. Gray images only."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
     
