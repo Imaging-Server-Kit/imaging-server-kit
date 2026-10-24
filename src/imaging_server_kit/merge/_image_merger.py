@@ -1,103 +1,68 @@
+import math
 from typing import Optional
 
 import numpy as np
 
 from imaging_server_kit.types._image import Image
+from imaging_server_kit.types.common import _get_slices_with_channel
 from imaging_server_kit.merge.merger import DefaultMerger
 from imaging_server_kit.merge.common import prepare_canvas, update_meta
 
 
-def overlap_count_map(layer: Image) -> Optional[np.ndarray]:
-    """Return an array of the same shape as the tile containing the number of overlapping tiles at each pixel."""
-    if (layer.size is None) or (layer.ndim is None):
-        return
-
-    # If unspecified, overlap defaults to zero
-    _overlap_px = layer.tile_meta.overlap_px
-    if _overlap_px is None:
-        if layer._bounds is not None:
-            _overlap_px = tuple([0] * layer.ndim)
-
-    per_axis = []
-
-    if layer.tile_meta.first_tile is None:
-        first_tile_ = [False] * layer.ndim
-    else:
-        first_tile_ = layer.tile_meta.first_tile
-
-    if layer.tile_meta.last_tile is None:
-        last_tile_ = [False] * layer.ndim
-    else:
-        last_tile_ = layer.tile_meta.last_tile
-
-    for size_i, overlap_i, first_tile, last_tile in zip(
-        layer.size, _overlap_px, first_tile_, last_tile_
-    ):
-        size_i = int(size_i)
-
-        arr_i = np.arange(size_i)
-        c = np.ones(size_i, dtype=np.int16)
-
-        if not first_tile:
-            c = c + (arr_i < overlap_i).astype(np.int16)
-
-        if not last_tile:
-            c = c + (arr_i >= size_i - overlap_i).astype(np.int16)
-
-        out_shape = (
-            (1,) * len(per_axis) + (size_i,) + (1,) * (layer.ndim - len(per_axis) - 1)
-        )
-        per_axis.append(c.reshape(out_shape))
-
-    overlap_count_arr = np.ones([int(s) for s in layer.size], dtype=np.int16)
-    for c in per_axis:
-        overlap_count_arr *= c
-
-    if layer.channel_axis is not None:
-        # Expand the overlap array along the channel dimensions (repeat it n_channels times)
-        channel_axis = layer.channel_axis
-        n_channels = layer.data.shape[channel_axis]
-        overlap_count_arr = np.expand_dims(overlap_count_arr, axis=channel_axis)
-        overlap_count_arr = np.repeat(overlap_count_arr, n_channels, axis=channel_axis)
-
-    return overlap_count_arr
-
-
-def weighted_tile_data(layer: Image) -> np.ndarray:
-    """Tile data divided by the number of overlapping tiles at each pixel.
-
-    Summing the weighted tiles gives the average image intensity in overlapping regions.
-    Tiles without overlap are returned as-is (their dtype is kept).
-    """
-    overlap_px = layer.tile_meta.overlap_px
-    if (overlap_px is None) or not any(overlap_px):
-        return layer.data
-
-    return (layer.data / overlap_count_map(layer)).astype(np.float32)
-
-
 class ImageTileOverlapMerger(DefaultMerger):
-    """Merge images while averaging image intensities in overlapping regions."""
+    """Merge images while averaging image intensities in overlapping regions.
 
-    @staticmethod
-    def merge(receiving_layer: Image, incoming_layer: Image) -> None:
+    The merger counts how many tiles have covered each pixel of the receiving layer
+    so far. Each incoming tile updates the running average of the pixels it covers,
+    so that the merged image is correct after every tile, whatever the tile layout,
+    overlap, or order. Pixels not covered by any tile of the current run (count of
+    zero) are overwritten by the first tile that covers them.
+    """
+
+    def __init__(self):
+        # Number of tiles merged at each pixel (same shape as the receiving data)
+        self._counts: Optional[np.ndarray] = None
+
+    def merge(self, receiving_layer: Image, incoming_layer: Image) -> None:
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
             receiving_layer.position = incoming_layer.position
-            receiving_layer.data = weighted_tile_data(incoming_layer)
+            receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
+            self._counts = np.ones(incoming_layer.data.shape, dtype=np.int32)
             return
+
+        if (self._counts is None) or (self._counts.shape != receiving_layer.data.shape):
+            # The receiving data was not produced by this merge run
+            self._counts = np.zeros(receiving_layer.data.shape, dtype=np.int32)
+
+        old_coords_min = receiving_layer.coords_min
+        old_coords_max = receiving_layer.coords_max
 
         new_data, slices_with_channel = prepare_canvas(
             receiving_layer, incoming_layer, dtype=np.float32, copy_data=True
         )
 
-        # We `add` the weighted incoming image data (average in overlapping regions)
-        new_data[slices_with_channel] = new_data[
-            slices_with_channel
-        ] + weighted_tile_data(incoming_layer)
+        if new_data.shape != self._counts.shape:
+            # The canvas was enlarged: place the counts like the receiving data
+            origin = receiving_layer.coords_min
+            counts = np.zeros(new_data.shape, dtype=np.int32)
+            counts_slices = _get_slices_with_channel(
+                [math.floor(v - o) for v, o in zip(old_coords_min, origin)],
+                [math.ceil(v - o) for v, o in zip(old_coords_max, origin)],
+                incoming_layer.channel_axis,
+            )
+            counts[counts_slices] = self._counts
+            self._counts = counts
+
+        # Update the running average with the incoming tile
+        counts = self._counts[slices_with_channel]
+        new_data[slices_with_channel] = (
+            new_data[slices_with_channel] * counts + incoming_layer.data
+        ) / (counts + 1)
+        self._counts[slices_with_channel] = counts + 1
 
         # Update the data of receiving layer
         receiving_layer.data = new_data
@@ -105,9 +70,12 @@ class ImageTileOverlapMerger(DefaultMerger):
         # Meta becomes incoming layer's meta (except from position; we don't want to move the receiving layer)
         update_meta(receiving_layer, incoming_layer)
 
-    @staticmethod
-    def on_first_merge(receiving_layer: Image, incoming_layer: Image) -> None:
-        if (receiving_layer is incoming_layer) and (incoming_layer.data is not None):
-            # The layer was just added to the stack (its data is not merged),
-            # so its data must be weighted like that of the next tiles.
-            receiving_layer.data = weighted_tile_data(incoming_layer)
+    def on_first_merge(self, receiving_layer: Image, incoming_layer: Image) -> None:
+        if receiving_layer.data is None:
+            self._counts = None
+        elif receiving_layer is incoming_layer:
+            # The layer was just added to the stack: its data counts as one tile
+            self._counts = np.ones(receiving_layer.data.shape, dtype=np.int32)
+        else:
+            # Existing data is overwritten by the tiles of the new run
+            self._counts = np.zeros(receiving_layer.data.shape, dtype=np.int32)

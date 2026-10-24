@@ -248,7 +248,7 @@ def _get_tile_pos_and_size_i(
 ):
     """Compute the tile position and size and remove parts of border tiles outside of the pixel bounds."""
     coord_i = idx_i * shift_i - half_pad_i
-    if coord_i < 0:
+    if coord_i <= 0:
         pos_i = 0
         trim_left = -coord_i
         is_first_tile_i = True

@@ -62,13 +62,28 @@ def _assert_tiled_image_matches_untiled(**tiling):
     np.testing.assert_allclose(result.data, expected.data, rtol=1e-6)
 
 
+# Above 0.5, pixels are covered by more than two tiles per axis
+IMAGE_TILE_OVERLAPS = [0.0, 0.25, 0.45, 0.5, 0.6, 0.75]
+
+
 @pytest.mark.parametrize("tile_size", [16, 25, 100, [20, 30]])
-@pytest.mark.parametrize("tile_overlap", [0.0, 0.25])
+@pytest.mark.parametrize("tile_overlap", IMAGE_TILE_OVERLAPS)
 @pytest.mark.parametrize("tile_randomize", [False, True])
 def test_tiled_image_matches_untiled(tile_size, tile_overlap, tile_randomize):
     _assert_tiled_image_matches_untiled(
         tile_size=tile_size, tile_overlap=tile_overlap, tile_randomize=tile_randomize
     )
+
+
+def test_tiled_image_rerun_in_stack_matches_untiled():
+    image = np.random.default_rng(0).random((50, 70))
+    expected = pointwise.run(image)[0]
+
+    stack = pointwise.run(image, tiled=True, tile_size=16, tile_overlap=0.25)
+    stack = pointwise.run(image, tiled=True, tile_size=16, tile_overlap=0.5, stack=stack)
+
+    assert len(stack) == 1
+    np.testing.assert_allclose(stack[0].data, expected.data, rtol=1e-6)
 
 
 @sk.algorithm(parameters={"image": sk.Image(channel_axis=0)}, tileable=True)
@@ -96,7 +111,7 @@ def pointwise_rgb(image: np.ndarray) -> sk.Image:
     ],
     ids=["channel_axis=0", "channel_axis=2", "rgb", "3d"],
 )
-@pytest.mark.parametrize("tile_overlap", [0.0, 0.25])
+@pytest.mark.parametrize("tile_overlap", IMAGE_TILE_OVERLAPS)
 def test_tiled_channel_layouts_match_untiled(algo, shape, tile_size, tile_overlap):
     image = np.random.default_rng(1).random(shape)
     expected = algo.run(image)[0]
