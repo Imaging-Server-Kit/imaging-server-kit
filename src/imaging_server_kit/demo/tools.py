@@ -468,9 +468,12 @@ def remove_small_objects_algo(mask, min_size, mask_is_binary):
 
 
 # - Keep biggest objects
-def keep_biggest_objects(labelled: np.ndarray, n=1) -> np.ndarray:
+def keep_biggest_objects(mask: np.ndarray, n=1, mask_is_binary=False) -> np.ndarray:
     """Remove all but the N biggest objects in a labelled array."""
-    uniques, counts = np.unique(labelled, return_counts=1)
+    if mask_is_binary:
+        mask = label(mask)
+    
+    uniques, counts = np.unique(mask, return_counts=1)
 
     # Ignore the background if it's there
     if uniques[0] == 0:
@@ -480,9 +483,9 @@ def keep_biggest_objects(labelled: np.ndarray, n=1) -> np.ndarray:
     # Sort unique values by counts (descending), then extract the N unique values corresponding to the biggest objects
     biggest_labels = uniques[np.argsort(counts)[::-1][:n]]
 
-    biggest_objects_filt = np.isin(labelled, biggest_labels)
+    biggest_objects_filt = np.isin(mask, biggest_labels)
 
-    biggest_objects_mask = labelled.copy()
+    biggest_objects_mask = mask.copy()
     biggest_objects_mask[~biggest_objects_filt] = 0
 
     return biggest_objects_mask
@@ -498,16 +501,17 @@ def keep_biggest_objects(labelled: np.ndarray, n=1) -> np.ndarray:
             min=1,
             max=100_000,
         ),
+        "mask_is_binary": sk.Bool(name="Mask is binary", default=False),
     },
     name="Mask - Keep biggest objects",
     description="Keep a predetermined number of objects based on their size.",
     tags=["Mask"],
 )
-def keep_biggest_objects_algo(mask, n_objects):
+def keep_biggest_objects_algo(mask, n_objects, mask_is_binary):
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
-    new_mask = keep_biggest_objects(mask, n_objects)
+    new_mask = keep_biggest_objects(mask, n_objects, mask_is_binary)
 
     return sk.Mask(new_mask, name=f"Mask (N={n_objects})")
 
