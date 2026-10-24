@@ -28,7 +28,6 @@ import imaging_server_kit as sk
 # - Gaussian
 @sk.algorithm(
     name="Process - Gaussian filter",
-    description="Apply a Gaussian filter (blur) to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.gaussian",
     tags=["Process", "Scikit-image"],
     parameters={
@@ -50,6 +49,7 @@ import imaging_server_kit as sk
     samples=[{"image": skimage.data.camera()}],
 )
 def gaussian_algo(image, sigma, mode, preserve_range):
+    """Apply a Gaussian filter (blur) to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -65,7 +65,6 @@ def gaussian_algo(image, sigma, mode, preserve_range):
 # - Median
 @sk.algorithm(
     name="Process - Median filter",
-    description="Apply a median filter to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.median",
     tags=["Process", "Scikit-image"],
     parameters={
@@ -75,6 +74,7 @@ def gaussian_algo(image, sigma, mode, preserve_range):
     samples=[{"image": skimage.data.camera()}],
 )
 def median_algo(image, size):
+    """Apply a median filter to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -90,7 +90,6 @@ def median_algo(image, size):
 # - Variance
 @sk.algorithm(
     name="Process - Variance filter",
-    description="Apply a variance filter to an image.",
     tags=["Process", "Scikit-image"],
     parameters={
         "image": sk.Image(),
@@ -99,6 +98,7 @@ def median_algo(image, size):
     samples=[{"image": skimage.data.camera()}],
 )
 def variance_algo(image, size):
+    """Apply a variance filter to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -119,12 +119,12 @@ def variance_algo(image, size):
 # - Sobel
 @sk.algorithm(
     name="Process - Sobel filter",
-    description="Apply a Sobel filter to an image.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.filters.html#skimage.filters.sobel",
     tags=["Process", "Scikit-image"],
     samples=[{"image": skimage.data.camera()}],
 )
 def sobel_algo(image):
+    """Apply a Sobel filter to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -140,11 +140,11 @@ def sobel_algo(image):
 # - Invert image
 @sk.algorithm(
     name="Process - Invert image",
-    description="Invert the image intensity.",
     tags=["Process"],
     samples=[{"image": skimage.data.camera()}],
 )
 def invert_algo(image):
+    """Invert the image intensity."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -165,11 +165,11 @@ def invert_algo(image):
         "max_val": sk.Float(name="Max", default=1.0, min=-1e9, max=1e9),
     },
     name="Process - Rescale intensity",
-    description="Rescale the image intensity.",
     tags=["Process"],
     samples=[{"image": skimage.data.camera()}],
 )
 def rescale_intensity_algo(image, min_val, max_val):
+    """Rescale the image intensity."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -198,11 +198,11 @@ def rescale_intensity_algo(image, min_val, max_val):
         "num_sigma": sk.Integer(name="Num sigma", min=1, max=1000, default=10),
     },
     name="Process - Blobness",
-    description="Apply a blobness filter to an image.",
     tags=["Process"],
     samples=[{"image": skimage.data.camera()}],
 )
 def blobness(image, min_sigma, max_sigma, num_sigma):
+    """Apply a blobness filter to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -229,11 +229,11 @@ def blobness(image, min_sigma, max_sigma, num_sigma):
         "order": sk.Integer(name="Interpolation order", default=1, min=0, max=3),
     },
     name="Utils - Rescale image",
-    description="Rescale the image.",
     tags=["Utils"],
     samples=[{"image": skimage.data.camera()}],
 )
 def rescale_algo(image, scale, order):
+    """Rescale the image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -257,12 +257,12 @@ def rescale_algo(image, scale, order):
         ),
     },
     name="Utils - Centered crop",
-    description="Extract a crop from the center of the image.",
     project_url="https://scikit-image.org/docs/0.25.x/api/skimage.util.html#skimage.util.crop",
     tags=["Utils"],
     samples=[{"image": skimage.data.camera()}],
 )
 def crop_algo(image, crop_width):
+    """Extract a crop from the center of the image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -277,7 +277,6 @@ def crop_algo(image, crop_width):
 # - Blob detector
 @sk.algorithm(
     name="Detect - Blobs",
-    description="Blob detection algorithm implemented with a Laplacian of Gaussian (LoG) filter.",
     project_url="https://scikit-image.org/docs/dev/api/skimage.feature.html#skimage.feature.blob_log",
     tags=["Scikit-image"],
     parameters={
@@ -320,6 +319,7 @@ def crop_algo(image, crop_width):
     ],
 )
 def blob_detector_algo(image, min_sigma, max_sigma, num_sigma, threshold):
+    """Blob detection algorithm implemented with a Laplacian of Gaussian (LoG) filter."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -356,7 +356,6 @@ def blob_detector_algo(image, min_sigma, max_sigma, num_sigma, threshold):
 # - Threshold (manual)
 @sk.algorithm(
     name="Segmentation - Intensity threshold",
-    description="Segment an image based on an intensity threshold.",
     tags=["Segmentation"],
     parameters={
         "image": sk.Image(),
@@ -382,6 +381,7 @@ def blob_detector_algo(image, min_sigma, max_sigma, num_sigma, threshold):
     ],
 )
 def threshold_manual(image, threshold, dark_background):
+    """Segment an image based on an intensity threshold."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -398,11 +398,11 @@ def threshold_manual(image, threshold, dark_background):
 # - Threshold Otsu
 @sk.algorithm(
     name="Segmentation - Otsu's threshold",
-    description="Otsu's automatic thresholding algorithm.",
     tags=["Segmentation", "Scikit-image"],
     samples=[{"image": skimage.data.camera()}],
 )
 def otsu_threshold(image):
+    """Otsu's automatic thresholding algorithm."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -417,11 +417,11 @@ def otsu_threshold(image):
 # - Label
 @sk.algorithm(
     name="Mask - Label",
-    description="Connected components labelling.",
     tags=["Mask", "Scikit-image"],
     tileable=True,
 )
 def label_algo(mask):
+    """Connected components labelling."""
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
@@ -444,10 +444,10 @@ def label_algo(mask):
         "mask_is_binary": sk.Bool(name="Mask is binary", default=False),
     },
     name="Mask - Remove small objects",
-    description="Remove objects of size below a predetermined threshold.",
     tags=["Mask", "Scikit-image"],
 )
 def remove_small_objects_algo(mask, min_size, mask_is_binary):
+    """Remove objects of size below a predetermined threshold."""
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
@@ -504,10 +504,10 @@ def keep_biggest_objects(mask: np.ndarray, n=1, mask_is_binary=False) -> np.ndar
         "mask_is_binary": sk.Bool(name="Mask is binary", default=False),
     },
     name="Mask - Keep biggest objects",
-    description="Keep a predetermined number of objects based on their size.",
     tags=["Mask"],
 )
 def keep_biggest_objects_algo(mask, n_objects, mask_is_binary):
+    """Keep a predetermined number of objects based on their size."""
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
@@ -519,16 +519,32 @@ def keep_biggest_objects_algo(mask, n_objects, mask_is_binary):
 # - Fill holes
 @sk.algorithm(
     name="Mask - Fill holes",
-    description="Fill holes in a binary mask.",
     tags=["Mask"],
 )
 def fill_holes_algo(mask):
+    """Fill holes in a binary mask."""
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
     labelled = ndi.binary_fill_holes(mask)
 
     return sk.Mask(labelled, name="Filled mask")
+
+
+# - Invert mask
+@sk.algorithm(
+    name="Mask - Invert",
+    tags=["Mask"],
+    tileable=True,
+)
+def invert_mask_algo(mask):
+    """Invert a binary mask."""
+    if mask is None:
+        return sk.Notification("A binary mask is required!", level="warning")
+
+    inverted = np.logical_not(mask).astype(mask.dtype)
+
+    return sk.Mask(inverted, name="Inverted mask")
 
 
 # - Erode / Dilate / Open / Close
@@ -549,10 +565,10 @@ def fill_holes_algo(mask):
         ),
     },
     name="Mask - Morphological operators",
-    description="Binary morphological operators (erode, dilate, open, close).",
     tags=["Mask"],
 )
 def morphological_operators(mask, operation, radius):
+    """Binary morphological operators (erode, dilate, open, close)."""
     if mask is None:
         return sk.Notification("A binary mask is required!", level="warning")
 
@@ -585,10 +601,10 @@ def morphological_operators(mask, operation, radius):
         ),
     },
     name="Math - Image-to-Image",
-    description="Simple mathematical operations between two images.",
     tags=["Math"],
 )
 def math_operators_images(image1, image2, operation):
+    """Simple mathematical operations between two images."""
     if (image1 is None) or (image2 is None):
         return sk.Notification("Two images are required!", level="warning")
 
@@ -618,10 +634,10 @@ def math_operators_images(image1, image2, operation):
         ),
     },
     name="Math - Image Math",
-    description="Simple mathematical operations on an image.",
     tags=["Math"],
 )
 def math_operators_algo(image, value, operation):
+    """Simple mathematical operations on an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
@@ -645,14 +661,14 @@ def math_operators_algo(image, value, operation):
         "mask1": sk.Mask(name="Mask 1"),
         "mask2": sk.Mask(name="Mask 2"),
         "operation": sk.Choice(
-            name="Operation", items=["AND", "OR", "XOR", "NOT"], default="AND"
+            name="Operation", items=["AND", "OR", "XOR"], default="AND"
         ),
     },
     name="Math - Mask-to-Mask",
-    description="Simple logical operations between two masks.",
     tags=["Math"],
 )
 def logial_operators_masks(mask1, mask2, operation):
+    """Simple logical operations between two masks."""
     if (mask1 is None) or (mask2 is None):
         return sk.Notification("Two masks are required!", level="warning")
 
@@ -660,7 +676,6 @@ def logial_operators_masks(mask1, mask2, operation):
         "AND": (np.logical_and, "AND"),
         "OR": (np.logical_or, "OR"),
         "XOR": (np.logical_xor, "XOR"),
-        "NOT": (np.logical_not, "NOT"),
     }
 
     func, operated = mappings[operation]
@@ -693,25 +708,3 @@ def image_masking_algo(image, mask, value):
     new_image[mask.astype(bool)] = value
 
     return sk.Image(new_image, name=f"Image (masked)")
-
-
-## Special ##
-
-# # Special - Translate an image (OK to debug, but not super useful)
-# @sk.algorithm(
-#     parameters={
-#         "image": sk.Image(),
-#         "position": sk.Integer(name="Position", min=-100_000, max=100_000, default=0, step=5),
-#     },
-#     name="Special - Translate image",
-#     description="Translate an image.",
-#     tags=["Special"],
-#     samples=[{"image": skimage.data.camera()}],
-# )
-# def translate_image(image, position):
-#     if image is None:
-#         return sk.Notification("An image is required!", level="warning")
-
-#     position = tuple([position]*image.ndim)
-    
-#     return sk.Image(image, name="Translated", position=position, colormap="viridis")
