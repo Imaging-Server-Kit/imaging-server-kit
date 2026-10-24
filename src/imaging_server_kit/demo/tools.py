@@ -7,9 +7,9 @@ import skimage.data
 import scipy.ndimage as ndi
 from skimage.filters import gaussian, sobel, median, threshold_otsu
 from skimage.morphology import (
+    ball,
     disk,
     label,
-    remove_small_objects,
     isotropic_erosion,
     isotropic_dilation,
     isotropic_opening,
@@ -45,20 +45,28 @@ import imaging_server_kit as sk
             default="nearest",
         ),
         "preserve_range": sk.Bool(name="Preserve range", default=True),
+        "rgb": sk.Bool(name="RGB image", default=False),
     },
     samples=[{"image": skimage.data.camera()}],
 )
-def gaussian_algo(image, sigma, mode, preserve_range):
+def gaussian_algo(image, sigma, mode, preserve_range, rgb):
     """Apply a Gaussian filter (blur) to an image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    filtered = gaussian(image, sigma=sigma, mode=mode, preserve_range=preserve_range)
+    filtered = gaussian(
+        image,
+        sigma=sigma,
+        mode=mode,
+        preserve_range=preserve_range,
+        channel_axis=-1 if rgb else None,
+    )
 
     return sk.Image(
         filtered,
         name="Filtered image (Gaussian)",
         contrast_limits=[filtered.min(), filtered.max()],
+        rgb=rgb,
     )
 
 
@@ -78,7 +86,9 @@ def median_algo(image, size):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    filtered = median(image, footprint=disk(size))
+    footprint = disk(size) if image.ndim == 2 else ball(size)
+
+    filtered = median(image, footprint=footprint)
 
     return sk.Image(
         filtered,
@@ -90,7 +100,7 @@ def median_algo(image, size):
 # - Variance
 @sk.algorithm(
     name="Process - Variance filter",
-    tags=["Process", "Scikit-image"],
+    tags=["Process"],
     parameters={
         "image": sk.Image(),
         "size": sk.Integer(name="Size", min=1, max=100, default=2),
@@ -148,7 +158,11 @@ def invert_algo(image):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    inverted = -image
+    if image.dtype == bool:
+        inverted = np.logical_not(image)
+    else:
+        # Mirror the intensities within [min, max] (no overflow for unsigned integers)
+        inverted = image.max() - (image - image.min())
 
     return sk.Image(
         inverted,
@@ -212,7 +226,7 @@ def blobness(image, min_sigma, max_sigma, num_sigma):
 
     image_cube = np.empty(image.shape + (len(sigma_list),), dtype=np.float32)
     for i, s in enumerate(sigma_list):
-        image_cube[..., i] = -ndi.gaussian_laplace(image, s) * np.mean(s) ** 2
+        image_cube[..., i] = -ndi.gaussian_laplace(image, s) * s**2
 
     blobness = np.max(image_cube, axis=-1)
 
@@ -227,21 +241,27 @@ def blobness(image, min_sigma, max_sigma, num_sigma):
         "image": sk.Image(),
         "scale": sk.Float(name="Scale", default=0.5, min=0.1, max=16.0),
         "order": sk.Integer(name="Interpolation order", default=1, min=0, max=3),
+        "rgb": sk.Bool(name="RGB image", default=False),
     },
     name="Utils - Rescale image",
     tags=["Utils"],
     samples=[{"image": skimage.data.camera()}],
 )
-def rescale_algo(image, scale, order):
+def rescale_algo(image, scale, order, rgb):
     """Rescale the image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
     rescaled = rescale(
-        image, scale=scale, order=order, anti_aliasing=True, preserve_range=True
+        image,
+        scale=scale,
+        order=order,
+        anti_aliasing=True,
+        preserve_range=True,
+        channel_axis=-1 if rgb else None,
     )
 
-    return sk.Image(rescaled, name="Rescaled image")
+    return sk.Image(rescaled, name="Rescaled image", rgb=rgb)
 
 
 # - Crop
@@ -278,7 +298,7 @@ def crop_algo(image, crop_width):
 @sk.algorithm(
     name="Detect - Blobs",
     project_url="https://scikit-image.org/docs/dev/api/skimage.feature.html#skimage.feature.blob_log",
-    tags=["Scikit-image"],
+    tags=["Detect", "Scikit-image"],
     parameters={
         "image": sk.Image(description="Input image (2D, 3D).", dimensionality=[2, 3]),
         "min_sigma": sk.Integer(
@@ -385,12 +405,12 @@ def threshold_manual(image, threshold, dark_background):
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    thresh_rel = threshold * (image.max() - image.min())
+    thresh = image.min() + threshold * (image.max() - image.min())
 
     if dark_background:
-        mask = image > thresh_rel
+        mask = image > thresh
     else:
-        mask = image <= thresh_rel
+        mask = image <= thresh
 
     return sk.Mask(mask, name="Binarized image")
 
@@ -453,10 +473,14 @@ def remove_small_objects_algo(mask, min_size, mask_is_binary):
 
     if mask_is_binary:
         # We first label the mask
-        mask = label(mask)
         mask_dtype = mask.dtype
-    
-    new_mask = remove_small_objects(mask, min_size)
+        mask = label(mask)
+
+    # Set the labels of objects with fewer than `min_size` pixels to zero
+    labels = mask.astype(np.intp)
+    counts = np.bincount(labels.ravel())
+    new_mask = mask.copy()
+    new_mask[counts[labels] < min_size] = 0
     merger = "instances"
     
     if mask_is_binary:
@@ -471,9 +495,10 @@ def remove_small_objects_algo(mask, min_size, mask_is_binary):
 def keep_biggest_objects(mask: np.ndarray, n=1, mask_is_binary=False) -> np.ndarray:
     """Remove all but the N biggest objects in a labelled array."""
     if mask_is_binary:
+        mask_dtype = mask.dtype
         mask = label(mask)
     
-    uniques, counts = np.unique(mask, return_counts=1)
+    uniques, counts = np.unique(mask, return_counts=True)
 
     # Ignore the background if it's there
     if uniques[0] == 0:
@@ -487,6 +512,10 @@ def keep_biggest_objects(mask: np.ndarray, n=1, mask_is_binary=False) -> np.ndar
 
     biggest_objects_mask = mask.copy()
     biggest_objects_mask[~biggest_objects_filt] = 0
+
+    if mask_is_binary:
+        # Back to a binary mask, with original dtype
+        biggest_objects_mask = (biggest_objects_mask > 0).astype(mask_dtype)
 
     return biggest_objects_mask
 
@@ -617,7 +646,8 @@ def math_operators_images(image1, image2, operation):
 
     func, operated = mappings[operation]
 
-    new_image = func(image1, image2)
+    # Avoid integer overflow (e.g. negative values after subtracting uint8 images)
+    new_image = func(image1.astype(float), image2.astype(float))
 
     return sk.Image(new_image, name=f"Image ({operated})")
 
@@ -667,7 +697,7 @@ def math_operators_algo(image, value, operation):
     name="Math - Mask-to-Mask",
     tags=["Math"],
 )
-def logial_operators_masks(mask1, mask2, operation):
+def logical_operators_masks(mask1, mask2, operation):
     """Simple logical operations between two masks."""
     if (mask1 is None) or (mask2 is None):
         return sk.Notification("Two masks are required!", level="warning")
@@ -685,26 +715,28 @@ def logial_operators_masks(mask1, mask2, operation):
     return sk.Mask(new_mask, name=f"Mask ({operated})")
 
 
-# - Between a grayscale image and a mask (set to value)
+# - Between an image and a mask (set to value)
 @sk.algorithm(
     parameters={
-        "image": sk.Image(name="Gray image", rgb=False),
+        "image": sk.Image(),
         "mask": sk.Mask(),
         "value": sk.Float(name="Set value", default=0, min=-1e9, max=1e9),
+        "rgb": sk.Bool(name="RGB image", default=False),
     },
     name="Math - Image masking",
     tags=["Math"],
 )
-def image_masking_algo(image, mask, value):
-    """Set the value of an image inside a mask. Gray images only."""
+def image_masking_algo(image, mask, value, rgb):
+    """Set the value of an image inside a mask."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
-    
+
     if mask is None:
         return sk.Notification("A mask is required!", level="warning")
 
     new_image = image.copy()
-    
+
+    # For RGB images, all channels are set to the value
     new_image[mask.astype(bool)] = value
 
-    return sk.Image(new_image, name=f"Image (masked)")
+    return sk.Image(new_image, name="Image (masked)", rgb=rgb)

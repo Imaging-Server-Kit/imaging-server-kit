@@ -42,19 +42,18 @@ import imaging_server_kit as sk
             "dark_background": False,
         },
     ],
-    tileable=True,
 )
 def threshold_algo(image, threshold, dark_background):
     """Segment an image based on an intensity threshold."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    thresh_rel = threshold * (image.max() - image.min())
+    thresh = image.min() + threshold * (image.max() - image.min())
     if dark_background:
-        mask = image > thresh_rel
+        mask = image > thresh
     else:
-        mask = image <= thresh_rel
-    
+        mask = image <= thresh
+
     return sk.Mask(mask, name="Binarized image")
 
 
@@ -91,7 +90,7 @@ def auto_threshold(image, method):
         mask = image > threshold_otsu(image)
     elif method == "Li":
         mask = image > threshold_li(image)
-    
+
     return sk.Mask(mask, name="Binary mask (auto)")
 
 
@@ -131,11 +130,11 @@ def gaussian_algo(image, sigma, mode):
         return sk.Notification("An image is required!", level="warning")
 
     filtered = gaussian(image, sigma=sigma, mode=mode)
-    
+
     return sk.Image(
         filtered,
-        name=f"Filtered image (Gaussian)",
-        contrast_limits=[0, 1],
+        name="Filtered image (Gaussian)",
+        contrast_limits=[filtered.min(), filtered.max()],
     )
 
 
@@ -149,8 +148,11 @@ def gaussian_algo(image, sigma, mode):
 )
 def sobel_algo(image):
     """Apply a Sobel filter to an image."""
+    if image is None:
+        return sk.Notification("An image is required!", level="warning")
+
     filtered = sobel(image)
-    return sk.Image(filtered, name=f"Edges (Sobel)", contrast_limits=[0, 1])
+    return sk.Image(filtered, name="Edges (Sobel)", contrast_limits=[0, 1])
 
 
 ## Fibonacci sphere
@@ -263,10 +265,10 @@ def blob_detector_algo(
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    if invert_image:
-        image = -image
-
     image = img_as_float(image)
+
+    if invert_image:
+        image = image.max() + image.min() - image
 
     if (image.ndim == 3) & time_dim:
         # Handle a time-series
@@ -545,4 +547,4 @@ def conway_algo(max_iter=20, delay=0.1):
     for k in range(max_iter):
         grid = update(grid, N)
         time.sleep(delay)
-        yield sk.Mask(grid), sk.Progress(k, max_val=max_iter)
+        yield sk.Mask(grid), sk.Progress(k + 1, max_val=max_iter)
