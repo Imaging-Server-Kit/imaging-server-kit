@@ -356,3 +356,42 @@ def test_image_masking_rgb(rgb):
     assert layer.meta["rgb"] is rgb
     assert (layer.data[:4] == 0).all()
     assert (layer.data[4:] == 255).all()
+
+
+## Tiling ##
+
+
+def _tiling_cases():
+    rng = np.random.default_rng(0)
+    img = rng.integers(0, 256, (70, 90), dtype=np.uint8)
+    img2 = rng.integers(0, 256, (70, 90), dtype=np.uint8)
+    rgb = rng.integers(0, 256, (70, 90, 3), dtype=np.uint8)
+    m1 = (rng.random((70, 90)) > 0.5).astype(np.uint8)
+    m2 = (rng.random((70, 90)) > 0.5).astype(np.uint8)
+    return [
+        (tools.invert_mask_algo, dict(mask=m1)),
+        (tools.math_operators_images, dict(image1=img, image2=img2, operation="subtract")),
+        (tools.math_operators_algo, dict(image=img, value=3.5, operation="divide")),
+        (tools.logical_operators_masks, dict(mask1=m1, mask2=m2, operation="XOR")),
+        (tools.image_masking_algo, dict(image=img, mask=m1, value=7, rgb=False)),
+        (tools.image_masking_algo, dict(image=rgb, mask=m1, value=7, rgb=True)),
+    ]
+
+
+def test_tileable_tools_are_tested():
+    # `label_algo` is tileable, but stitching objects across tiles is approximate
+    tested = {algo for algo, _ in _tiling_cases()} | {tools.label_algo}
+    assert {algo for algo in ALGORITHMS if algo.tileable} == tested
+
+
+@pytest.mark.parametrize(
+    "algo, params", _tiling_cases(), ids=lambda x: x.name if isinstance(x, sk.Algorithm) else ""
+)
+@pytest.mark.parametrize("tile_overlap", [0.0, 0.25, 0.6])
+def test_tiled_matches_untiled(algo, params, tile_overlap):
+    expected = algo.run(**params)[0].data
+    result = algo.run(
+        **params, tiled=True, tile_size=32, tile_overlap=tile_overlap, tile_randomize=True
+    )[0].data
+    assert result.shape == expected.shape
+    np.testing.assert_allclose(result.astype(float), expected.astype(float), rtol=1e-6)

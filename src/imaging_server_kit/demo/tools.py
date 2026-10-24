@@ -631,6 +631,7 @@ def morphological_operators(mask, operation, radius):
     },
     name="Math - Image-to-Image",
     tags=["Math"],
+    tileable=True,
 )
 def math_operators_images(image1, image2, operation):
     """Simple mathematical operations between two images."""
@@ -665,6 +666,7 @@ def math_operators_images(image1, image2, operation):
     },
     name="Math - Image Math",
     tags=["Math"],
+    tileable=True,
 )
 def math_operators_algo(image, value, operation):
     """Simple mathematical operations on an image."""
@@ -696,6 +698,7 @@ def math_operators_algo(image, value, operation):
     },
     name="Math - Mask-to-Mask",
     tags=["Math"],
+    tileable=True,
 )
 def logical_operators_masks(mask1, mask2, operation):
     """Simple logical operations between two masks."""
@@ -725,6 +728,7 @@ def logical_operators_masks(mask1, mask2, operation):
     },
     name="Math - Image masking",
     tags=["Math"],
+    tileable=True,
 )
 def image_masking_algo(image, mask, value, rgb):
     """Set the value of an image inside a mask."""
