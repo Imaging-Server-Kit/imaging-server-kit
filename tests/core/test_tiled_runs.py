@@ -7,6 +7,7 @@ semantic and instance masks, and object layers (points, vectors, boxes).
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 import skimage.io
 import skimage.measure
@@ -119,6 +120,28 @@ def test_tiled_semantic_mask_matches_untiled(tile_overlap):
     result = threshold.run(image, tiled=True, tile_size=16, tile_overlap=tile_overlap)[0]
 
     np.testing.assert_array_equal(result.data, expected.data)
+
+
+@sk.algorithm(parameters={"image": sk.Image()}, tileable=True)
+def threshold_with_features(image: np.ndarray) -> sk.Mask:
+    mask = (image > 0.5).astype(np.int32)
+    return sk.Mask(mask, features={"label": [0, 1], "area": [(mask == 0).sum(), mask.sum()]})
+
+
+def test_tiled_semantic_mask_features_are_dropped():
+    image = np.random.default_rng(2).random((50, 70))
+
+    assert "features" in threshold_with_features.run(image)[0].meta
+
+    with pytest.warns(UserWarning, match="cannot be merged across tiles"):
+        stack = threshold_with_features.run(image, tiled=True, tile_size=16)
+    assert "features" not in stack[0].meta
+
+    # Features of a previous (untiled) run are dropped too
+    stack = threshold_with_features.run(image)
+    with pytest.warns(UserWarning):
+        threshold_with_features.run(image, tiled=True, tile_size=16, stack=stack)
+    assert "features" not in stack[0].meta
 
 
 ### 2. Instance masks ###
@@ -264,3 +287,130 @@ def test_tiled_detection_matches_untiled():
     np.testing.assert_array_equal(
         _sorted_rows(_global_coords(result)), _sorted_rows(_global_coords(expected))
     )
+
+
+### 4. Features ###
+
+
+@sk.algorithm(parameters={"image": sk.Image()}, tileable=True)
+def label_with_features(image: np.ndarray) -> sk.Mask:
+    labels = skimage.measure.label(image > 0)
+    features = skimage.measure.regionprops_table(labels, properties=("label", "area"))
+    features["class"] = ["blob"] * len(features["label"])
+    return sk.Mask(labels, merger="instances", features=features)
+
+
+def _squares_image() -> np.ndarray:
+    """Squares of different areas (labels 1..4 in raster order), none crossing a border of tiles of size 32."""
+    image = np.zeros((64, 64))
+    for i, (r, c) in enumerate([(4, 4), (4, 40), (40, 4), (40, 40)]):
+        image[r : r + 4 + i, c : c + 4 + i] = 1
+    return image
+
+
+def _assert_features_match_labels(mask: sk.Mask) -> None:
+    """Features have one row per label, and their (non-NaN) areas match the mask."""
+    features = mask.meta["features"]
+    np.testing.assert_array_equal(features["label"], np.unique(mask.data[mask.data > 0]))
+    for label, area in zip(features["label"], features["area"]):
+        if not np.isnan(area):
+            assert (mask.data == label).sum() == area
+
+
+def test_tiled_instance_features_match_labels():
+    mask = label_with_features.run(_squares_image(), tiled=True, tile_size=32)[0]
+
+    _assert_features_match_labels(mask)
+    assert list(mask.meta["features"]["class"]) == ["blob"] * 4
+
+
+def test_instance_features_are_replaced_on_rerun():
+    stack = label_with_features.run(_squares_image())
+    label_with_features.run(np.zeros((64, 64)), stack=stack)
+
+    assert len(stack[0].meta["features"]["label"]) == 0
+
+
+def test_instance_rerun_in_domain_keeps_objects_outside():
+    """Objects outside the domain of a rerun, and their features, are kept."""
+    stack = label_with_features.run(_squares_image())
+    label_with_features.run(
+        _squares_image(), stack=stack, domain=sk.Domain(position=(0, 0), size=(32, 32))
+    )
+
+    mask = stack[0]
+    assert _same_partition(mask.data, label_with_features.run(_squares_image())[0].data)
+    _assert_features_match_labels(mask)
+
+
+def test_instance_rerun_in_domain_invalidates_features_of_cut_objects():
+    """The parts of objects cut by the domain of a rerun keep their label, with NaN features."""
+    stack = label_with_features.run(_squares_image())
+    label_with_features.run(
+        _squares_image(), stack=stack, domain=sk.Domain(position=(0, 0), size=(6, 64))
+    )
+
+    mask = stack[0]
+    _assert_features_match_labels(mask)
+    # The 2 top squares are cut (rows 4-6 recomputed, the rest kept), the 2 others are untouched
+    assert len(mask.meta["features"]["label"]) == 6
+    assert np.isnan(mask.meta["features"]["area"]).sum() == 2
+    assert list(mask.meta["features"]["class"]).count("blob") == 4
+
+
+class _FeaturesSpyStack(sk.Stack):
+    """Records whether the features of the mask match its labels after each merged tile."""
+
+    def __init__(self):
+        super().__init__()
+        self.matches = []
+
+    def _post_merge(self, receiving_layers):
+        for layer in receiving_layers:
+            if layer.kind == "mask":
+                labels = layer.meta["features"]["label"]
+                self.matches.append(
+                    np.array_equal(np.sort(labels), np.unique(layer.data[layer.data > 0]))
+                )
+
+
+@pytest.mark.parametrize("rerun", [False, True])
+def test_tiled_instance_features_match_labels_during_the_run(rerun):
+    """The features shown during the run (e.g. in Napari) are those of the objects merged so far."""
+    stack = _FeaturesSpyStack()
+    if rerun:
+        label_with_features.run(_squares_image(), stack=stack)
+        stack.matches.clear()
+
+    label_with_features.run(_squares_image(), tiled=True, tile_size=32, stack=stack)
+
+    assert stack.matches == [True] * 4
+
+
+@sk.algorithm(parameters={"image": sk.Image()}, tileable=True)
+def label_with_features_set_after(image: np.ndarray) -> sk.Mask:
+    labels = skimage.measure.label(image > 0)
+    mask = sk.Mask(labels, merger="instances")
+    mask.meta["features"] = pd.DataFrame(
+        skimage.measure.regionprops_table(labels, properties=("label", "area"))
+    )
+    return mask
+
+
+def test_tiled_instance_features_set_after_creating_the_layer():
+    mask = label_with_features_set_after.run(_squares_image(), tiled=True, tile_size=32)[0]
+
+    _assert_features_match_labels(mask)
+
+
+@sk.algorithm(parameters={"points": sk.Points()}, tileable=True)
+def points_with_features(points: np.ndarray) -> sk.Points:
+    return sk.Points(points, features={"class": ["p"] * len(points)})
+
+
+def test_tiled_points_list_features_are_merged():
+    points = _points_on_borders()
+
+    result = points_with_features.run(points, tiled=True, tile_size=32)[0]
+
+    assert list(result.meta["features"]["class"]) == ["p"] * len(points)

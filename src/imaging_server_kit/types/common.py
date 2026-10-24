@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 import numpy as np
+import pandas as pd
 
 if TYPE_CHECKING:
     from imaging_server_kit.core.domain import Domain
@@ -30,6 +31,22 @@ def select_object_meta(meta: Dict, n_objects: int, tile_filter: np.ndarray) -> D
     
     return {k: _extract_meta(v, n_objects, tile_filter) for k, v in meta.items()}
 
+
+
+def normalize_features(features):
+    """Convert layer features (a DataFrame, or a dict of lists, Series or arrays) to a dict of Numpy arrays.
+
+    Features stored as arrays can be selected and merged in tiles, and serialized.
+    Other values are returned as-is.
+    """
+    if isinstance(features, pd.DataFrame):
+        return {k: v.to_numpy() for k, v in features.items()}
+    if isinstance(features, Dict):
+        return {
+            k: np.asarray(v) if isinstance(v, (list, tuple, pd.Series)) else v
+            for k, v in features.items()
+        }
+    return features
 
 
 def copy_meta(layer: Layer) -> Optional[Dict]:

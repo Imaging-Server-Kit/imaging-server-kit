@@ -24,6 +24,32 @@ MAX_SIZE_COUNT_LABELS = 2**24
 _RASTERIO_INT_DTYPES = (np.uint8, np.int16, np.uint16, np.int32)
 
 
+def invalidate_label_features(features, labels: Sequence[int]) -> Dict:
+    """Set NaN values to all the features (except `label`) of the given labels.
+
+    Used for objects whose features are no longer accurate, e.g. objects cut by a tile border.
+
+    Parameters
+    ----------
+    features : dict or DataFrame
+        Features with a `label` column.
+    labels : sequence of int
+        The labels to invalidate.
+
+    Returns
+    -------
+    The features, as a dict of 1D Numpy arrays.
+    """
+    df = pd.DataFrame(features)
+    rows = df["label"].isin(labels)
+    if rows.any():
+        for c in df.columns.difference(["label"]):
+            if df[c].dtype.kind in "iub":
+                df[c] = df[c].astype(float)  # To hold NaN values
+            df.loc[rows, c] = np.nan
+    return {c: df[c].values for c in df.columns}
+
+
 def _offset_transform(offset: Sequence[float]) -> Affine:
     """Affine transform from (row, col) pixel indices to (x, y) coordinates, shifted by `offset` (row, col)."""
     return Affine.translation(float(offset[1]), float(offset[0]))
@@ -342,5 +368,15 @@ class Mask(Layer):
         slices_with_channel, _ = selection
 
         new_data = self.data.copy()
+        erased_labels = np.unique(new_data[slices_with_channel])
         new_data[slices_with_channel] = 0
         self.data = new_data
+
+        # Objects cut by the domain keep part of their pixels: their features are no longer accurate
+        features = self.meta.get("features")
+        if isinstance(features, Dict) and ("label" in features):
+            cut_labels = np.unique(new_data[np.isin(new_data, erased_labels[erased_labels > 0])])
+            try:
+                self.meta = {**self.meta, "features": invalidate_label_features(features, cut_labels)}
+            except ValueError:
+                pass  # Features that don't fit in a table (e.g. columns of different lengths) are left as-is

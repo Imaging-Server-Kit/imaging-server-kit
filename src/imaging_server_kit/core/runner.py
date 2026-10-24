@@ -13,6 +13,7 @@ from imaging_server_kit.core.stack import Stack, StackTileGenerator
 from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
+from imaging_server_kit.types.common import normalize_features
 
 
 def napari_available() -> bool:
@@ -199,6 +200,11 @@ class AlgorithmRunner(ABC):
         stack_tile_gen = StackTileGenerator()
         for params_tile in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
             for result_tile in self._stream(algorithm, params_tile):
+                # Features may have been set after creating the layers, e.g. `mask.meta["features"] = df`
+                for layer in result_tile:
+                    if (layer.meta is not None) and ("features" in layer.meta):
+                        layer.meta["features"] = normalize_features(layer.meta["features"])
+
                 # Create a progress layer at the current step
                 if tile_progress_needed:
                     progress_layer = layer_factory(

@@ -35,6 +35,11 @@ NAPARI_TO_KIND: Dict[Type[napari.layers.Layer], str] = {
 }
 
 
+# Key of the Napari layer `metadata` holding the meta of the corresponding serverkit layer (e.g. its merger and
+# features), so that a new `NapariStack` on the same viewer (e.g. `algo.run(..., stack=viewer)`) recovers it
+SK_META_KEY = "serverkit_meta"
+
+
 def _set_layer_features(napari_layer: napari.layers.Layer, value) -> None:
     try:
         setattr(napari_layer, "features", value)
@@ -52,7 +57,8 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
                 df = pd.DataFrame(value)
                 
                 # For Napari to display the correct label on hover, we need to sort rows by 'label' and add missing labels (incl. 0)
-                full_labels = pd.DataFrame({"label": np.arange(df.label.max()+1)})
+                max_label = int(df.label.max()) if len(df) else 0
+                full_labels = pd.DataFrame({"label": np.arange(max_label + 1)})
                 df_merged = pd.merge(full_labels, df, how="outer", on="label")
                 value = df_merged.sort_values(by="label")
                 
@@ -96,6 +102,7 @@ def _napari_layer_update(ctx: UpdateContext):
                     l.translate = ctx.layer.position
 
                 _set_layer_attributes_from_meta(ctx.layer.meta, l)
+                l.metadata[SK_META_KEY] = ctx.layer.meta
 
 
 def _notification_update(ctx: UpdateContext):
@@ -200,8 +207,10 @@ class NapariStack(Stack):
 
         data = None if kind == "boxes" else napari_layer.data
 
-        # Keep track of the new Napari layer in the layer stack (Note: we don't track layer metadata)
-        self.add(layer_factory(kind=kind, name=napari_layer.name, data=data))
+        # Keep track of the new Napari layer in the layer stack. Napari layer attributes are not tracked,
+        # but the meta of layers created by serverkit is recovered.
+        meta = napari_layer.metadata.get(SK_META_KEY)
+        self.add(layer_factory(kind=kind, name=napari_layer.name, data=data, meta=meta))
 
     def _post_add(self, layer: Layer) -> Layer:
         if layer.data is None:
@@ -240,6 +249,7 @@ class NapariStack(Stack):
 
         if napari_layer is not None:
             _set_layer_attributes_from_meta(meta, napari_layer)
+            napari_layer.metadata[SK_META_KEY] = meta
 
         return layer
 

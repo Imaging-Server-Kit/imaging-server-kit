@@ -8,6 +8,7 @@ import json
 
 import msgpack
 import numpy as np
+import pandas as pd
 import pytest
 
 import imaging_server_kit as sk
@@ -142,3 +143,18 @@ def test_stack_roundtrip(transport):
     assert [l.name for l in result] == ["first", "second", "third"]
     for result_layer, layer in zip(result, stack):
         _assert_same_layer(result_layer, layer)
+
+
+def test_features_roundtrip(transport):
+    """String features (e.g. class names) and DataFrame features survive."""
+    points = np.array([[1.0, 2.0], [3.0, 4.0]])
+    features = pd.DataFrame({"area": [3, 5], "class": ["cat", "dog"]})
+
+    result = _roundtrip(sk.Points(points, features=features), transport)
+
+    assert list(result.meta["features"]["class"]) == ["cat", "dog"]
+    np.testing.assert_array_equal(result.meta["features"]["area"], [3, 5])
+
+    names = np.array(["a", "bc"])
+    result = _roundtrip(sk.Points(points, features={"name": names}), transport)
+    assert result.meta["features"]["name"].dtype == names.dtype

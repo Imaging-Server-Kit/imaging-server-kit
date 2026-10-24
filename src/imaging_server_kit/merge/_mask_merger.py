@@ -8,7 +8,7 @@ import networkx as nx
 from skimage.util import map_array
 
 from imaging_server_kit.merge.merger import DefaultMerger
-from imaging_server_kit.types._mask import Mask
+from imaging_server_kit.types._mask import Mask, invalidate_label_features
 from imaging_server_kit.merge.common import prepare_canvas, update_meta
 from imaging_server_kit.core.tiling import generate_tiles
 
@@ -17,8 +17,32 @@ from imaging_server_kit.core.tiling import generate_tiles
 MAX_MAP_ARRAY_SIZE = 1024**3
 
 
+def _drop_tiled_features(receiving_layer: Mask, incoming_layer: Mask) -> None:
+    """Remove the features of a semantic mask merged from several tiles.
+
+    There is no general way to combine features computed per tile (e.g. the area of each class),
+    and keeping those of the last tile would be wrong.
+    """
+    if incoming_layer.tile_meta.n_tiles <= 1:
+        return
+
+    if "features" in incoming_layer.meta:
+        warnings.warn(
+            f"Features of the semantic mask `{incoming_layer.name}` are dropped: they cannot be merged across tiles.",
+            stacklevel=2,
+        )
+
+    if (receiving_layer.meta is not None) and ("features" in receiving_layer.meta):
+        receiving_layer.meta = {
+            k: v for k, v in receiving_layer.meta.items() if k != "features"
+        }
+
+
 class MaskOverrideMerger(DefaultMerger):
-    """Merge masks using and `override` strategy: last tile overrides existing data in overlapping regions."""
+    """Merge masks using and `override` strategy: last tile overrides existing data in overlapping regions.
+
+    In tiled runs, features are dropped (they cannot be merged across tiles).
+    """
 
     @staticmethod
     def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
@@ -29,6 +53,7 @@ class MaskOverrideMerger(DefaultMerger):
             receiving_layer.position = incoming_layer.position
             receiving_layer.data = incoming_layer.data
             receiving_layer.meta = incoming_layer.meta
+            _drop_tiled_features(receiving_layer, incoming_layer)
             return
 
         new_data, slices_with_channel = prepare_canvas(
@@ -43,6 +68,12 @@ class MaskOverrideMerger(DefaultMerger):
 
         # Meta becomes incoming layer's meta (except from position)
         update_meta(receiving_layer, incoming_layer)
+        _drop_tiled_features(receiving_layer, incoming_layer)
+
+    @staticmethod
+    def on_first_merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
+        # Also removes the features of the first tile (added to the stack) or of a previous run
+        _drop_tiled_features(receiving_layer, incoming_layer)
 
 
 class InstanceTileTracker:
@@ -53,8 +84,8 @@ class InstanceTileTracker:
         self.N = 0  # Current number of objects
         self.G = nx.Graph()
 
-        # Used to store features during the tiles run => resolved at the end with self.resolve_features()
-        self.F = {}
+        # Used to store features (one DataFrame per tile) during the tiles run => resolved at the end with self.resolve_features()
+        self.F = []
 
     def add_N_to_tile(
         self, labels: np.ndarray, features: Optional[Dict] = None
@@ -62,24 +93,17 @@ class InstanceTileTracker:
         # Important - copy to avoid mutating the original array. We use uint32 so that
         # offsetting the labels by N cannot overflow the input dtype (e.g. uint16).
         labels = labels.astype(np.uint32)
-        
+
+        # Features are stored even if the tile is empty, so that features of a previous run get replaced
+        if features is not None:
+            df = pd.DataFrame(features)
+            # Only keep the features of objects present in the tile (this drops the background)
+            df = df[df["label"].isin(unique_positive(labels))]
+            # Make the labels global
+            self.F.append(df.assign(label=df["label"] + self.N))
+
         if labels.sum() > 0:
             labels[labels != 0] = labels[labels != 0] + self.N
-
-            if features:
-                for feature_key, feature_val in features.items():
-                    if feature_key == "label":
-                        is_bg = feature_val == 0
-                        # Make the labels global (except background)
-                        feature_val = feature_val + self.N
-                        feature_val[is_bg] = 0
-
-                    # Store a list of feature arrays as self.F
-                    if feature_key not in self.F:
-                        self.F[feature_key] = [feature_val]
-                    else:
-                        self.F[feature_key].append(feature_val)
-
             self.N = labels.max()
 
         return labels
@@ -109,6 +133,11 @@ class InstanceTileTracker:
 
         return map_array(arr, out=arr, input_vals=input_vals, output_vals=output_vals)
 
+    def current_features(self) -> Dict:
+        """Features registered so far, matching the labels of the merged mask before it is resolved."""
+        df = pd.concat(self.F, ignore_index=True)
+        return {c: df[c].values for c in df.columns}
+
     def resolve_features(self, old_unique_labels: np.ndarray) -> Dict:
         if not hasattr(self, "_mapping"):
             self.build_mapping()
@@ -116,30 +145,20 @@ class InstanceTileTracker:
         input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
         output_vals = np.array(list(self._mapping.values()), dtype=np.int64)
 
-        resolved_features = {}
-        for feature_key, feature_val in self.F.items():
-            # feature_val should be a list of 1D arrays of different lengths => we hstack them
-            resolved_features[feature_key] = np.hstack(feature_val)
+        # Tiles missing a feature column get NaN values for it
+        df = pd.concat(self.F, ignore_index=True)
 
-        try:
-            # Sort values based on the `label` in ascending order
-            df = pd.DataFrame(resolved_features).sort_values(by="label", ascending=True)
-        except ValueError as e:
-            feature_lengths = [len(v) for v in resolved_features.values()]
-            warnings.warn(
-                f"Features could not be resolved into a DataFrame. Perhaps feature values don't have the same lengths? (Lengths: {feature_lengths}). Error: {e}",
-                stacklevel=2,
-            )
-            return {}
+        # Remove rows where `label` is not in `old_unique_labels` (labels present in the array to resolve),
+        # e.g. objects overridden by the next tiles
+        df = df[df["label"].isin(old_unique_labels)].copy()
+        if len(df) == 0:
+            return {c: df[c].values for c in df.columns}
 
-        # Remove rows where `label` is not in `old_unique_labels` (labels present in the array to resolve)
-        # Note: slightly unclear where this difference comes from..
-        df = df[df["label"].isin(old_unique_labels)]
-
-        # Remap the labels
+        # Remap the labels, and sort rows by label
         df["label"] = map_array(
             df["label"].values.copy(), input_vals=input_vals, output_vals=output_vals
         )
+        df = df.sort_values(by="label")
 
         # Feature aggregation:
         # For all 'labels' that have duplicates (= they fall on a tile boundary)
@@ -148,13 +167,11 @@ class InstanceTileTracker:
         # is no good default way to know how to aggregate arbitrary features at the
         # tile boundary. In the future, we could specify strategies for specific,
         # common features like `area` (which should be added) or `class` (majority voting).
-        is_dup_label = df["label"].duplicated(keep=False)
+        dup_labels = df.loc[df["label"].duplicated(), "label"].unique()
         df = df.drop_duplicates(subset=["label"], keep="first")
-        other_cols = df.columns.difference(["label"])
-        df.loc[df["label"].isin(df.loc[is_dup_label, "label"]), other_cols] = np.nan
 
         # Return as dict of 1D numpy arrays
-        return {c: df[c].values for c in df.columns}
+        return invalidate_label_features(df, dup_labels)
 
 
 def unique_positive(labels: np.ndarray) -> np.ndarray:
@@ -187,19 +204,23 @@ def overlap_border_mask(layer: Mask) -> Optional[np.ndarray]:
 
 
 def clean_mask_layer_features(mask: Mask) -> Optional[Dict]:
-    if "features" in mask.meta.keys():
-        incoming_features = mask.meta["features"]
-        if isinstance(incoming_features, Dict):
-            if "label" in incoming_features.keys():
-                labels_arr = incoming_features["label"]
-                if set(labels_arr) == set(np.unique(mask.data)):
-                    # Extract clean features (1D arrays of correct length)
-                    clean_features = {"label": labels_arr}
-                    for feature_key, feature_val in incoming_features.items():
-                        if isinstance(feature_val, np.ndarray):
-                            if len(feature_val) == len(labels_arr):
-                                clean_features[feature_key] = feature_val
-                    return clean_features
+    """Features of the mask with a `label` column, keeping only the 1D arrays of the same length (one value per label)."""
+    features = mask.meta.get("features")
+    if not isinstance(features, Dict) or ("label" not in features):
+        return
+
+    labels_arr = np.asarray(features["label"])
+    clean_features = {}
+    for feature_key, feature_val in features.items():
+        feature_val = np.asarray(feature_val)
+        if (feature_val.ndim == 1) and (len(feature_val) == len(labels_arr)):
+            clean_features[feature_key] = feature_val
+        else:
+            warnings.warn(
+                f"Feature `{feature_key}` is not a 1D array with one value per label; it is dropped.",
+                stacklevel=2,
+            )
+    return clean_features
 
 
 class InstanceMaskTileMerger(DefaultMerger):
@@ -219,6 +240,7 @@ class InstanceMaskTileMerger(DefaultMerger):
                 features=clean_mask_layer_features(incoming_layer),
             )
             receiving_layer.meta = incoming_layer.meta
+            self._update_features(receiving_layer)
             return
 
         new_data, slices_with_channel = prepare_canvas(
@@ -259,17 +281,30 @@ class InstanceMaskTileMerger(DefaultMerger):
 
         # Meta becomes incoming layer's meta (except from position/features)
         update_meta(receiving_layer, incoming_layer, exclude=("position", "features"))
+        self._update_features(receiving_layer)
+
+    def _update_features(self, layer: Mask) -> None:
+        """During the run, the layer shows the features of the tiles merged so far (e.g. live in Napari).
+
+        Without this, it would show the features of the first tile, or of a previous run.
+        They are resolved with the labels on the last merge.
+        """
+        if len(self.tile_tracker.F):
+            # New dict: the meta may be shared with the incoming layer
+            layer.meta = {**layer.meta, "features": self.tile_tracker.current_features()}
 
     def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask):
         self.tile_tracker = InstanceTileTracker()
 
-        if (receiving_layer is incoming_layer) and (incoming_layer.data is not None):
-            # The layer was just added to the stack (its data is not merged). We register its labels
-            # in the tracker, so that labels from the next tiles don't collide with them.
+        if receiving_layer.data is not None:
+            # We register the labels (and features) of the receiving layer in the tracker, so that labels from
+            # the next tiles don't collide with them. Either the layer was just added to the stack (its data
+            # is not merged), or it holds objects from a previous run, outside of the reinitialized domain.
             receiving_layer.data = self.tile_tracker.add_N_to_tile(
-                incoming_layer.data,
-                features=clean_mask_layer_features(incoming_layer),
+                receiving_layer.data,
+                features=clean_mask_layer_features(receiving_layer),
             )
+            self._update_features(receiving_layer)
 
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):
         from imaging_server_kit.merge.layer_merger import LayerMerger

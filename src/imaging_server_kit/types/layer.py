@@ -5,7 +5,7 @@ import numpy as np
 
 from imaging_server_kit.core.domain import Domain, domain_from_key, index_frame
 from imaging_server_kit.core._fmt import fmt_tuple, truncate
-from imaging_server_kit.types.common import copy_meta
+from imaging_server_kit.types.common import copy_meta, normalize_features
 
 from imaging_server_kit.core.tiling import (
     TileMeta,
@@ -34,6 +34,9 @@ def _build_meta(
         meta.setdefault(k, v)
 
     meta.setdefault("required", False)
+
+    if "features" in meta:
+        meta["features"] = normalize_features(meta["features"])
 
     return meta
 
