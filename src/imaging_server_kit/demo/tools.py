@@ -275,20 +275,25 @@ def rescale_algo(image, scale, order, rgb):
             min=0,
             max=10_000,
         ),
+        "rgb": sk.Bool(name="RGB image", default=False),
     },
     name="Utils - Centered crop",
     project_url="https://scikit-image.org/docs/0.25.x/api/skimage.util.html#skimage.util.crop",
     tags=["Utils"],
     samples=[{"image": skimage.data.camera()}],
 )
-def crop_algo(image, crop_width):
+def crop_algo(image, crop_width, rgb):
     """Extract a crop from the center of the image."""
     if image is None:
         return sk.Notification("An image is required!", level="warning")
 
-    cropped = crop(image, crop_width=crop_width)
+    # For RGB images, the channel axis is left untouched
+    n_spatial = image.ndim - 1 if rgb else image.ndim
+    widths = [(crop_width, crop_width)] * n_spatial + [(0, 0)] * (image.ndim - n_spatial)
 
-    return sk.Image(cropped, name="Cropped image")
+    cropped = crop(image, crop_width=widths)
+
+    return sk.Image(cropped, name="Cropped image", rgb=rgb)
 
 
 ## Detect ##
