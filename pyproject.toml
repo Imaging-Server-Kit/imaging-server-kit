@@ -32,7 +32,6 @@ dependencies = [
     # FastAPI and related:
     "fastapi",
     "uvicorn[standard]",
-    "python-multipart",
     "requests",
     "msgpack",
     "networkx",
