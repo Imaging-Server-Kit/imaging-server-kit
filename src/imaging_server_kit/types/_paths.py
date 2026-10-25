@@ -33,7 +33,6 @@ class Paths(Layer):
         name="Paths",
         description="Input paths (2D, 3D)",
         dimensionality: Optional[List[int]] = None,
-        serializer: str = "default",
         **kwargs,
     ):
         super().__init__(
@@ -41,7 +40,6 @@ class Paths(Layer):
             description=description,
             data=data,
             dimensionality=dimensionality,
-            serializer=serializer,
             **kwargs,
         )
 

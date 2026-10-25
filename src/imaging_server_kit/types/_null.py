@@ -24,14 +24,12 @@ class Null(Layer):
         data: Optional[Any] = None,
         name="None",
         default=None,
-        serializer: str = "default",
         **kwargs,
     ):
         super().__init__(
             name=name,
             data=data,
             default=default,
-            serializer=serializer,
             **kwargs,
         )
 

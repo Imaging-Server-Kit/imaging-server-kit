@@ -34,13 +34,11 @@ class Any(Layer):
         data: Optional[typing.Any] = None,
         name="Any",
         default=None,
-        serializer: str = "default",
         **kwargs,
     ):
         super().__init__(
             name=name,
             data=data,
             default=default,
-            serializer=serializer,
             **kwargs,
         )
