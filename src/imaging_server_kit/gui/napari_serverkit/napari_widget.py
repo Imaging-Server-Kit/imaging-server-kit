@@ -3,14 +3,13 @@ from functools import partial
 import napari
 from napari.utils.notifications import show_info, show_warning
 
-import imaging_server_kit.core._etc as etc
 from imaging_server_kit.core.errors import AlgorithmServerError, ServerRequestError
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.gui.common import NAPARI_LAYER_TYPES
 from imaging_server_kit.gui.common.base_widget import BaseRunnerWidget
 from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 from imaging_server_kit.types import layer_factory
-from imaging_server_kit.core.runner import AlgorithmRunner
+from imaging_server_kit.core.runner import AlgorithmRunner, merge_result_tile
 
 
 class NapariWidget(BaseRunnerWidget):
@@ -59,29 +58,9 @@ class NapariWidget(BaseRunnerWidget):
         try:
             algo_params = self.params_panel.get_algo_params()
 
-            algo_param_defs = self.runner_widget.runner.get_parameters(algorithm_name)[
-                "properties"
-            ]
-
-            signature_params = self.runner_widget.runner.get_signature_params(
-                algorithm_name
+            params_stack = self.runner_widget.runner._params_stack(
+                algorithm_name, args=(), algo_params=algo_params
             )
-
-            resolved_params = etc.resolve_params(
-                algo_param_defs,
-                signature_params,
-                args=(),
-                algo_params=algo_params,
-            )
-
-            params_stack = Stack()
-            for name, data in resolved_params.items():
-                kw = algo_param_defs[name]
-                kind = kw.pop("param_type")
-                if "anyOf" in kw:
-                    kw.pop("anyOf")  # added by Pydantic - we don't need it.
-                param_layer = layer_factory(kind=kind, data=data, name=name, **kw)
-                params_stack.add(param_layer)
 
             tiling_ctx = self.runner_widget.selected_tiling_specs
 
@@ -92,7 +71,8 @@ class NapariWidget(BaseRunnerWidget):
                 params_stack=params_stack,
             )
 
-            self.reinitialize_domain = params_stack.extent
+            # The parameters extent doesn't change during the run (computed once)
+            self.params_extent = params_stack.extent
 
         except (AlgorithmServerError, ServerRequestError) as e:
             show_warning(e.message)
@@ -105,21 +85,9 @@ class NapariWidget(BaseRunnerWidget):
         if payload is None:
             return
 
-        result_tile, params_domain = payload
+        result_tile, params_tile = payload
 
-        # New position can be offset by the position of the parameters tile
-        if (result_tile.position is not None) and (params_domain.position is not None):
-            result_tile.position = tuple(
-                [p + q for p, q in zip(params_domain.position, result_tile.position)]
-            )
-        else:
-            result_tile.position = params_domain.position
-
-        if self.reinitialize_domain is None:
-            # If inputs don't have an extent, we clear up the whole output
-            self.reinitialize_domain = self.napari_stack.extent
-
-        self.napari_stack.merge(result_tile, self.reinitialize_domain)
+        merge_result_tile(self.napari_stack, result_tile, params_tile, self.params_extent)
 
     def _download_sample(self, *args, **kwargs) -> Stack:
         algorithm_name = self.runner_widget.selected_algorithm_name

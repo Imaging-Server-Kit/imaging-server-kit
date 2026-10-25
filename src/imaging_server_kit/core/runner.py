@@ -38,6 +38,39 @@ def validate_algorithm(func: Callable) -> Callable:
     return wrapper
 
 
+def merge_result_tile(
+    stack: Stack,
+    result_tile: Stack,
+    params_tile: Stack,
+    params_extent: Optional[Domain],
+) -> None:
+    """Merge a result tile (from `run_generator()`) into a stack, in place.
+
+    The previous results are reinitialized in `params_extent`, the extent of the parameters
+    of the whole run (or the whole stack, if the parameters have no extent).
+    """
+    # If the parameters tile and result tile both have a position,
+    # the result tile's position is offset by that of the parameters tile
+    if (result_tile.position is not None) and (params_tile.position is not None):
+        result_tile.position = tuple(
+            [p + q for p, q in zip(params_tile.position, result_tile.position)]
+        )
+    else:
+        result_tile.position = params_tile.position
+
+    # We assume that reinitializing the parameters domain on first tile
+    # will be the correct behaviour most of the time.
+    if params_extent is None:
+        # If inputs don't have an extent, we clear up the whole output
+        # (re-evaluated, since the output grows as results are merged)
+        domain_to_erase = stack.extent
+    else:
+        domain_to_erase = params_extent
+
+    # Merge the result tile into the stack
+    stack.merge(result_tile, domain_to_erase)
+
+
 class AlgorithmRunner(ABC):
     """Interface shared by `sk.Algorithm`, `sk.MultiAlgorithm`, and `sk.Client`.
 
@@ -161,6 +194,44 @@ class AlgorithmRunner(ABC):
         self, algorithm, params_stack: Stack
     ) -> Generator[Stack, None, None]: ...
 
+    def _params_stack(self, algorithm: str, args: Tuple, algo_params: Dict) -> Stack:
+        """Resolve the parameters of a run (positional, by name, defaults) into a Stack of layers."""
+        # Parameters from the Pydantic model => gives defaults from the {parameters=} definition
+        algo_param_defs = self.get_parameters(algorithm)["properties"]
+
+        # Ordered list of parameter names based on the run function signature (args + kwargs)
+        signature_params = self.get_signature_params(algorithm)
+
+        # Catch users making typos or sending unknown parameters
+        unknown_params = set(algo_params) - set(signature_params)
+        if unknown_params:
+            raise TypeError(
+                f"{self.name} got unexpected parameter(s) {sorted(unknown_params)}; "
+                f"expected one of {signature_params}"
+            )
+
+        # Default parameters resolution. Priority is given to defaults set in the wrapped function.
+        # If no defaults are set, the defaults from the decorated parameters are used.
+        resolved_params = etc.resolve_params(
+            algo_param_defs,
+            signature_params,
+            args,
+            algo_params,
+        )
+
+        # Convert the resolved parameters to a Stack object
+        params_stack = Stack()
+        for name, data in resolved_params.items():
+            kw = dict(algo_param_defs[name])  # Copy, to avoid mutating the parameters schema
+            kind = kw.pop("param_type")
+            if "anyOf" in kw:
+                kw.pop("anyOf")  # added by Pydantic - we don't need it.
+
+            param_layer = layer_factory(kind=kind, data=data, name=name, **kw)
+            params_stack.add(param_layer)
+
+        return params_stack
+
     def run_generator(
         self,
         algorithm: str,
@@ -282,39 +353,7 @@ class AlgorithmRunner(ABC):
                 message="Algorithm cannot be run in tiled mode.",
             )
 
-        # Parameters from the Pydantic model => gives defaults from the {parameters=} definition
-        algo_param_defs = self.get_parameters(algorithm)["properties"]
-
-        # Ordered list of parameter names based on the run function signature (args + kwargs)
-        signature_params = self.get_signature_params(algorithm)
-
-        # Catch users making typos or sending unknown parameters
-        unknown_params = set(algo_params) - set(signature_params)
-        if unknown_params:
-            raise TypeError(
-                f"{self.name} got unexpected parameter(s) {sorted(unknown_params)}; "
-                f"expected one of {signature_params}"
-            )
-
-        # Default parameters resolution. Priority is given to defaults set in the wrapped function.
-        # If no defaults are set, the defaults from the decorated parameters are used.
-        resolved_params = etc.resolve_params(
-            algo_param_defs,
-            signature_params,
-            args,
-            algo_params,
-        )
-
-        # Convert the resolved parameters to a Stack object
-        params_stack = Stack()
-        for name, data in resolved_params.items():
-            kw = dict(algo_param_defs[name])  # Copy, to avoid mutating the parameters schema
-            kind = kw.pop("param_type")
-            if "anyOf" in kw:
-                kw.pop("anyOf")  # added by Pydantic - we don't need it.
-
-            param_layer = layer_factory(kind=kind, data=data, name=name, **kw)
-            params_stack.add(param_layer)
+        params_stack = self._params_stack(algorithm, args, algo_params)
 
         if stack is None:
             stack = Stack()
@@ -356,28 +395,7 @@ class AlgorithmRunner(ABC):
             for result_tile, params_tile in self.run_generator(
                 algorithm, params_stack, tiling_ctx
             ):
-                # If the parameters tile and result tile both have a position,
-                # the result tile's position is offset by that of the parameters tile
-                if (result_tile.position is not None) and (
-                    params_tile.position is not None
-                ):
-                    result_tile.position = tuple(
-                        [p + q for p, q in zip(params_tile.position, result_tile.position)]
-                    )
-                else:
-                    result_tile.position = params_tile.position
-
-                # We assume that reinitializing the parameters domain on first tile
-                # will be the correct behaviour most of the time.
-                if params_extent is None:
-                    # If inputs don't have an extent, we clear up the whole output
-                    # (re-evaluated, since the output grows as results are merged)
-                    domain_to_erase = stack.extent
-                else:
-                    domain_to_erase = params_extent
-
-                # Merge the result tile into the stack
-                stack.merge(result_tile, domain_to_erase)
+                merge_result_tile(stack, result_tile, params_tile, params_extent)
         finally:
             # Stop the terminal progress bars, even if the run fails or is interrupted
             progress_display.stop()
