@@ -10,10 +10,9 @@ from skimage.util import map_array
 from imaging_server_kit.merge.merger import DefaultMerger
 from imaging_server_kit.types._mask import Mask, invalidate_label_features
 from imaging_server_kit.merge.common import prepare_canvas, update_meta
-from imaging_server_kit.core.tiling import generate_tiles
 
 # Max pixels for doing the resolve() operation of instance masks one go (set arbitrarily, could be configurable in future versions).
-# If the image is bigger than that, we do the instance mask resolution in tiles, too.
+# If the image is bigger than that, we do the instance mask resolution in chunks.
 MAX_MAP_ARRAY_SIZE = 1024**3
 
 
@@ -307,21 +306,16 @@ class InstanceMaskTileMerger(DefaultMerger):
             self._update_features(receiving_layer)
 
     def on_last_merge(self, receiving_layer: Mask, incoming_layer: Mask):
-        from imaging_server_kit.merge.layer_merger import LayerMerger
-
         old_unique_labels = np.unique(receiving_layer.data)
 
         if receiving_layer.data.size > MAX_MAP_ARRAY_SIZE:
-            # Use ndim to approximate tile size
-            tile_size = int(np.floor(MAX_MAP_ARRAY_SIZE ** (1 / receiving_layer.ndim)))
-
-            merger = LayerMerger()
-            for tile_meta, tile_domain in generate_tiles(
-                domain=receiving_layer.extent, tile_size=tile_size
-            ):
-                roi = receiving_layer.select(tile_domain)
-                roi.data = self.tile_tracker.resolve(roi.data)
-                merger.merge(receiving_layer, roi)
+            # The label mapping is applied pixel by pixel, so we resolve the data in chunks along the first axis
+            data = receiving_layer.data
+            chunk_len = max(1, MAX_MAP_ARRAY_SIZE // (data.size // len(data)))
+            for start in range(0, len(data), chunk_len):
+                chunk = slice(start, start + chunk_len)
+                data[chunk] = self.tile_tracker.resolve(data[chunk])
+            receiving_layer.data = data
         else:
             # Don't bother resolving the data in tiles
             receiving_layer.data = self.tile_tracker.resolve(receiving_layer.data)

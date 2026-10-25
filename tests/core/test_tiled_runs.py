@@ -204,6 +204,16 @@ def test_tiled_instance_mask_with_more_than_65535_labels():
     assert len(np.unique(result)) == 300 * 300
 
 
+def test_tiled_instance_labels_resolved_in_chunks_match(blobs, monkeypatch):
+    """Large masks are resolved in chunks; labels must be the same as when resolved in one go."""
+    expected = label_blobs.run(blobs, tiled=True, tile_size=64, tile_overlap=0.25)[0].data
+
+    monkeypatch.setattr("imaging_server_kit.merge._mask_merger.MAX_MAP_ARRAY_SIZE", 1000)
+    result = label_blobs.run(blobs, tiled=True, tile_size=64, tile_overlap=0.25)[0].data
+
+    np.testing.assert_array_equal(result, expected)
+
+
 def test_tiled_instance_rerun_into_existing_stack(blobs):
     stack = label_blobs.run(blobs, tiled=True, tile_size=64, tile_overlap=0.25)
     stack = label_blobs.run(blobs, tiled=True, tile_size=64, tile_overlap=0.25, stack=stack)
