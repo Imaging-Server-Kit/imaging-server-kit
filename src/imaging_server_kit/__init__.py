@@ -74,13 +74,9 @@ def convert(stack: Stack, to: str = "stack") -> Union[Stack, "napari.Viewer"]:
     if to == "stack":
         return Stack(layers=stack.layers)
     elif to == "napari":
-        from imaging_server_kit.gui.napari_serverkit import napari_available
+        from imaging_server_kit.core._optional import require_napari
 
-        if not napari_available():
-            raise ImportError("""
-                    This function requires the optional Napari dependencies to be installed.\n
-                    Install them with: `pip install imaging-server-kit[napari]`.
-                """)
+        require_napari()
 
         from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 

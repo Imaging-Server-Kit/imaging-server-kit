@@ -1,12 +1,8 @@
 from typing import Callable, Optional, Union
-import importlib.util
 
-from imaging_server_kit import Algorithm
+from imaging_server_kit.core._optional import napari_available, require_napari  # noqa: F401 (napari_available is re-exported)
+from imaging_server_kit.core.algorithm import as_runner
 from imaging_server_kit.core.runner import AlgorithmRunner
-
-
-def napari_available() -> bool:
-    return importlib.util.find_spec("napari") is not None
 
 
 def to_qwidget(
@@ -30,18 +26,11 @@ def to_qwidget(
     QWidget
         The widget, exposing the parameters and results of the runner.
     """
-    if not napari_available():
-        raise ImportError(
-                """
-                    This function requires the optional Napari dependencies to be installed.\n
-                    Install them with: `pip install imaging-server-kit[napari]`.
-                """
-            )
+    require_napari()
     
     from .napari_widget import NapariWidget
     
-    if not isinstance(runner, AlgorithmRunner):
-        runner = Algorithm(runner)
+    runner = as_runner(runner)
 
     return NapariWidget(viewer=viewer, runner=runner)
 
@@ -71,18 +60,11 @@ def to_napari(
     --------
     >>> viewer = sk.to_napari(threshold_algo)
     """
-    if not napari_available():
-        raise ImportError(
-                """
-                    This function requires the optional Napari dependencies to be installed.\n
-                    Install them with: `pip install imaging-server-kit[napari]`.
-                """
-            )
+    require_napari()
 
     import napari
     
-    if not isinstance(runner, AlgorithmRunner):
-        runner = Algorithm(run_algorithm_func=runner)
+    runner = as_runner(runner)
 
     if viewer is None:
         viewer = napari.Viewer()

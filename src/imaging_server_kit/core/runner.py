@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
-import importlib.util
 
 import imaging_server_kit.core._etc as etc
 import imaging_server_kit.core._progress_display as progress_display
+from imaging_server_kit.core._optional import napari_available
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
@@ -14,10 +14,6 @@ from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
 from imaging_server_kit.types.common import normalize_features
-
-
-def napari_available() -> bool:
-    return importlib.util.find_spec("napari") is not None
 
 
 def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) -> str:

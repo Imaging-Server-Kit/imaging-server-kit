@@ -467,6 +467,13 @@ class Algorithm(AlgorithmRunner, Generic[P]):
                 raise AlgorithmRuntimeError(algorithm=algorithm, error=e)
 
 
+def as_runner(obj: Union[AlgorithmRunner, Callable]) -> AlgorithmRunner:
+    """Return `obj` if it is already a runner; otherwise, convert the Python function to an algorithm."""
+    if isinstance(obj, AlgorithmRunner):
+        return obj
+    return Algorithm(obj)
+
+
 @overload
 def algorithm(func: Callable[P, Any]) -> Algorithm[P]: ...
 

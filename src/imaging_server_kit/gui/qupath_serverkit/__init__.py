@@ -1,18 +1,14 @@
 from __future__ import annotations
 import sys
 from typing import Callable, Optional, Union, TYPE_CHECKING
-import importlib.util
 
+from imaging_server_kit.core._optional import qubalab_available, require_qupath  # noqa: F401 (qubalab_available is re-exported)
 from imaging_server_kit.core.runner import AlgorithmRunner
-from imaging_server_kit.core.algorithm import Algorithm
+from imaging_server_kit.core.algorithm import as_runner
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QWidget
     from napari import Viewer
-
-
-def qubalab_available() -> bool:
-    return importlib.util.find_spec("qubalab") is not None
 
 
 def to_qwidget(
@@ -40,18 +36,11 @@ def to_qwidget(
     QWidget
         The QuPath panel.
     """
-    if not qubalab_available():
-        raise ImportError(
-                """
-                    This function requires the optional QuPath dependencies to be installed.\n
-                    Install them with: `pip install imaging-server-kit[qupath]`.
-                """
-            )
+    require_qupath()
     
     from .qupath_widget import QuPathWidget
     
-    if not isinstance(runner, AlgorithmRunner):
-        runner = Algorithm(runner)
+    runner = as_runner(runner)
 
     return QuPathWidget(port=port, token=token, runner=runner, viewer=viewer)
 
@@ -88,16 +77,9 @@ def to_qupath(
     napari.Viewer or None
         The viewer, if one was given.
     """
-    if not qubalab_available():
-        raise ImportError(
-                """
-                    This function requires the optional QuPath dependencies to be installed.\n
-                    Install them with: `pip install imaging-server-kit[qupath]`.
-                """
-            )
+    require_qupath()
     
-    if not isinstance(runner, AlgorithmRunner):
-        runner = Algorithm(run_algorithm_func=runner)
+    runner = as_runner(runner)
 
     if viewer is not None:
         widget = to_qwidget(runner=runner, port=port, token=token, viewer=viewer)
