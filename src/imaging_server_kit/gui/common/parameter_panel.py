@@ -153,4 +153,5 @@ class ParameterPanel(QGroupBox):
         """Whenever a worker returns, we update the napari layer comboboxes to their current index (instead of resetting it)"""
         for cb_list in self.layer_comboboxes.values():
             for cb in cb_list:
-                worker.returned.connect(lambda _: cb.setCurrentIndex(cb.currentIndex()))
+                # Bind `cb` as a default argument (a plain closure would only see the last combobox)
+                worker.returned.connect(lambda _, cb=cb: cb.setCurrentIndex(cb.currentIndex()))
