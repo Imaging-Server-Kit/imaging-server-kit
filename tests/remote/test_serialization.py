@@ -76,6 +76,7 @@ LAYERS = {
     "boxes-empty": lambda: sk.Boxes(np.zeros((0, 4, 2))),
     "vectors-empty": lambda: sk.Vectors(np.zeros((0, 2, 3))),
     "tracks-empty": lambda: sk.Tracks(np.zeros((0, 4))),
+    "paths-empty": lambda: sk.Paths([np.zeros((0, 2)), np.array([[1.0, 2.0], [3.0, 4.0]])]),
     "paths": lambda: sk.Paths([np.array([[0.0, 0.0], [1.0, 2.0]]), np.array([[5.0, 5.0], [6.0, 7.5], [8.0, 9.0]])]),
     "tracks": lambda: sk.Tracks(np.array([[1.0, 0.0, 10.0, 12.0], [1.0, 1.0, 11.0, 13.5]])),
     "float": lambda: sk.Float(2.5, min=0.0, max=10.0),
