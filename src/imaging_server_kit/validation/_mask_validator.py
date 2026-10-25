@@ -20,9 +20,9 @@ class MaskValidator(Validator):
             raise TypeError(f"Mask data ({type(data)}) is not a Numpy array")
 
         if not all(data.shape):
-            raise ValueError("Image array has an invalid shape: ", data.shape)
+            raise ValueError("Mask array has an invalid shape: ", data.shape)
 
         if meta:
             if len(data.shape) not in meta["dimensionality"]:
-                raise ValueError("Image array has the wrong dimensionality.")
+                raise ValueError("Mask array has the wrong dimensionality.")
         

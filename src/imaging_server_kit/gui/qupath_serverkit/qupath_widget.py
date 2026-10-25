@@ -206,7 +206,7 @@ class QuPathWidget(QWidget):
 
             self.runner_widget.update_tiled_ui(algo_is_tileable)
         except Exception:
-            self.logger.log("⚠️ Algorithm `{selected_algo}` is unavailable.")
+            self.logger.log(f"⚠️ Algorithm `{selected_algo}` is unavailable.")
 
     def _run(self):
         annotation_name = self.annotation_field.currentText()
@@ -234,7 +234,7 @@ class QuPathWidget(QWidget):
 
             elif len(found_annotations) > 1:
                 self.logger.log(
-                    f"⚠️ Multiple annotations named `{annotation_name}` found in QuPath (found {len(found_annotations)}). Using the first one."
+                    f"⚠️ Multiple annotations named `{annotation_name}` found in QuPath (found {len(found_annotations)}). Please give it a unique name."
                 )
                 return
 

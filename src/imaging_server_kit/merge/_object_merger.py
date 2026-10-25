@@ -2,7 +2,7 @@ from typing import Dict, Union
 
 import numpy as np
 
-from imaging_server_kit.merge.layer_merger import DefaultMerger
+from imaging_server_kit.merge.merger import DefaultMerger
 from imaging_server_kit.types._points import Points
 from imaging_server_kit.types._vectors import Vectors
 from imaging_server_kit.types._boxes import Boxes

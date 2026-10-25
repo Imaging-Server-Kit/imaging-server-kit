@@ -35,7 +35,7 @@ class NapariWidget(QWidget):
             viewer, pbar=self.pbar, params_panel=self.params_panel
         )
 
-        # # Runner widget
+        # Runner widget
         self.runner_widget = RunnerWidget(runner)
 
         # Layout

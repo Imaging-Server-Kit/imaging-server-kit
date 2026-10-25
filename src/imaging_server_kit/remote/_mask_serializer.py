@@ -1,6 +1,5 @@
-from typing import List, Optional, Union
+from typing import Optional
 
-from geojson import Feature
 import numpy as np
 
 from imaging_server_kit.remote.encoding import decode_contents, encode_contents
@@ -10,7 +9,7 @@ from imaging_server_kit.types._mask import Mask
 
 class MaskDataSerializer(Serializer):
     @staticmethod
-    def serialize(mask: Optional[Mask]) -> Optional[Union[List[Feature], str]]:
+    def serialize(mask: Optional[Mask]) -> Optional[str]:
         if mask is None:
             return
 

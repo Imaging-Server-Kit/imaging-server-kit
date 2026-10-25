@@ -63,7 +63,7 @@ class Stack:
 
         self._tile_meta = TileMeta() if tile_meta is None else tile_meta.copy()
 
-        self._position = position  # self._resolve_stack_position(position)
+        self._position = position
 
     def __repr__(self) -> str:
         n = len(self.layers)
