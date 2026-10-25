@@ -155,3 +155,31 @@ def test_process_error_is_streamed_as_last_message(client):
     messages = list(unpacker)
 
     assert messages[-1] == {"__error__": {"type": "RuntimeError", "message": "boom"}}
+
+
+### HTML pages ###
+
+
+def test_info_page_lists_parameters(client):
+    resp = client.get("/add_offset/info")
+
+    assert resp.status_code == 200
+    assert "<h1>add_offset</h1>" in resp.text
+    assert "<code class=\"text-muted\">offset</code>" in resp.text
+
+
+def test_home_page_lists_algorithms(client):
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    for name in ["add_offset", "double_int", "fails"]:
+        assert f'href="/{name}/info"' in resp.text
+
+
+def test_home_page_of_a_single_algorithm_is_its_info_page():
+    client = TestClient(AlgorithmApp(algorithms=[add_offset], name="Test server").app)
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "<h1>add_offset</h1>" in resp.text

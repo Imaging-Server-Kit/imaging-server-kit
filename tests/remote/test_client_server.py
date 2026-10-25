@@ -19,7 +19,10 @@ import imaging_server_kit as sk
 from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
+    AlgorithmServerError,
+    AlgorithmTimeoutError,
     InvalidAlgorithmParametersError,
+    ServerRequestError,
 )
 from imaging_server_kit.remote.app import AlgorithmApp
 from imaging_server_kit.remote.client import Client
@@ -151,3 +154,46 @@ def test_server_side_error_is_raised_by_client(client, algorithm):
 def test_unknown_algorithm_raises(client):
     with pytest.raises(AlgorithmNotFoundError):
         client.run(algorithm="does_not_exist")
+
+
+### Error mapping (no server needed) ###
+
+
+class _FakeResponse:
+    def __init__(self, status_code, body):
+        self.status_code = status_code
+        self.text = str(body)
+        self._body = body
+
+    def json(self):
+        if not isinstance(self._body, dict):
+            raise ValueError("Not JSON")
+        return self._body
+
+
+@pytest.mark.parametrize(
+    "status_code, error_cls",
+    [
+        (422, InvalidAlgorithmParametersError),
+        (504, AlgorithmTimeoutError),
+        (500, AlgorithmServerError),
+        (404, AlgorithmServerError),
+    ],
+)
+def test_response_status_codes_map_to_errors(status_code, error_cls):
+    with pytest.raises(error_cls) as exc_info:
+        Client()._handle_response_errored(_FakeResponse(status_code, "Server says no"))
+
+    assert exc_info.value.status_code == status_code
+
+
+def test_invalid_parameters_error_reports_the_failing_parameter():
+    body = {"detail": [{"loc": ["offset"], "msg": "Input should be less than 10", "input": 12}]}
+
+    with pytest.raises(InvalidAlgorithmParametersError, match="offset.*less than 10.*12"):
+        Client()._handle_response_errored(_FakeResponse(422, body))
+
+
+def test_unreachable_server_raises_server_request_error():
+    with pytest.raises(ServerRequestError):
+        Client(f"http://127.0.0.1:{_free_port()}")
