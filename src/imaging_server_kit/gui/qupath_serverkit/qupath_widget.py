@@ -2,28 +2,23 @@ from functools import partial
 from typing import List, Optional
 
 from napari_toolkit.containers.collapsible_groupbox import QCollapsibleGroupBox
-from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QComboBox,
     QGridLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QProgressBar,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
-    QWidget,
 )
 
 from imaging_server_kit.core.runner import AlgorithmRunner
-from imaging_server_kit.gui.common import ParameterPanel, RunnerWidget, TaskManager
+from imaging_server_kit.gui.common.base_widget import BaseRunnerWidget
 from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import (
     QuPathBridge,
     if_compatible_get_qupath_schema,
 )
-from imaging_server_kit.remote import Client
-from imaging_server_kit.core.errors import AlgorithmServerError, ServerRequestError
 
 
 def _qupath_compabile_algos(runner: AlgorithmRunner) -> List[str]:
@@ -45,7 +40,7 @@ class LogPanel(QPlainTextEdit):
         self.appendPlainText(f"{message}")
 
 
-class QuPathWidget(QWidget):
+class QuPathWidget(BaseRunnerWidget):
     def __init__(
         self,
         runner: AlgorithmRunner,
@@ -53,13 +48,7 @@ class QuPathWidget(QWidget):
         token: str = "",
         viewer: Optional["napari.Viewer"] = None,
     ):
-        super().__init__()
-
-        # Create a dynamic parameters panel
-        self.params_panel = ParameterPanel(trigger=self._run)
-
-        # Progress bar
-        self.pbar = QProgressBar(minimum=0, maximum=1)  # type: ignore
+        super().__init__(runner, algorithms=_qupath_compabile_algos(runner=runner))
 
         # Optional Napari stack to collect results in at the same time as QuPath
         if viewer is not None:
@@ -73,16 +62,9 @@ class QuPathWidget(QWidget):
 
             self.stack = Stack()
 
-        # Runner widget
-        qupath_compatible_algos = _qupath_compabile_algos(runner=runner)
-        self.runner_widget = RunnerWidget(runner, algorithms=qupath_compatible_algos)
+        layout = self.layout()
 
-        # Layout
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.setLayout(layout)
-
-        # QuPath context
+        # QuPath context (inserted above the runner widget)
         qp_groupbox = QCollapsibleGroupBox("QuPath connection")  # type: ignore
         qp_groupbox.setChecked(False)
         qp_layout = QGridLayout(qp_groupbox)
@@ -98,54 +80,15 @@ class QuPathWidget(QWidget):
         self.token_field.setText(token)
         qp_layout.addWidget(self.token_field, 1, 1)
 
-        layout.addWidget(qp_groupbox)
+        layout.insertWidget(0, qp_groupbox)
 
         self.qupath_connect_btn = QPushButton("Connect to QuPath")
         self.qupath_connect_btn.clicked.connect(self._connect)
-        layout.addWidget(self.qupath_connect_btn)
+        layout.insertWidget(1, self.qupath_connect_btn)
 
-        layout.addWidget(QLabel("Annotation"))
+        layout.insertWidget(2, QLabel("Annotation"))
         self.annotation_field = QComboBox()
-        layout.addWidget(self.annotation_field)
-
-        # Add the runner's extra UI
-        layout.addWidget(self.runner_widget)
-
-        # Connect the server URL field
-        self.runner_widget.connect_btn.clicked.connect(self._connect_from_btn)
-
-        # Connect the ComboBox change from the runner to the UI update
-        self.runner_widget.cb_algorithms.currentTextChanged.connect(
-            self._algorithm_changed
-        )
-
-        # Connect the doc link button
-        self.runner_widget.algo_info_btn.clicked.connect(self._open_info_link_from_btn)
-
-        # Add the parameters panel
-        layout.addWidget(self.params_panel)
-
-        # Run button
-        self.run_btn = QPushButton("Run", self)
-        self.run_btn.clicked.connect(self._run)
-        layout.addWidget(self.run_btn)
-
-        # Task manager
-        self.tasks = TaskManager(
-            self._grayout_ui,  # called when worker starts
-            self._ungrayout_ui,  # called when worker stops
-            self.params_panel,  # linked to manage_cbs_events(worker)
-        )
-
-        self.grayout_ui_list = [self.params_panel, self.run_btn, self.runner_widget]
-
-        # Cancel button
-        cancel_btn = QPushButton("❌ Cancel")
-        cancel_btn.clicked.connect(self._cancel)
-        layout.addWidget(cancel_btn)
-
-        # Progress bar (= soon to be its own layout appearing at the bottom)
-        layout.addWidget(self.pbar)
+        layout.insertWidget(3, self.annotation_field)
 
         # Logging panel
         self.logger = LogPanel()
@@ -159,9 +102,7 @@ class QuPathWidget(QWidget):
         log_layout.addWidget(log_clear_btn)
         layout.addWidget(log_groupbox)
 
-        # Trigger an initial `algorithm selection`
-        if len(self.runner_widget.runner.algorithms) > 0:
-            self._algorithm_changed(self.runner_widget.runner.algorithms[0])
+        self._select_first_algorithm()
 
     def _connect(self):
         port = self.port_field.value()
@@ -271,40 +212,8 @@ class QuPathWidget(QWidget):
             if result_tile.tile_meta.is_last_tile:
                 self.bridge.merge_with_qupath(self.stack)
 
-    def _open_info_link_from_btn(self, *args, **kwargs) -> None:
-        algorithm = self.runner_widget.selected_algorithm_name
-        if algorithm == "":
-            return
+    def _log(self, message: str, warning: bool = False) -> None:
+        self.logger.log(message)
 
-        self.runner_widget.runner.info(algorithm)
-
-    def _connect_from_btn(self):
-        server_url = self.runner_widget.server_url_field.text()
-        if server_url == "":
-            return
-
-        if isinstance(self.runner_widget.runner, Client):
-            try:
-                self.runner_widget.runner.connect(server_url)
-            except (ServerRequestError, AlgorithmServerError):
-                self.logger.log(f"Could not connect to server on {server_url}")
-
-        self.runner_widget.cb_algorithms.clear()
-        qupath_compatible_algos = _qupath_compabile_algos(
-            runner=self.runner_widget.runner
-        )
-        self.runner_widget.cb_algorithms.addItems(qupath_compatible_algos)
-
-    def _cancel(self):
-        self.logger.log("⏳ Cancelling...")
-        self.tasks.cancel_all()
-
-    def _grayout_ui(self):
-        self.pbar.setMaximum(0)  # Start the pbar
-        for ui_element in self.grayout_ui_list:
-            ui_element.setEnabled(False)
-
-    def _ungrayout_ui(self):
-        self.pbar.setMaximum(1)  # Stop the pbar
-        for ui_element in self.grayout_ui_list:
-            ui_element.setEnabled(True)
+    def _list_algorithms(self) -> List[str]:
+        return _qupath_compabile_algos(runner=self.runner_widget.runner)
