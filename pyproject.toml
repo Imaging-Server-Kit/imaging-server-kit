@@ -33,6 +33,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
+    "requests",
     "msgpack",
     "networkx",
     "pillow>=13.0.0",
