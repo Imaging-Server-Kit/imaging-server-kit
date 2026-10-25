@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import numpy as np
 
-from imaging_server_kit.core.tiling import Domain
-from imaging_server_kit.types.common import copy_meta, objects_in_domain, select_object_meta
-from imaging_server_kit.types.layer import Layer
+from imaging_server_kit.types._objects import _ObjectsLayer
 
 
-class Points(Layer):
+class Points(_ObjectsLayer):
     """Data layer for sets of points (2D, 3D).
 
     Parameters
@@ -45,109 +43,3 @@ class Points(Layer):
             dimensionality=dimensionality,
             **kwargs,
         )
-
-    @property
-    def data_global_coords(self) -> Optional[np.ndarray]:
-        """Data in global coordinates."""
-        if self.data is not None:
-            return self.data + self.position
-
-    def data_from_coords(self, coords: Tuple) -> Optional[np.ndarray]:
-        """Data viewed from the given origin coordinates."""
-        if self.data is not None:
-            return self.data + (np.asarray(self.position) - np.asarray(coords))
-
-    @property
-    def n_objects(self) -> int:
-        if self.data is None:
-            return 0
-        else:
-            return len(self.data)
-
-    @property
-    def _bounds(self) -> Optional[Tuple]:
-        """Data bounds in local coordinates."""
-        if self.data is None:
-            return
-
-        if self.n_objects == 0:
-            return
-
-        # The upper bound is exclusive (+1), like an image extent is its shape
-        bounds_min = tuple(np.min(self.data, axis=0).tolist())
-        bounds_max = tuple((np.max(self.data, axis=0) + 1).tolist())
-
-        return (bounds_min, bounds_max)
-
-    def select(self, domain: Domain) -> Points:
-        """Select the part of the layer inside a domain.
-
-        Parameters
-        ----------
-        domain : Domain
-            The region to select, in global pixel coordinates.
-
-        Returns
-        -------
-        Points
-            A new layer with the selected data, positioned in global coordinates.
-        """
-        if domain.size is None:
-            # Undefined domain: nothing to select, the data is kept as-is
-            return Points(
-                data=self.data,
-                name=self.name,
-                meta=copy_meta(self),
-                tile_meta=self.tile_meta.copy(),
-            )
-
-        if self.n_objects == 0:
-            _data = self._zeros_in(domain=domain)
-            _meta = copy_meta(self)
-        else:
-            # Select points via global coordinates
-            filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
-
-            selected_points = self.data_global_coords[filt]
-
-            if self.meta:
-                selected_meta = select_object_meta(self.meta.copy(), self.n_objects, filt)
-            else:
-                selected_meta = self.meta
-
-            if len(selected_points) > 0:
-                # Return the points in coordinates local to the selection domain
-                selected_points = selected_points - domain.coords_min
-
-            _data = selected_points
-            _meta = selected_meta
-
-        points_selection = Points(
-            data=_data,
-            name=self.name,
-            meta=_meta,
-            tile_meta=self.tile_meta.copy(),
-        )
-        
-        points_selection.position = domain.coords_min
-        
-        return points_selection
-
-    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
-        """Initialize zero-valued data in a given domain."""
-        if domain is not None:
-            return np.zeros((0, domain.ndim), dtype=np.float32)
-
-    def _reinitialize(self, domain: Domain) -> None:
-        """Remove data in a given domain."""
-        if self.data is None:
-            return
-
-        if self.n_objects == 0:
-            return
-
-        filt = objects_in_domain(self.data_global_coords, domain)  # (N,)
-
-        if filt.any():
-            self.data = self.data[~filt]
-            self.meta = select_object_meta(self.meta, len(filt), ~filt)

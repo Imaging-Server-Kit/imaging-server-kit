@@ -18,14 +18,17 @@ See [Data layers](../../concepts/layers-and-stacks.md) for an introduction to da
 ::: imaging_server_kit.Points
     options:
       members: false
+      show_bases: false  # The base class is private
 
 ::: imaging_server_kit.Vectors
     options:
       members: false
+      show_bases: false  # The base class is private
 
 ::: imaging_server_kit.Boxes
     options:
       members: false
+      show_bases: false  # The base class is private
 
 ::: imaging_server_kit.Paths
     options:
