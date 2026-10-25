@@ -14,10 +14,17 @@ class PointsValidator(Validator):
             return
         
         data = points.data
+        meta = points.meta
         
         if not isinstance(data, np.ndarray):
             raise TypeError(f"Points data ({type(data)}) is not a Numpy array")
         
         if len(data.shape) != 2:
             raise ValueError("Points data should have shape (N, D)")
+
+        if meta:
+            allowed_dims = meta["dimensionality"]
+
+            if data.shape[1] not in allowed_dims:
+                raise ValueError(f"Points have an unsupported dimensionality: {data.shape[1]} (accepted: {allowed_dims})")
         
