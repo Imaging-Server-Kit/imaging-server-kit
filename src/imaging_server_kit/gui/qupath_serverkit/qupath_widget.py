@@ -23,8 +23,7 @@ from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import (
     if_compatible_get_qupath_schema,
 )
 from imaging_server_kit.remote import Client
-from imaging_server_kit.core.errors import AlgorithmServerError
-from imaging_server_kit.remote.client import ServerRequestError
+from imaging_server_kit.core.errors import AlgorithmServerError, ServerRequestError
 
 
 def _qupath_compabile_algos(runner: AlgorithmRunner) -> List[str]:

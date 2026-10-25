@@ -15,6 +15,7 @@ from imaging_server_kit.core.errors import (
     AlgorithmServerError,
     AlgorithmTimeoutError,
     InvalidAlgorithmParametersError,
+    ServerRequestError,
 )
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.remote.stack_serializer import StackSerializer
@@ -26,16 +27,6 @@ MAX_BUFFER_SIZE = 0
 # Timeout (in seconds) for the requests to the metadata endpoints (not for running algorithms),
 # so that an unresponsive server raises an error instead of hanging forever.
 GET_TIMEOUT = 60
-
-
-class ServerRequestError(Exception):
-    """Exception raised when HTTP requests fail."""
-
-    def __init__(self, url: str, error: Exception, message="Request to server failed"):
-        self.url = url
-        self.error = error
-        self.message = f"{message} ({url=}): {error}"
-        super().__init__(self.message)
 
 
 class Client(AlgorithmRunner):

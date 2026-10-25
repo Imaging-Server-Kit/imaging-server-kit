@@ -33,11 +33,21 @@ class AlgorithmTimeoutError(Exception):
         self,
         status_code,
         response_text,
-        message="Algorithm server returned an unexpected status_code",
+        message="Request to the algorithm server timed out",
     ):
         self.status_code = status_code
         self.response_text = response_text
         self.message = f"{message}: {status_code}\nResponse: {response_text}"
+        super().__init__(self.message)
+
+
+class ServerRequestError(Exception):
+    """Exception raised when HTTP requests fail."""
+
+    def __init__(self, url: str, error: Exception, message="Request to server failed"):
+        self.url = url
+        self.error = error
+        self.message = f"{message} ({url=}): {error}"
         super().__init__(self.message)
 
 

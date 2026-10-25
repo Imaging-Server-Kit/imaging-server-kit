@@ -6,7 +6,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 import imaging_server_kit.core._etc as etc
-from imaging_server_kit.core.errors import AlgorithmServerError
+from imaging_server_kit.core.errors import AlgorithmServerError, ServerRequestError
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.gui.common import (
     NAPARI_LAYER_TYPES,
@@ -16,7 +16,7 @@ from imaging_server_kit.gui.common import (
 )
 from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 from imaging_server_kit.types import layer_factory
-from imaging_server_kit.remote.client import Client, ServerRequestError
+from imaging_server_kit.remote.client import Client
 from imaging_server_kit.core.runner import AlgorithmRunner
 
 
