@@ -84,4 +84,6 @@ local_scheme = "no-local-version"
 filterwarnings = [
     # Ignore warnings related to pydantic (coming from napari)
     "ignore:.*json_encoders.*:DeprecationWarning",
+    # Ignore warnings from skimage's `map_array` with NumPy >= 2.5 (raised inside skimage, not our code)
+    "ignore:Setting the shape on a NumPy array:DeprecationWarning:skimage",
 ]
