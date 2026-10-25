@@ -1,6 +1,6 @@
 # Installation
 
-The Imaging Server Kit supports Python 3.10 to 3.13.
+The Imaging Server Kit supports Python 3.11 to 3.13.
 
 ## Installing with pip
 
