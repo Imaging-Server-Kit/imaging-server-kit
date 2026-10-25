@@ -1,9 +1,9 @@
 import warnings
-from typing import List, Optional, Union
+from typing import Any, List, Optional
 
 from geojson import Feature, Point
 from imaging_server_kit.remote.serializer import Serializer
-from imaging_server_kit.remote.encoding import decode_contents, encode_contents
+from imaging_server_kit.remote.encoding import decode_coords, encode_coords
 import numpy as np
 
 from imaging_server_kit.types._points import Points
@@ -35,16 +35,15 @@ def encode_point_features(points: np.ndarray) -> List[Feature]:
 
 class PointsDataSerializer(Serializer):
     @staticmethod
-    def serialize(points: Optional[Points]) -> Optional[Union[str, List[Feature]]]:
+    def serialize(points: Optional[Points]) -> Any:
         if points is None:
             return
 
         if points.data is None:
             return
 
-        return encode_contents(points.data.astype(np.float32))
+        return encode_coords(points.data)
 
     @staticmethod
-    def deserialize(serialized_points: Optional[str]) -> Optional[np.ndarray]:
-        if isinstance(serialized_points, str):
-            return decode_contents(serialized_points).astype(float)
+    def deserialize(serialized_points: Any) -> Optional[np.ndarray]:
+        return decode_coords(serialized_points)

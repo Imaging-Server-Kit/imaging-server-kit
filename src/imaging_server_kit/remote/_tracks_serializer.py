@@ -1,24 +1,23 @@
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
 from imaging_server_kit.remote.serializer import Serializer
-from imaging_server_kit.remote.encoding import decode_contents, encode_contents
+from imaging_server_kit.remote.encoding import decode_coords, encode_coords
 from imaging_server_kit.types._tracks import Tracks
 
 
 class TracksDataSerializer(Serializer):
     @staticmethod
-    def serialize(tracks: Optional[Tracks]) -> Optional[str]:
+    def serialize(tracks: Optional[Tracks]) -> Any:
         if tracks is None:
             return
 
         if tracks.data is None:
             return
 
-        return encode_contents(tracks.data.astype(np.float32))
+        return encode_coords(tracks.data)
 
     @staticmethod
-    def deserialize(serialized_tracks: Optional[str]) -> Optional[np.ndarray]:
-        if isinstance(serialized_tracks, str):
-            return decode_contents(serialized_tracks).astype(float)
+    def deserialize(serialized_tracks: Any) -> Optional[np.ndarray]:
+        return decode_coords(serialized_tracks)

@@ -1,6 +1,6 @@
 import io
 import base64
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import tifffile
@@ -18,17 +18,18 @@ def decode_contents(contents: str) -> np.ndarray:
     return tifffile.imread(io.BytesIO(base64.b64decode(contents)))
 
 
-def encode_contents(arr: np.ndarray) -> str:
+def encode_contents(arr: np.ndarray, photometric: Optional[str] = None) -> str:
     """Encodes a NumPy array image into a base64 string.
 
     Args:
         image (np.ndarray): The image to encode.
+        photometric (str, optional): Passed to `tifffile.imwrite` (by default, tifffile guesses it from the shape).
 
     Returns:
         str: The base64 encoded string representation of the image.
     """
     img_byte_arr = io.BytesIO()
-    tifffile.imwrite(img_byte_arr, arr)
+    tifffile.imwrite(img_byte_arr, arr, photometric=photometric)
 
     return base64.b64encode(img_byte_arr.getvalue()).decode()
 
@@ -62,3 +63,24 @@ def decode_array(obj: Dict[str, Any]) -> np.ndarray:
     if DTYPE_KEY in obj:
         return np.array(obj[ARRAY_KEY], dtype=obj[DTYPE_KEY])
     return decode_contents(obj[ARRAY_KEY])
+
+
+# Key holding the shape of empty coordinate arrays, which are not sent as TIFF, e.g. {"__shape__": [0, 4, 2]}
+SHAPE_KEY = "__shape__"
+
+
+def encode_coords(arr: np.ndarray) -> Union[str, Dict[str, Any]]:
+    """Encode the coordinates of objects (Points, Boxes, Vectors, Tracks) as float32."""
+    if arr.size == 0:
+        # TIFF does not support zero-size arrays: we only send the shape
+        return {SHAPE_KEY: list(arr.shape)}
+    # `minisblack`: arrays such as (N, 4, 3) boxes must not be stored as RGB images
+    return encode_contents(arr.astype(np.float32), photometric="minisblack")
+
+
+def decode_coords(obj: Any) -> Optional[np.ndarray]:
+    """Decode coordinates encoded with `encode_coords()` (None if `obj` holds no coordinates)."""
+    if isinstance(obj, dict) and (SHAPE_KEY in obj):
+        return np.zeros(obj[SHAPE_KEY], dtype=float)
+    if isinstance(obj, str):
+        return decode_contents(obj).astype(float)
