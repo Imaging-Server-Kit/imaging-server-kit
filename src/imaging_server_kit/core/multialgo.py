@@ -31,7 +31,6 @@ class MultiAlgorithm(AlgorithmRunner):
     """
 
     def __init__(self, algorithms: List[Algorithm], name: str = "algorithms"):
-        self.sk_algorithms = algorithms
         self._name = name
 
         self._algorithms_dict: Dict[str, Algorithm] = {}

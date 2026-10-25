@@ -300,10 +300,6 @@ class QuPathWidget(QWidget):
         self.logger.log("⏳ Cancelling...")
         self.tasks.cancel_all()
 
-    def _aborted(self):
-        self._ungrayout_ui()
-        self.pbar.setMaximum(1)
-
     def _grayout_ui(self):
         self.pbar.setMaximum(0)  # Start the pbar
         for ui_element in self.grayout_ui_list:

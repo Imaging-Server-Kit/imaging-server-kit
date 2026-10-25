@@ -66,17 +66,6 @@ class InvalidAlgorithmParametersError(Exception):
         super().__init__(self.message)
 
 
-class AlgorithmStreamError(Exception):
-    """Exception raised when an algorithm is incorrectly used as a stream."""
-
-    def __init__(
-        self, algorithm: str, message="Algorithm incorrectly used as a stream."
-    ):
-        self.algorithm_name = algorithm
-        self.message = f"{algorithm}: {message}"
-        super().__init__(self.message)
-
-
 class AlgorithmRuntimeError(Exception):
     def __init__(
         self,

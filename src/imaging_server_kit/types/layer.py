@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generator, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 
 from imaging_server_kit.core.domain import Domain, domain_from_key, index_frame
 from imaging_server_kit.core._fmt import fmt_tuple, truncate
 from imaging_server_kit.types.common import copy_meta, normalize_features
 
-from imaging_server_kit.core.tiling import (
-    TileMeta,
-    TilingSpecs,
-    generate_tiles,
-)
+from imaging_server_kit.core.tiling import TileMeta
 
 
 def _build_meta(
@@ -336,24 +332,3 @@ class Layer:
     def _zeros_in(self, domain: Optional[Domain]) -> Any:
         """Provide zero-valued data in the specified domain; meant to be implemented by subclasses."""
         pass
-
-
-class LayerTileGenerator:
-    @staticmethod
-    def generate_tiles(
-        layer: Layer, ctx: Optional[TilingSpecs]
-    ) -> Generator[Layer, None, None]:
-        if ctx is None:
-            yield layer.select(domain=Domain())
-        else:
-            for tile_meta, tile_domain in generate_tiles(
-                domain=layer.extent,
-                tile_size=ctx.tile_size,
-                tile_overlap=ctx.tile_overlap,
-                tile_delay=ctx.tile_delay,
-                tile_randomize=ctx.tile_randomize,
-            ):
-                tile = layer.select(domain=tile_domain)
-                tile.tile_meta = tile_meta
-
-                yield tile

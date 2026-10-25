@@ -302,6 +302,7 @@ class QuPathBridge:
         return qp_image_roi_annotations
 
     def get_single_annotation(self, cls_name: str) -> geojson.Feature:
+        """Extract a single annotaion with the given class name from QuPath (experimental)."""
         annotations = self.get_annotations()
 
         found_annotations = self.get_annotations_by_class_name(
