@@ -49,14 +49,9 @@ def merge_result_tile(
     The previous results are reinitialized in `params_extent`, the extent of the parameters
     of the whole run (or the whole stack, if the parameters have no extent).
     """
-    # If the parameters tile and result tile both have a position,
-    # the result tile's position is offset by that of the parameters tile
-    if (result_tile.position is not None) and (params_tile.position is not None):
-        result_tile.position = tuple(
-            [p + q for p, q in zip(params_tile.position, result_tile.position)]
-        )
-    else:
-        result_tile.position = params_tile.position
+    # Result tiles are positioned at their parameters tile. Positions of the result layers themselves
+    # (e.g. objects returned with `position=`) are kept, as the stack's position setter offsets them.
+    result_tile.position = params_tile.position
 
     # We assume that reinitializing the parameters domain on first tile
     # will be the correct behaviour most of the time.
