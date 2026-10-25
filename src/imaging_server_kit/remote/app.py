@@ -1,7 +1,5 @@
 import errno
-import importlib.resources
 import logging
-import pathlib
 import socket
 from typing import Dict, Iterable, List
 
@@ -23,15 +21,7 @@ from imaging_server_kit.remote.serializer import ERROR_FRAME_KEY
 
 logger = logging.getLogger(__name__)
 
-templates_dir = pathlib.Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("templates")  # type: ignore
-)
-
-static_dir = pathlib.Path(
-    importlib.resources.files("imaging_server_kit.core").joinpath("static")  # type: ignore
-)
-
-templates = Jinja2Templates(directory=str(templates_dir))
+templates = Jinja2Templates(directory=str(etc.templates_dir))
 
 
 def find_algorithm(algorithm_name: str, algorithms_dict: Dict) -> Algorithm:
@@ -48,7 +38,7 @@ class AlgorithmApp:
     def __init__(self, algorithms: List[Algorithm], name: str):
         self.algorithms_dict = {algo.name: algo for algo in algorithms}
         self.app = FastAPI(title=name)
-        self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        self.app.mount("/static", StaticFiles(directory=str(etc.static_dir)), name="static")
 
         # Centralized exception handlers
         @self.app.exception_handler(RequestValidationError)
