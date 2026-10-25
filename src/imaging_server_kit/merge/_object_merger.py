@@ -3,6 +3,7 @@ from typing import Dict, Union
 import numpy as np
 
 from imaging_server_kit.merge.merger import DefaultMerger
+from imaging_server_kit.merge.common import adopt_incoming
 from imaging_server_kit.types._points import Points
 from imaging_server_kit.types._vectors import Vectors
 from imaging_server_kit.types._boxes import Boxes
@@ -40,8 +41,8 @@ def merge_meta_tile(
 
 
 class ObjectMerger(DefaultMerger):
-    @staticmethod
     def merge(
+        self,
         receiving_layer: Union[Points, Vectors, Boxes],
         incoming_layer: Union[Points, Vectors, Boxes],
     ) -> None:
@@ -52,9 +53,7 @@ class ObjectMerger(DefaultMerger):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
-            receiving_layer.position = incoming_layer.position
-            receiving_layer.data = incoming_layer.data
-            receiving_layer.meta = incoming_layer.meta
+            adopt_incoming(receiving_layer, incoming_layer)
             return
 
         merged_extent = merge_domains(

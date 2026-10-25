@@ -9,7 +9,7 @@ from skimage.util import map_array
 
 from imaging_server_kit.merge.merger import DefaultMerger
 from imaging_server_kit.types._mask import Mask, invalidate_label_features
-from imaging_server_kit.merge.common import prepare_canvas, update_meta
+from imaging_server_kit.merge.common import adopt_incoming, prepare_canvas, update_meta
 
 # Max pixels for doing the resolve() operation of instance masks one go (set arbitrarily, could be configurable in future versions).
 # If the image is bigger than that, we do the instance mask resolution in chunks.
@@ -43,15 +43,12 @@ class MaskOverrideMerger(DefaultMerger):
     In tiled runs, features are dropped (they cannot be merged across tiles).
     """
 
-    @staticmethod
-    def merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
+    def merge(self, receiving_layer: Mask, incoming_layer: Mask) -> None:
         if (incoming_layer.data is None) or (incoming_layer.ndim is None):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
-            receiving_layer.position = incoming_layer.position
-            receiving_layer.data = incoming_layer.data
-            receiving_layer.meta = incoming_layer.meta
+            adopt_incoming(receiving_layer, incoming_layer)
             _drop_tiled_features(receiving_layer, incoming_layer)
             return
 
@@ -69,8 +66,7 @@ class MaskOverrideMerger(DefaultMerger):
         update_meta(receiving_layer, incoming_layer)
         _drop_tiled_features(receiving_layer, incoming_layer)
 
-    @staticmethod
-    def on_first_merge(receiving_layer: Mask, incoming_layer: Mask) -> None:
+    def on_first_merge(self, receiving_layer: Mask, incoming_layer: Mask) -> None:
         # Also removes the features of the first tile (added to the stack) or of a previous run
         _drop_tiled_features(receiving_layer, incoming_layer)
 
@@ -224,13 +220,12 @@ class InstanceMaskTileMerger(DefaultMerger):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
-            receiving_layer.position = incoming_layer.position
             # Labels are registered in the tracker, so that labels from the next tiles don't collide with them
-            receiving_layer.data = self.tile_tracker.add_N_to_tile(
+            labels = self.tile_tracker.add_N_to_tile(
                 incoming_layer.data,
                 features=clean_mask_layer_features(incoming_layer),
             )
-            receiving_layer.meta = incoming_layer.meta
+            adopt_incoming(receiving_layer, incoming_layer, data=labels)
             self._update_features(receiving_layer)
             return
 

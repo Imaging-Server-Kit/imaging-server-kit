@@ -6,7 +6,7 @@ import numpy as np
 from imaging_server_kit.types._image import Image
 from imaging_server_kit.types.common import _get_slices_with_channel
 from imaging_server_kit.merge.merger import DefaultMerger
-from imaging_server_kit.merge.common import prepare_canvas, update_meta
+from imaging_server_kit.merge.common import adopt_incoming, prepare_canvas, update_meta
 
 
 class ImageTileOverlapMerger(DefaultMerger):
@@ -28,9 +28,7 @@ class ImageTileOverlapMerger(DefaultMerger):
             return
 
         if (receiving_layer.data is None) or (receiving_layer.position is None):
-            receiving_layer.position = incoming_layer.position
-            receiving_layer.data = incoming_layer.data
-            receiving_layer.meta = incoming_layer.meta
+            adopt_incoming(receiving_layer, incoming_layer)
             self._counts = np.ones(incoming_layer.data.shape, dtype=np.int32)
             return
 

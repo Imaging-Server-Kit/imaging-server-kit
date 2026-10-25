@@ -72,3 +72,13 @@ def update_meta(
     for k, v in incoming_layer.meta.items():
         if k not in exclude:
             receiving_layer.meta[k] = v
+
+
+def adopt_incoming(receiving_layer: Layer, incoming_layer: Layer, data=None) -> None:
+    """Initialize an empty receiving layer from the incoming layer (position, data, meta).
+
+    `data` replaces the incoming layer's data, if given (e.g. relabeled instance masks).
+    """
+    receiving_layer.position = incoming_layer.position
+    receiving_layer.data = incoming_layer.data if data is None else data
+    receiving_layer.meta = incoming_layer.meta
