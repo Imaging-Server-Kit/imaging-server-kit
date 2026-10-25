@@ -386,15 +386,16 @@ class QuPathBridge:
                 # Reduce the XY tile size so that the whole tile does not exceed the limit (use a square tile)
                 tile_size = int(np.floor(np.sqrt(MAX_IMAGE_PIXELS / (n_z * n_t * n_c))))
 
-                if tiling_ctx is None:
-                    print(
-                        f"⚠️ Selected region is too big to be processed all at once. Using tile size: {tile_size}."
-                    )
+                print(
+                    f"⚠️ Selected region is too big to be processed all at once. Using tile size: {tile_size}."
+                )
 
             tiling_ctx = TilingSpecs(tile_size=tile_size)
         else:
             # Warn that tile size seems too big for the image (but don't stop it)
-            if np.array(tiling_ctx.tile_size).size > MAX_IMAGE_PIXELS:
+            # Pixels in one tile (the tile size is an int or a (Y, X) tuple)
+            n_tile_pixels = np.prod(np.broadcast_to(tiling_ctx.tile_size, (2,))) * n_z * n_t * n_c
+            if n_tile_pixels > MAX_IMAGE_PIXELS:
                 print(
                     f"⚠️ Selected region might be too big to be processed in tiles of size {tiling_ctx.tile_size}."
                 )
