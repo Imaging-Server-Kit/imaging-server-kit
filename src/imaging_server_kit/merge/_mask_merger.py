@@ -1,6 +1,6 @@
 import warnings
 import math
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -77,14 +77,14 @@ class MaskOverrideMerger(DefaultMerger):
 
 class InstanceTileTracker:
     def __init__(self) -> None:
-        self.initialize()
-
-    def initialize(self):
         self.N = 0  # Current number of objects
         self.G = nx.Graph()
 
         # Used to store features (one DataFrame per tile) during the tiles run => resolved at the end with self.resolve_features()
         self.F = []
+
+        # Label mapping (input labels => resolved labels), built on first use by self._mapping_arrays()
+        self._mapping: Optional[Tuple[np.ndarray, np.ndarray]] = None
 
     def add_N_to_tile(
         self, labels: np.ndarray, features: Optional[Dict] = None
@@ -107,26 +107,22 @@ class InstanceTileTracker:
 
         return labels
 
-    def add_node(self, lab):
-        self.G.add_node(lab)
-
-    def add_edge(self, a, b):
-        self.G.add_edge(a, b)
-
-    def build_mapping(self):
-        self.G.add_nodes_from(range(1, self.N + 1))
-        mapping = {}
-        for comp_id, comp in enumerate(nx.connected_components(self.G), start=1):
-            for n in comp:
-                mapping[int(n)] = comp_id
-        self._mapping = mapping
+    def _mapping_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Input and output label values mapping each label to its connected component in the graph."""
+        if self._mapping is None:
+            self.G.add_nodes_from(range(1, self.N + 1))
+            mapping = {}
+            for comp_id, comp in enumerate(nx.connected_components(self.G), start=1):
+                for n in comp:
+                    mapping[int(n)] = comp_id
+            self._mapping = (
+                np.array(list(mapping.keys()), dtype=np.int64),
+                np.array(list(mapping.values()), dtype=np.int64),
+            )
+        return self._mapping
 
     def resolve(self, arr: np.ndarray) -> np.ndarray:
-        if not hasattr(self, "_mapping"):
-            self.build_mapping()
-
-        input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
-        output_vals = np.array(list(self._mapping.values()), dtype=np.int64)
+        input_vals, output_vals = self._mapping_arrays()
 
         arr = np.ascontiguousarray(arr)
 
@@ -138,11 +134,7 @@ class InstanceTileTracker:
         return {c: df[c].values for c in df.columns}
 
     def resolve_features(self, old_unique_labels: np.ndarray) -> Dict:
-        if not hasattr(self, "_mapping"):
-            self.build_mapping()
-
-        input_vals = np.array(list(self._mapping.keys()), dtype=np.int64)
-        output_vals = np.array(list(self._mapping.values()), dtype=np.int64)
+        input_vals, output_vals = self._mapping_arrays()
 
         # Tiles missing a feature column get NaN values for it
         df = pd.concat(self.F, ignore_index=True)
@@ -260,7 +252,7 @@ class InstanceMaskTileMerger(DefaultMerger):
         )
 
         for new_label in unique_positive(dst_arr):
-            self.tile_tracker.add_node(new_label)
+            self.tile_tracker.G.add_node(new_label)
 
         border_mask = overlap_border_mask(incoming_layer)
 
@@ -271,7 +263,7 @@ class InstanceMaskTileMerger(DefaultMerger):
                 for src_lab in unique_positive(src_tile_filt):
                     n_intersecting_px = (src_tile_filt == src_lab).sum()
                     if n_intersecting_px > self.min_intersecting_px:
-                        self.tile_tracker.add_edge(src_lab, dst_lab)
+                        self.tile_tracker.G.add_edge(src_lab, dst_lab)
 
         new_data[slices_with_channel] = dst_arr
 
