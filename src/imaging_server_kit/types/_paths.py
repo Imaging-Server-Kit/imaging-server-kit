@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from typing import List, Optional, Tuple
 import numpy as np
 
+from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.types.common import copy_meta, objects_in_domain, select_object_meta
 from imaging_server_kit.types.layer import Layer
-from imaging_server_kit.core.tiling import Domain
 
 
 class Paths(Layer):
@@ -58,10 +61,69 @@ class Paths(Layer):
         if self.n_objects > 0:
             paths_min = [np.min(path, axis=0) for path in self.data]
             paths_max = [np.max(path, axis=0) for path in self.data]
+            # The upper bound is exclusive (+1), like an image extent is its shape
             bounds_min = tuple(np.min(np.asarray(paths_min), axis=0).tolist())
-            bounds_max = tuple(np.max(np.asarray(paths_max), axis=0).tolist())
+            bounds_max = tuple((np.max(np.asarray(paths_max), axis=0) + 1).tolist())
 
             return (bounds_min, bounds_max)
+
+    def select(self, domain: Domain) -> Paths:
+        """Select the part of the layer inside a domain.
+
+        Paths are selected based on their center (each path goes to a single tile); the selected
+        paths keep all their points, which may extend beyond the domain.
+
+        Parameters
+        ----------
+        domain : Domain
+            The region to select, in global pixel coordinates.
+
+        Returns
+        -------
+        Paths
+            A new layer with the selected paths, positioned in global coordinates.
+        """
+        if domain.size is None:
+            # Undefined domain: nothing to select, the data is kept as-is
+            return Paths(
+                data=self.data,
+                name=self.name,
+                meta=copy_meta(self),
+                tile_meta=self.tile_meta.copy(),
+            )
+
+        if self.n_objects == 0:
+            _data = self.data
+            _meta = copy_meta(self)
+        else:
+            # Select paths via the global coordinates of their centers
+            offset = np.asarray(self.position)
+            centers = np.array([np.mean(path, axis=0) for path in self.data]) + offset
+            filt = objects_in_domain(centers, domain)  # (N,)
+
+            # Return the paths in coordinates local to the selection domain
+            local_offset = offset - np.asarray(domain.coords_min)
+            _data = [
+                np.asarray(path) + local_offset
+                for path, selected in zip(self.data, filt)
+                if selected
+            ]
+
+            if self.meta:
+                _meta = select_object_meta(self.meta.copy(), self.n_objects, filt)
+            else:
+                _meta = self.meta
+
+        paths_selection = Paths(
+            data=_data,
+            name=self.name,
+            meta=_meta,
+            tile_meta=self.tile_meta.copy(),
+        )
+
+        paths_selection.position = domain.coords_min
+
+        return paths_selection
 
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""

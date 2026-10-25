@@ -1,11 +1,11 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import numpy as np
 
-from imaging_server_kit.types.layer import Layer
-from imaging_server_kit.core.tiling import Domain
+from imaging_server_kit.core.domain import Domain
+from imaging_server_kit.types._objects import _ObjectsLayer
 
 
-class Tracks(Layer):
+class Tracks(_ObjectsLayer):
     """Data layer for object tracks: point detections linked over time by a track ID.
 
     Parameters
@@ -42,6 +42,19 @@ class Tracks(Layer):
             **kwargs,
         )
 
+    def _anchor(self, data: np.ndarray) -> np.ndarray:
+        # Track points are selected by their coordinates [T, (Z), Y, X] (the first column is the track ID)
+        return data[:, 1:]
+
+    def _offset(self, data: np.ndarray, offset) -> np.ndarray:
+        # The track IDs are not translated
+        data = data.copy()
+        data[:, 1:] = data[:, 1:] + offset
+        return data
+
+    def _bounds_coords(self, data: np.ndarray) -> np.ndarray:
+        return data[:, 1:]
+
     def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
         """Initialize zero-valued data in a given domain."""
         if domain is not None:
@@ -56,22 +69,3 @@ class Tracks(Layer):
         if self.ndim is not None:
             summary += f", {self.ndim}D"
         return summary
-
-    @property
-    def n_objects(self) -> int:
-        if self.data is None:
-            return 0
-        else:
-            return len(self.data)
-
-    @property
-    def _bounds(self) -> Optional[Tuple]:
-        """Data bounds in local coordinates, given the data."""
-        if (self.data is None) or (self.n_objects == 0):
-            return
-
-        # Coordinates are [T, (Z), Y, X] (the first column is the track ID)
-        bounds_min = tuple(np.min(self.data, axis=0)[1:].tolist())
-        bounds_max = tuple(np.max(self.data, axis=0)[1:].tolist())
-
-        return (bounds_min, bounds_max)
