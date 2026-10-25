@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import imaging_server_kit as sk
 
 

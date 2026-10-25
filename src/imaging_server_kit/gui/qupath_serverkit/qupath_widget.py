@@ -287,7 +287,7 @@ class QuPathWidget(QWidget):
         if isinstance(self.runner_widget.runner, Client):
             try:
                 self.runner_widget.runner.connect(server_url)
-            except (ServerRequestError, AlgorithmServerError) as e:
+            except (ServerRequestError, AlgorithmServerError):
                 self.logger.log(f"Could not connect to server on {server_url}")
 
         self.runner_widget.cb_algorithms.clear()

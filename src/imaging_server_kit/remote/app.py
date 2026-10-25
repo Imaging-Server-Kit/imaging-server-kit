@@ -1,10 +1,9 @@
 import errno
 import importlib.resources
 import logging
-import os
 import pathlib
 import socket
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 import msgpack
 import uvicorn
@@ -19,7 +18,6 @@ import imaging_server_kit.core._etc as etc
 from imaging_server_kit._version import __version__
 from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.stack import Stack
-from imaging_server_kit.types import Layer, layer_factory
 from imaging_server_kit.remote.stack_serializer import StackSerializer
 from imaging_server_kit.remote.serializer import ERROR_FRAME_KEY
 

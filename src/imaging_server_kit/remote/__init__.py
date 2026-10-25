@@ -29,8 +29,6 @@ def serve(
     >>> if __name__ == "__main__":
     ...     sk.serve(threshold_algo, port=8000)
     """
-    from imaging_server_kit.remote.app import AlgorithmApp
-
     if isinstance(algorithm, Algorithm):
         algorithm_servers = [algorithm]
     elif isinstance(algorithm, MultiAlgorithm):

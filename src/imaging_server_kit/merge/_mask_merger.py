@@ -250,7 +250,7 @@ class InstanceMaskTileMerger(DefaultMerger):
 
         src_tile = receiving_layer.select(domain=incoming_layer.extent)
         if src_tile.data is None:
-            raise ValueError(f"Could not get a mask tile where it was requested.")
+            raise ValueError("Could not get a mask tile where it was requested.")
 
         # Handle label features; features dictionary should contain a `label` column to identify objects.
         features = clean_mask_layer_features(incoming_layer)

@@ -199,7 +199,7 @@ def _boxes2detections(boxes: sk.Boxes) -> List[Feature]:
 
         try:
             geom = Polygon(coordinates=[coords.tolist()], validate=True)
-        except ValueError as e:
+        except ValueError:
             print("⚠️ Invalid polygon found in _boxes2detections (ignoring it).")
             continue
 

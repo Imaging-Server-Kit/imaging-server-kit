@@ -17,7 +17,6 @@ from imaging_server_kit.gui.common import (
 from imaging_server_kit.gui.napari_serverkit.napari_stack import NapariStack
 from imaging_server_kit.types import layer_factory
 from imaging_server_kit.remote.client import Client, ServerRequestError
-from imaging_server_kit.core.errors import AlgorithmServerError
 from imaging_server_kit.core.runner import AlgorithmRunner
 
 
@@ -241,7 +240,7 @@ class NapariWidget(QWidget):
         if isinstance(self.runner_widget.runner, Client):
             try:
                 self.runner_widget.runner.connect(server_url)
-            except (ServerRequestError, AlgorithmServerError) as e:
+            except (ServerRequestError, AlgorithmServerError):
                 show_warning(f"Could not connect to server on {server_url}")
 
         self.runner_widget.cb_algorithms.clear()
