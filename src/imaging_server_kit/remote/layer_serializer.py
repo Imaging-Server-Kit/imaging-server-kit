@@ -4,24 +4,22 @@ from imaging_server_kit.types import Layer, DATA_TYPES
 from imaging_server_kit.remote.meta_serializer import MetaSerializer
 from imaging_server_kit.remote.tile_serializer import TileMetaSerializer
 from imaging_server_kit.remote.serializer import Serializer, DefaultDataSerializer
-from imaging_server_kit.remote._image_serializer import ImageDataSerializer
-from imaging_server_kit.remote._mask_serializer import MaskDataSerializer
-from imaging_server_kit.remote._boxes_serializer import BoxesDataSerializer
+from imaging_server_kit.remote._data_serializers import (
+    ArrayDataSerializer,
+    CoordsDataSerializer,
+)
 from imaging_server_kit.remote._paths_serializer import PathsDataSerializer
-from imaging_server_kit.remote._points_serializer import PointsDataSerializer
-from imaging_server_kit.remote._tracks_serializer import TracksDataSerializer
-from imaging_server_kit.remote._vectors_serializer import VectorsDataSerializer
 from imaging_server_kit.remote._null_serializer import NullDataSerializer
 from imaging_server_kit.remote._any_serializer import AnyDataSerializer
 
 LAYER_DATA_SERIALIZERS: Dict[str, Type[Serializer]] = {
-    "image": ImageDataSerializer,
-    "mask": MaskDataSerializer,
-    "points": PointsDataSerializer,
-    "boxes": BoxesDataSerializer,
+    "image": ArrayDataSerializer,
+    "mask": ArrayDataSerializer,
+    "points": CoordsDataSerializer,
+    "boxes": CoordsDataSerializer,
     "paths": PathsDataSerializer,
-    "tracks": TracksDataSerializer,
-    "vectors": VectorsDataSerializer,
+    "tracks": CoordsDataSerializer,
+    "vectors": CoordsDataSerializer,
     "null": NullDataSerializer,
     "any": AnyDataSerializer,
 }
