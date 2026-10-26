@@ -18,17 +18,6 @@ def _fmt_flags(flags: Tuple) -> str:
     return f"({', '.join('T' if f else 'F' for f in flags)})"
 
 
-class TilingError(Exception):
-    def __init__(
-        self,
-        bounds,
-        provided_shape,
-        message="Error during tiling occured. Provided shape (overlap or tile) is inconsistent with the pixel bounds: ",
-    ):
-        self.message = message + f"{bounds=}, {provided_shape=}"
-        super().__init__(self.message)
-
-
 @dataclass
 class TilingSpecs:
     tile_size: Union[int, Tuple, List] = 64
@@ -112,15 +101,11 @@ class TileMeta:
 
     @property
     def is_first_tile(self) -> bool:
-        if self.tile_idx is not None:
-            return self.tile_idx == 0
-        return False
+        return self.tile_idx == 0
 
     @property
     def is_last_tile(self) -> bool:
-        if self.n_tiles is not None:
-            return self.tile_idx == self.n_tiles - 1
-        return False
+        return self.tile_idx == self.n_tiles - 1
 
     def serialize(self) -> Dict:
         return {
@@ -240,7 +225,7 @@ def _tiles_info_axis(size_i: int, tile_size_i: int, overlap_px_i: int):
     # Amount of translation betwen consecutive tiles
     shift_i = tile_size_i - overlap_px_i
 
-    return size_i, n_tiles_i, shift_i, half_pad_i
+    return n_tiles_i, shift_i, half_pad_i
 
 
 def _get_tile_pos_and_size_i(
@@ -277,18 +262,14 @@ def _generate_tile_meta(
     size = domain.size
     coords_min = domain.coords_min
 
-    # Resolve the tile shape and overlap
+    # Resolve the tile shape and overlap (their lengths are validated in `generate_tiles`)
     if isinstance(ctx.tile_size, (list, tuple)):
         tile_shape = ctx.tile_size
-        if len(tile_shape) != ndim:
-            raise TilingError(bounds=size, provided_shape=tile_shape)
     else:
         tile_shape = [ctx.tile_size] * ndim  # Isotropic tile
 
     if isinstance(ctx.tile_overlap, (list, tuple)):
         overlap = ctx.tile_overlap
-        if len(overlap) != ndim:
-            raise TilingError(bounds=size, provided_shape=overlap)
     else:
         overlap = [ctx.tile_overlap] * ndim
 
@@ -301,10 +282,9 @@ def _generate_tile_meta(
         _tiles_info_axis(size[axis], tile_shape[axis], overlap_px[axis])
         for axis in range(ndim)
     ]
-    n_pix_ax = [returns[0] for returns in tile_infos_axes]
-    n_tiles_ax = [returns[1] for returns in tile_infos_axes]
-    shift_ax = [returns[2] for returns in tile_infos_axes]
-    half_pad_ax = [returns[3] for returns in tile_infos_axes]
+    n_tiles_ax = [returns[0] for returns in tile_infos_axes]
+    shift_ax = [returns[1] for returns in tile_infos_axes]
+    half_pad_ax = [returns[2] for returns in tile_infos_axes]
 
     grid = np.meshgrid(*[np.arange(n) for n in n_tiles_ax], indexing="ij")
     tile_coords_idx = np.stack([g.ravel() for g in grid], axis=1)
@@ -323,7 +303,7 @@ def _generate_tile_meta(
             tile_size = []
             tile_pos = []
             for axis, (coord_i, n_pix_i, shift_i, half_pad_i) in enumerate(
-                zip(tile_coord_ax, n_pix_ax, shift_ax, half_pad_ax)
+                zip(tile_coord_ax, size, shift_ax, half_pad_ax)
             ):
                 tile_shape_i = tile_shape[axis]
                 pos_i, tile_size_i, first_tile_i, last_tile_i = (
@@ -344,7 +324,7 @@ def _generate_tile_meta(
 
             tile_meta = TileMeta(
                 tile_idx=tile_idx,
-                n_tiles=len(tile_coords_idx),
+                n_tiles=n_tiles,
                 first_tile=first_tile,
                 last_tile=last_tile,
                 overlap_px=overlap_px,
