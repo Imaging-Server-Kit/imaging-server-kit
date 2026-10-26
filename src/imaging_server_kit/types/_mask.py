@@ -13,9 +13,7 @@ from rasterio.transform import Affine
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
-from imaging_server_kit.types.layer import Layer
-from imaging_server_kit.core.domain import Domain
-from imaging_server_kit.types.common import copy_meta, domain_slices
+from imaging_server_kit.types._array import _ArrayLayer
 
 # Largest mask (in pixels) for which the number of labels is shown in `repr`
 MAX_SIZE_COUNT_LABELS = 2**24
@@ -209,7 +207,7 @@ def features2instance_mask(
     return _rasterize(features, image_shape, "Detection ID", offset)
 
 
-class Mask(Layer):
+class Mask(_ArrayLayer):
     """Data layer for segmentation masks.
 
     Masks are label images, where integer values encode either object classes (e.g.
@@ -241,6 +239,7 @@ class Mask(Layer):
     """
 
     kind = "mask"
+    _zeros_dtype = np.uint32
 
     def __init__(
         self,
@@ -271,12 +270,6 @@ class Mask(Layer):
         return summary
 
     @property
-    def channel_axis(self) -> Optional[int]:
-        if self.meta:
-            if self.meta["channel_axis"] is not None:
-                return self.meta["channel_axis"]
-    
-    @property
     def n_objects(self) -> int:
         if self.data is None:
             return 0
@@ -286,96 +279,14 @@ class Mask(Layer):
             n_labels = len(labels) - int(0 in labels)
             return n_labels
 
-    @property
-    def _bounds(self) -> Optional[Tuple]:
-        """Data bounds in local coordinates."""
-        if self._data is None:
-            return
-
-        if self.meta is None:
-            return
-
-        if self.channel_axis is not None:
-            shape = list(self._data.shape)
-            shape.pop(self.channel_axis)
-            bounds_min = tuple([0] * len(shape))
-            bounds_max = tuple(shape)
-        else:
-            bounds_min = tuple([0] * len(self._data.shape))
-            bounds_max = tuple(self._data.shape)
-
-        return (bounds_min, bounds_max)
-
-    def select(self, domain: Domain) -> Mask:
-        """Select the part of the layer inside a domain.
-
-        Parameters
-        ----------
-        domain : Domain
-            The region to select, in global pixel coordinates.
-
-        Returns
-        -------
-        Mask
-            A new layer with the selected data, positioned in global coordinates.
-        """
-        _meta = copy_meta(self)
-
-        if (self.data is None) or (domain.size is None):
-            return Mask(
-                data=None,
-                name=self.name,
-                meta=_meta,
-                tile_meta=self.tile_meta.copy(),
-            )
-
-        selection = domain_slices(self, domain)
-        if selection is None:
-            # No intersection
-            _data = None
-            position = domain.coords_min
-        else:
-            slices_with_channel, position = selection
-            _data = self.data[slices_with_channel]
-
-        mask_selection = Mask(
-            data=_data,
-            name=self.name,
-            meta=_meta,
-            tile_meta=self.tile_meta.copy(),
-        )
-
-        mask_selection.position = position
-
-        return mask_selection
-
-    def _zeros_in(self, domain: Optional[Domain]) -> Optional[np.ndarray]:
-        """Initialize zero-valued data in a given domain."""
-        if domain is not None:
-            if domain.size is not None:
-                return np.zeros(domain.size, dtype=np.uint32)
-
-    def _reinitialize(self, domain: Domain) -> None:
-        """Remove data in a given domain."""
-        if self.data is None:
-            return
-
-        selection = domain_slices(self, domain)
-        if selection is None:
-            # No intersection
-            return
-
-        slices_with_channel, _ = selection
-
-        new_data = self.data.copy()
-        erased_labels = np.unique(new_data[slices_with_channel])
-        new_data[slices_with_channel] = 0
-        self.data = new_data
+    def _erase(self, slices_with_channel) -> None:
+        erased_labels = np.unique(self.data[slices_with_channel])
+        super()._erase(slices_with_channel)
 
         # Objects cut by the domain keep part of their pixels: their features are no longer accurate
         features = self.meta.get("features")
         if isinstance(features, Dict) and ("label" in features):
-            cut_labels = np.unique(new_data[np.isin(new_data, erased_labels[erased_labels > 0])])
+            cut_labels = np.unique(self.data[np.isin(self.data, erased_labels[erased_labels > 0])])
             try:
                 self.meta = {**self.meta, "features": invalidate_label_features(features, cut_labels)}
             except ValueError:

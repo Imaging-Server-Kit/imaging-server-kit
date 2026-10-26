@@ -84,3 +84,37 @@ def decode_coords(obj: Any) -> Optional[np.ndarray]:
         return np.zeros(obj[SHAPE_KEY], dtype=float)
     if isinstance(obj, str):
         return decode_contents(obj).astype(float)
+
+
+def encode_value(obj: Any, strict: bool = False) -> Any:
+    """Recursively encode Numpy arrays (tagged) and Numpy scalars (as Python scalars) in dicts, lists and tuples.
+
+    With `strict=True`, objects that are not JSON-compatible raise a ValueError (otherwise, they are returned as-is).
+    """
+    if isinstance(obj, dict):
+        return {k: encode_value(v, strict) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [encode_value(v, strict) for v in obj]
+    if isinstance(obj, np.ndarray):
+        return encode_array(obj)
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if strict and not (obj is None or isinstance(obj, (str, int, float, bool))):
+        raise ValueError(f"Cannot serialize this object: {obj}")
+    return obj
+
+
+def decode_value(obj: Any, strict: bool = False) -> Any:
+    """Recursively decode the Numpy arrays encoded by `encode_value()`.
+
+    With `strict=True`, objects that are not JSON-compatible raise a ValueError (otherwise, they are returned as-is).
+    """
+    if is_encoded_array(obj):
+        return decode_array(obj)
+    if isinstance(obj, dict):
+        return {k: decode_value(v, strict) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [decode_value(v, strict) for v in obj]
+    if strict and not (obj is None or isinstance(obj, (str, int, float, bool))):
+        raise ValueError(f"Cannot deserialize this object: {obj}")
+    return obj

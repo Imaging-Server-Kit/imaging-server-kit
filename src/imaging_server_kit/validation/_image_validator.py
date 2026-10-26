@@ -1,9 +1,8 @@
 
 from typing import Optional
 
-import numpy as np
-
 from imaging_server_kit.validation.validator import Validator
+from imaging_server_kit.validation._array_validator import validate_array
 from imaging_server_kit.types._image import Image
 
 
@@ -12,20 +11,13 @@ class ImageValidator(Validator):
     def validate(image: Optional[Image]) -> None:
         if image is None:
             return
-        
-        data = image.data        
-        meta = image.meta
-        
-        if not isinstance(data, np.ndarray):
-            raise TypeError(f"Image data ({type(data)}) is not a Numpy array")
 
-        if not all(data.shape):
-            raise ValueError("Image array has an invalid shape: ", data.shape)
+        validate_array(image, "Image")
+
+        data = image.data
+        meta = image.meta
 
         if meta:
-            if len(data.shape) not in meta["dimensionality"]:
-                raise ValueError("Image array has the wrong dimensionality.")
-
             if meta["rgb"] is True:
                 if len(data.shape) not in [3, 4]:
                     raise ValueError("Image should be RGB.")
