@@ -42,7 +42,7 @@ dependencies = [
 napari = ["qtpy", "napari[all]>=0.4.16", "napari-toolkit", "opencv-contrib-python-headless"]  # Use opencv-headless to avoid interferring with PyQt
 qupath = ["imaging-server-kit[napari]", "qubalab>=0.2.0"]
 docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "ruff"]  # ruff formats signatures in the API reference
-test = ["pytest", "coverage", "httpx2"]
+test = ["pytest", "httpx2"]
 all = ["imaging-server-kit[napari,qupath,docs,test]"]
 
 [project.scripts]

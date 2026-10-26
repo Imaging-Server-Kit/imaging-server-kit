@@ -108,8 +108,13 @@ class Client(AlgorithmRunner):
         return self._access_algo_get_endpoint(endpoint)
 
     @validate_algorithm
-    def get_sample(self, algorithm: Optional[str] = None, idx: int = 0) -> Stack:
+    def get_sample(
+        self, algorithm: Optional[str] = None, idx: int = 0
+    ) -> Optional[Stack]:
         n_samples = self.get_n_samples(algorithm)
+        if n_samples == 0:
+            return
+
         if (idx < 0) or (idx > n_samples - 1):
             raise ValueError(
                 f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!"

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from napari_toolkit.containers.collapsible_groupbox import QCollapsibleGroupBox
 from qtpy.QtWidgets import (
@@ -19,6 +19,9 @@ from imaging_server_kit.gui.qupath_serverkit.qupath_bridge import (
     QuPathBridge,
     if_compatible_get_qupath_schema,
 )
+
+if TYPE_CHECKING:
+    import napari
 
 
 def _qupath_compabile_algos(runner: AlgorithmRunner) -> List[str]:

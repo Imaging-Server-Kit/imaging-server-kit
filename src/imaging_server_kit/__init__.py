@@ -1,4 +1,7 @@
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
+
+if TYPE_CHECKING:
+    import napari
 
 try:
     from ._version import version as __version__
@@ -97,7 +100,7 @@ def run(
     stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
     domain: Optional[Domain] = None,
     **algo_params,
-) -> Union[Stack, "napari.Viewer"]:  # type: ignore
+) -> Union[Stack, "napari.Viewer"]:
     """Run an algorithm. Equivalent to `runner.run(...)`.
 
     See [`AlgorithmRunner.run`][imaging_server_kit.AlgorithmRunner.run] for the

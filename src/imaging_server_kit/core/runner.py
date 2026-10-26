@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import imaging_server_kit.core._etc as etc
 import imaging_server_kit.core._progress_display as progress_display
@@ -9,11 +9,14 @@ from imaging_server_kit.core.errors import (
     AlgorithmNotFoundError,
     AlgorithmRuntimeError,
 )
-from imaging_server_kit.core.stack import Stack, StackTileGenerator
+from imaging_server_kit.core.stack import Stack, generate_stack_tiles
 from imaging_server_kit.core.tiling import TilingSpecs
 from imaging_server_kit.core.domain import Domain
 from imaging_server_kit.types import layer_factory
 from imaging_server_kit.types.common import normalize_features
+
+if TYPE_CHECKING:
+    import napari
 
 
 def _check_algorithm_available(algorithm: Optional[str], algorithms: List[str]) -> str:
@@ -259,8 +262,7 @@ class AlgorithmRunner(ABC):
                 else None  # Happens with non-spatial inputs
             )
 
-        stack_tile_gen = StackTileGenerator()
-        for params_tile in stack_tile_gen.generate_tiles(params_stack, tiling_ctx):
+        for params_tile in generate_stack_tiles(params_stack, tiling_ctx):
             for result_tile in self._stream(algorithm, params_tile):
                 # Features may have been set after creating the layers, e.g. `mask.meta["features"] = df`
                 for layer in result_tile:
@@ -294,7 +296,7 @@ class AlgorithmRunner(ABC):
         stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
         domain: Optional[Domain] = None,
         **algo_params,
-    ) -> Union[Stack, "napari.Viewer"]:  # type: ignore
+    ) -> Union[Stack, "napari.Viewer"]:
         """Run an algorithm with a set of parameters.
 
         Parameters

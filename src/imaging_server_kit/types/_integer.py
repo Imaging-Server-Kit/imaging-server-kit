@@ -4,6 +4,10 @@ import numpy as np
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core._fmt import fmt_num
 
+# Default bounds, also used in `_summary` to tell if the bounds were changed
+_DEFAULT_MIN = int(np.iinfo(np.int16).min)
+_DEFAULT_MAX = int(np.iinfo(np.int16).max)
+
 
 class Integer(Layer):
     """Data layer for integer values.
@@ -43,8 +47,8 @@ class Integer(Layer):
         default: int = 0,
         required: bool = True,
         auto_call: bool = False,
-        min: int = int(np.iinfo(np.int16).min),
-        max: int = int(np.iinfo(np.int16).max),
+        min: int = _DEFAULT_MIN,
+        max: int = _DEFAULT_MAX,
         step: int = 1,
         **kwargs,
     ):
@@ -63,6 +67,6 @@ class Integer(Layer):
     def _summary(self) -> str:
         summary = super()._summary()
         value_range = (self.meta.get("min"), self.meta.get("max"))
-        if value_range != (int(np.iinfo(np.int16).min), int(np.iinfo(np.int16).max)):
+        if value_range != (_DEFAULT_MIN, _DEFAULT_MAX):
             summary += f" in [{fmt_num(value_range[0])}, {fmt_num(value_range[1])}]"
         return summary

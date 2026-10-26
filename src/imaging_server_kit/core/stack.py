@@ -333,25 +333,24 @@ class Stack:
         return name
 
 
-class StackTileGenerator:
-    @staticmethod
-    def generate_tiles(
-        stack: Stack, ctx: Optional[TilingSpecs]
-    ) -> Generator[Stack, None, None]:
-        if ctx is None:
-            yield stack.select(domain=Domain())
-        else:
-            for tile_meta, tile_domain in generate_tiles(
-                domain=stack.extent,
-                tile_size=ctx.tile_size,
-                tile_overlap=ctx.tile_overlap,
-                tile_delay=ctx.tile_delay,
-                tile_randomize=ctx.tile_randomize,
-            ):
-                stack_tile = stack.select(domain=tile_domain)
-                stack_tile.tile_meta = tile_meta
-                
-                # We assign the tile position to the stack as well
-                stack_tile.position = tile_domain.coords_min
+def generate_stack_tiles(
+    stack: Stack, ctx: Optional[TilingSpecs]
+) -> Generator[Stack, None, None]:
+    """Split a stack into tiles (a single, unrestricted tile if `ctx` is None)."""
+    if ctx is None:
+        yield stack.select(domain=Domain())
+    else:
+        for tile_meta, tile_domain in generate_tiles(
+            domain=stack.extent,
+            tile_size=ctx.tile_size,
+            tile_overlap=ctx.tile_overlap,
+            tile_delay=ctx.tile_delay,
+            tile_randomize=ctx.tile_randomize,
+        ):
+            stack_tile = stack.select(domain=tile_domain)
+            stack_tile.tile_meta = tile_meta
 
-                yield stack_tile
+            # We assign the tile position to the stack as well
+            stack_tile.position = tile_domain.coords_min
+
+            yield stack_tile

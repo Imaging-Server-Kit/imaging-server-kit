@@ -44,7 +44,7 @@ def _set_layer_features(napari_layer: napari.layers.Layer, value) -> None:
     try:
         setattr(napari_layer, "features", value)
     except Exception as e:
-        print(f"⚠️ Could not set the layer features attribute: {e}")
+        show_warning(f"Could not set the layer features attribute: {e}")
 
 
 def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Layer):
@@ -64,7 +64,7 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
                 
                 _set_layer_features(napari_layer, value)
             else:
-                print("⚠️ For mask data, features must contain a `label` column.")
+                show_warning("For mask data, features must contain a `label` column.")
         else:
             _set_layer_features(napari_layer, value)
     
@@ -74,14 +74,14 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
             try:
                 setattr(napari_layer, "translate", value)
             except Exception:
-                print("⚠️ Could not set the layer translate attribute.")
+                show_warning("Could not set the layer translate attribute.")
 
     for key, value in meta.items():
         if key not in ["tile_params", "name", "features", "ndim"]:
             try:
                 setattr(napari_layer, key, value)
             except Exception:
-                print("⚠️ Could not set this layer property: ", key)
+                show_warning(f"Could not set this layer property: {key}")
 
 
 @dataclass
@@ -125,6 +125,19 @@ def _pbar_update(ctx: UpdateContext):
     if ctx.layer.data is not None:
         ctx.pbar.setValue(ctx.layer.data)
         ctx.pbar.setMaximum(ctx.layer.meta["max_val"])
+
+
+# How each layer kind is shown in Napari after a merge
+UPDATE_HOOKS: Dict[str, Callable] = {
+    **{kind: _napari_layer_update for kind in KIND_TO_NAPARI},
+    "notification": _notification_update,
+    "float": _textlayer_update,
+    "int": _textlayer_update,
+    "bool": _textlayer_update,
+    "str": _textlayer_update,
+    "choice": _textlayer_update,
+    "progress": _pbar_update,
+}
 
 
 class NapariStack(Stack):
@@ -261,23 +274,7 @@ class NapariStack(Stack):
 
     def _post_merge(self, dst_layers: List[Layer]) -> None:
         for layer in dst_layers:
-            update_hooks = {
-                "image": _napari_layer_update,
-                "mask": _napari_layer_update,
-                "points": _napari_layer_update,
-                "boxes": _napari_layer_update,
-                "paths": _napari_layer_update,
-                "vectors": _napari_layer_update,
-                "tracks": _napari_layer_update,
-                "notification": _notification_update,
-                "float": _textlayer_update,
-                "int": _textlayer_update,
-                "bool": _textlayer_update,
-                "str": _textlayer_update,
-                "choice": _textlayer_update,
-                "progress": _pbar_update,
-            }
-            update_func: Optional[Callable] = update_hooks.get(layer.kind)
+            update_func: Optional[Callable] = UPDATE_HOOKS.get(layer.kind)
 
             # Before doing the napari layer update, make sure the viewer layers exist by running post_add..
             # A little weird, but for now the only solution that seems to work!

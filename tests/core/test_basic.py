@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import imaging_server_kit as sk
 
 
@@ -192,3 +193,13 @@ def test_any_type():
     res = anytry.run(obj=obj)
     assert out == "Result is 1"
     assert res[0].data == "Result is 1"
+
+def test_sample_index_out_of_range():
+    with pytest.raises(ValueError):
+        sample_image.get_sample(idx=1)
+    with pytest.raises(ValueError):
+        sample_image.get_sample(idx=-1)
+
+
+def test_no_samples_returns_none():
+    assert algo_with_params.get_sample() is None

@@ -4,6 +4,10 @@ import numpy as np
 from imaging_server_kit.types.layer import Layer
 from imaging_server_kit.core._fmt import fmt_num
 
+# Default bounds, also used in `_summary` to tell if the bounds were changed
+_DEFAULT_MIN = float(np.finfo(np.float32).min)
+_DEFAULT_MAX = float(np.finfo(np.float32).max)
+
 
 class Float(Layer):
     """Data layer for floating-point values.
@@ -40,8 +44,8 @@ class Float(Layer):
         self,
         data: Optional[float] = None,
         name="Float",
-        min: float = float(np.finfo(np.float32).min),
-        max: float = float(np.finfo(np.float32).max),
+        min: float = _DEFAULT_MIN,
+        max: float = _DEFAULT_MAX,
         step: float = 0.1,
         default: float = 0.0,
         required: bool = True,
@@ -63,6 +67,6 @@ class Float(Layer):
     def _summary(self) -> str:
         summary = super()._summary()
         value_range = (self.meta.get("min"), self.meta.get("max"))
-        if value_range != (float(np.finfo(np.float32).min), float(np.finfo(np.float32).max)):
+        if value_range != (_DEFAULT_MIN, _DEFAULT_MAX):
             summary += f" in [{fmt_num(value_range[0])}, {fmt_num(value_range[1])}]"
         return summary

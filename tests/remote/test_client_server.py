@@ -136,6 +136,12 @@ def test_get_sample_roundtrip(client):
     assert image_layer.data.shape == (4, 4)
 
 
+def test_get_sample_out_of_range_or_missing(client):
+    with pytest.raises(ValueError):
+        client.get_sample(algorithm="add_offset", idx=-1)
+    assert client.get_sample(algorithm="double_int") is None
+
+
 def test_invalid_params_raise_client_side_error(client):
     image = np.zeros((2, 2), dtype=np.uint8)
     with pytest.raises(InvalidAlgorithmParametersError):

@@ -2,6 +2,7 @@ import warnings
 from functools import partial, update_wrapper, wraps
 from inspect import _empty, getdoc, isgeneratorfunction, signature
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -15,6 +16,9 @@ from typing import (
     Union,
     overload,
 )
+
+if TYPE_CHECKING:
+    import napari
 
 import numpy as np
 import skimage.io
@@ -335,7 +339,7 @@ class Algorithm(AlgorithmRunner, Generic[P]):
     @overload
     def run(
         self, *args: P.args, **kwargs: P.kwargs
-    ) -> Union[Stack, "napari.Viewer"]: ...  # type: ignore
+    ) -> Union[Stack, "napari.Viewer"]: ...
 
     @overload
     def run(
@@ -350,7 +354,7 @@ class Algorithm(AlgorithmRunner, Generic[P]):
         stack: Union[Stack, "napari.Viewer"] = None,  # type: ignore
         domain: Optional[Domain] = None,
         **algo_params: Any,
-    ) -> Union[Stack, "napari.Viewer"]: ...  # type: ignore
+    ) -> Union[Stack, "napari.Viewer"]: ...
 
     @wraps(AlgorithmRunner.run)  # keeps the base signature and docstring at runtime
     def run(self, *args, **kwargs):
@@ -398,7 +402,7 @@ class Algorithm(AlgorithmRunner, Generic[P]):
         if n_samples == 0:
             return
 
-        if idx > n_samples - 1:
+        if (idx < 0) or (idx > n_samples - 1):
             raise ValueError(
                 f"Algorithm provides {n_samples} samples. Max value for `idx` is {n_samples-1}!"
             )
@@ -431,9 +435,11 @@ class Algorithm(AlgorithmRunner, Generic[P]):
 
         return sample_stack
 
+    @validate_algorithm
     def get_n_samples(self, algorithm: Optional[str] = None) -> int:
         return len(self.samples)
 
+    @validate_algorithm
     def is_tileable(self, algorithm: Optional[str] = None) -> bool:
         return self.tileable
 

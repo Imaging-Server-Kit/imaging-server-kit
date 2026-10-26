@@ -5,6 +5,7 @@ import pytest
 
 import imaging_server_kit as sk
 from imaging_server_kit.core.errors import (
+    AlgorithmNotFoundError,
     AlgorithmRuntimeError,
     InvalidAlgorithmParametersError,
 )
@@ -56,3 +57,9 @@ def test_invalid_parameters_error_message(response_body, expected_in_message):
 
     for expected in expected_in_message:
         assert expected in str(error)
+
+
+@pytest.mark.parametrize("method", ["get_n_samples", "is_tileable"])
+def test_unknown_algorithm_name_raises(method):
+    with pytest.raises(AlgorithmNotFoundError):
+        getattr(fails, method)("typo")
