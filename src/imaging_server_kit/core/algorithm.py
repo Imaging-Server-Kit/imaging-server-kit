@@ -162,7 +162,10 @@ def _parse_output(payload: Any) -> Layer:
     if isinstance(payload, Layer):
         return payload
     if isinstance(payload, tuple(TYPE_MAPPINGS.keys())):  # Not a data layer...
-        cls: Type[Layer] = TYPE_MAPPINGS[type(payload)]
+        # Look up the closest mapped class, for subclasses like np.float64 (a float)
+        cls: Type[Layer] = next(
+            TYPE_MAPPINGS[c] for c in type(payload).__mro__ if c in TYPE_MAPPINGS
+        )
         return cls(data=payload)
     else:
         # Unidentified return types are wrapped as the `Any` type:

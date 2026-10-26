@@ -1,3 +1,5 @@
+import numpy as np
+
 import imaging_server_kit as sk
 
 
@@ -33,3 +35,14 @@ def test_rediretcion():
 
     out = extra.run(stack=stack)
     assert len(stack.layers) == 2
+
+
+@sk.algorithm
+def numpy_scalar():
+    return np.float64(0.5)
+
+
+def test_numpy_scalar_output():
+    out = numpy_scalar.run()
+    assert out[0].kind == "float"
+    assert out[0].data == 0.5
