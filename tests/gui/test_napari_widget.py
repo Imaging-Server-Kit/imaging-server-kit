@@ -314,3 +314,22 @@ def test_spin_boxes_accept_zero_bounds(viewer):
 
     assert ui_state["offset"].qt_widget.maximum() == 0.0
     assert ui_state["count"].qt_widget.maximum() == 0
+
+
+@sk.algorithm(parameters={"paths": sk.Paths(), "boxes": sk.Boxes()})
+def count_shapes(paths, boxes):
+    return len(paths), len(boxes)
+
+
+def test_shapes_dropdowns_split_paths_and_rectangles(viewer):
+    path = np.array([[0.0, 0.0], [5.0, 5.0], [10.0, 0.0]])
+    rectangle = np.array([[20.0, 20.0], [20.0, 30.0], [30.0, 30.0], [30.0, 20.0]])
+    shapes = viewer.add_shapes([path, rectangle], shape_type=["path", "rectangle"], name="shapes")
+
+    widget = NapariWidget(runner=count_shapes, viewer=viewer)
+    algo_params = widget.params_panel.get_algo_params()
+
+    assert len(algo_params["paths"]) == 1
+    np.testing.assert_allclose(algo_params["paths"][0], shapes.data[0])
+    assert algo_params["boxes"].shape == (1, 4, 2)
+    np.testing.assert_allclose(algo_params["boxes"][0], shapes.data[1])

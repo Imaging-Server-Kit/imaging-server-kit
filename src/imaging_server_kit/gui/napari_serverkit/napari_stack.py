@@ -84,6 +84,13 @@ def _set_layer_attributes_from_meta(meta: Dict, napari_layer: napari.layers.Laye
                 show_warning(f"Could not set this layer property: {key}")
 
 
+def _shapes_data(layer: napari.layers.Shapes, shape_type: str) -> List[np.ndarray]:
+    """Data of the shapes of a given type (e.g. "rectangle", "path") in a Shapes layer."""
+    if not isinstance(layer.data, list):
+        return []
+    return [d for d, t in zip(layer.data, layer.shape_type) if t == shape_type]
+
+
 @dataclass
 class UpdateContext:
     viewer: napari.Viewer
@@ -299,29 +306,13 @@ class NapariStack(Stack):
 
                         # For boxes, extract the rectangle data from shapes layers (and convert them to Numpy)
                         if kind == "boxes":
-                            data = None
-                            if isinstance(layer.data, list):
-                                if len(layer.data) > 0:
-                                    rectangle_data = []
-                                    for d, t in zip(layer.data, layer.shape_type):
-                                        if t == "rectangle":
-                                            rectangle_data.append(d)
-                                    if len(rectangle_data) > 0:
-                                        data = np.array(rectangle_data)
+                            rectangles = _shapes_data(layer, "rectangle")
+                            data = np.array(rectangles) if rectangles else None
                             cb.addItem(layer.name, data)
 
                         # For paths, extract the path data from shapes layers
                         elif kind == "paths":
-                            data = None
-                            if isinstance(layer.data, list):
-                                if len(layer.data) > 0:
-                                    path_data = []
-                                    for d, t in zip(layer.data, layer.shape_type):
-                                        if t == "rectangle":
-                                            path_data.append(d)
-                                    if len(path_data) > 0:
-                                        data = path_data
-                            cb.addItem(layer.name, data)
+                            cb.addItem(layer.name, _shapes_data(layer, "path") or None)
 
                         else:
                             cb.addItem(layer.name, layer.data)
