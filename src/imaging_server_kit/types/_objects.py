@@ -9,7 +9,7 @@ from imaging_server_kit.types.common import copy_meta, objects_in_domain, select
 
 
 class _ObjectsLayer(Layer):
-    """Base class of layers holding a set of objects with coordinates: Points, Boxes and Vectors.
+    """Base class of layers holding a set of objects with coordinates: Points, Boxes, Vectors and Tracks.
 
     The data is an array of shape `(N, *_object_shape, D)`. Subclasses define how objects are
     anchored (for selection), offset, and bounded.

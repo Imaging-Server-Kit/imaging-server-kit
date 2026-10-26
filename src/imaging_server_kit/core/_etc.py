@@ -1,7 +1,6 @@
 """Utility functions."""
 
 import importlib.resources
-import os
 import shutil
 import webbrowser
 from pathlib import Path
@@ -40,15 +39,9 @@ def open_doc_link(algo_params_schema: Dict, algo_info: Dict) -> None:
     )
 
     out_dir = Path.home() / ".serverkit"
-
-    if not out_dir.exists():
-        os.mkdir(out_dir)
-
     output_path = out_dir / "output.html"
     css_dir = out_dir / "static" / "css"
-
-    if not css_dir.exists():
-        os.makedirs(css_dir)
+    css_dir.mkdir(parents=True, exist_ok=True)
 
     css_path = static_dir / "css" / "info.css"
     local_css_path = css_dir / "info.css"

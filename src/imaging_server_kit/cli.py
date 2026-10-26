@@ -72,9 +72,7 @@ def cmd_install_skills(args):
         print(f"Installed {dest}")
 
 
-def main(
-        # argv=None
-    ):
+def main():
     parser = argparse.ArgumentParser(description="Imaging Server Kit CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

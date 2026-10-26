@@ -1,7 +1,7 @@
 import errno
 import logging
 import socket
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
 
 import msgpack
 import uvicorn
@@ -235,14 +235,13 @@ class AlgorithmApp:
                 params_stack=params_stack,
             )
 
-            # Will do stack.serialize() => msgpack.packrb() to stream the response
+            # Serialize each result tile and pack it with msgpack, to stream the response
             stream = self._stream_msgpack(gen)
 
-            # To check: `content` is a Python generator, where StreamingResponse expects a special ContentStream object..
-            # but it iseems to work anyway
+            # StreamingResponse accepts plain (sync) iterators; Starlette iterates them in a threadpool
             return StreamingResponse(stream, media_type="application/msgpack")
 
-    def _stream_msgpack(self, stream_generator: Iterable[Stack]):
+    def _stream_msgpack(self, stream_generator: Iterable[Tuple[Stack, Stack]]):
         try:
             for result_tile, params_tile in stream_generator:
                 for r in StackSerializer.serialize(result_tile):

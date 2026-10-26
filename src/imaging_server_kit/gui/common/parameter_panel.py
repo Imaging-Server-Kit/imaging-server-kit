@@ -64,9 +64,9 @@ class ParameterPanel(QGroupBox):
                 widget_value_recover_func = lambda qt_widget: qt_widget.currentText()
             elif param_type == "int":
                 qt_widget = QSpinBox()
-                if param_values.get("min"):
+                if param_values.get("min") is not None:
                     qt_widget.setMinimum(param_values.get("min"))
-                if param_values.get("max"):
+                if param_values.get("max") is not None:
                     qt_widget.setMaximum(param_values.get("max"))
                 qt_widget.setValue(param_values.get("default", 0))
                 if param_values.get("step"):
@@ -77,9 +77,9 @@ class ParameterPanel(QGroupBox):
                 widget_value_recover_func = lambda qt_widget: int(qt_widget.value())
             elif param_type == "float":
                 qt_widget = QDoubleSpinBox()
-                if param_values.get("min"):
+                if param_values.get("min") is not None:
                     qt_widget.setMinimum(param_values.get("min"))
-                if param_values.get("max"):
+                if param_values.get("max") is not None:
                     qt_widget.setMaximum(param_values.get("max"))
                 qt_widget.setValue(param_values.get("default", 0.0))
                 if param_values.get("step"):

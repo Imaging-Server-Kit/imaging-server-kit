@@ -35,7 +35,7 @@ dependencies = [
     "requests",
     "msgpack",
     "networkx",
-    "pillow>=13.0.0",
+    "pillow>=13.0.0",         # To fix security issue
 ]
 
 [project.optional-dependencies]

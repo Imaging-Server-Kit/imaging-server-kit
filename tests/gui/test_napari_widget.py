@@ -297,3 +297,20 @@ def test_load_sample_adds_layers_and_sets_parameters(viewer):
     # The sample can then be used to run the algorithm
     _run(widget)
     np.testing.assert_array_equal(viewer.layers["Mask"].data, SAMPLE_IMAGE > 0.3)
+
+
+def test_spin_boxes_accept_zero_bounds(viewer):
+    @sk.algorithm(
+        parameters={
+            "offset": sk.Float(min=-10.0, max=0.0, default=-1.0),
+            "count": sk.Integer(min=-5, max=0, default=-1),
+        }
+    )
+    def zero_bounds(offset, count):
+        return offset + count
+
+    widget = NapariWidget(runner=zero_bounds, viewer=viewer)
+    ui_state = widget.params_panel.ui_state
+
+    assert ui_state["offset"].qt_widget.maximum() == 0.0
+    assert ui_state["count"].qt_widget.maximum() == 0
