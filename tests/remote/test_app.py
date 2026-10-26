@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import imaging_server_kit as sk
-from imaging_server_kit._version import __version__
+from imaging_server_kit import __version__
 from imaging_server_kit.remote.app import AlgorithmApp
 from imaging_server_kit.remote.stack_serializer import StackSerializer
 

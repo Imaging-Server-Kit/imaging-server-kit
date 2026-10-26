@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from typing import Callable, Optional, Union, TYPE_CHECKING
 
-from imaging_server_kit.core._optional import qubalab_available, require_qupath  # noqa: F401 (qubalab_available is re-exported)
+from imaging_server_kit.core._optional import require_qupath
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.algorithm import as_runner
 

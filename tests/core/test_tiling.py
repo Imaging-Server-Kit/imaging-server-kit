@@ -3,6 +3,7 @@ from skimage.filters import gaussian
 from skimage.color import gray2rgb, rgb2gray
 import skimage.data
 import numpy as np
+import pytest
 
 
 ### Tiled image filtering
@@ -391,3 +392,16 @@ def test_merge_stack():
     assert np.allclose(res2.read(msk1.name).data, mask2)
     assert np.allclose(res2.read(pts1.name).data, points2)
     assert np.allclose(res2.read(vct1.name).data, vectors2)
+
+
+### Tiling parameters validation
+@pytest.mark.parametrize("tile_overlap", [2, -1, 1.5, (0.1, 2)])
+def test_invalid_tile_overlap_raises(tile_overlap):
+    with pytest.raises(ValueError, match="Invalid tile overlap"):
+        list(sk.generate_tiles(sk.Domain(size=(10, 10)), tile_size=4, tile_overlap=tile_overlap))
+
+
+@pytest.mark.parametrize("tile_overlap", [0, 0.5, (0, 0.25)])
+def test_valid_tile_overlap(tile_overlap):
+    tiles = list(sk.generate_tiles(sk.Domain(size=(10, 10)), tile_size=4, tile_overlap=tile_overlap))
+    assert len(tiles) > 1

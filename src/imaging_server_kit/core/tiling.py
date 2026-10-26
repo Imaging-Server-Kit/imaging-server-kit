@@ -155,7 +155,7 @@ def _valid_overlap(
     overlap: Union[float, Tuple, List], bounds: Union[Tuple, List]
 ) -> bool:
     """Validate that the overlap is in the range [0-1] and compatible with the pixel bounds."""
-    if isinstance(overlap, float):
+    if isinstance(overlap, (int, float)) and not isinstance(overlap, bool):
         if (overlap < 0.0) or (overlap > 1.0):
             return False
     elif isinstance(overlap, (Tuple, List)):

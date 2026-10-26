@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
 import imaging_server_kit.core._etc as etc
-from imaging_server_kit._version import __version__
+from imaging_server_kit import __version__
 from imaging_server_kit.core.algorithm import Algorithm
 from imaging_server_kit.core.stack import Stack
 from imaging_server_kit.remote.stack_serializer import StackSerializer

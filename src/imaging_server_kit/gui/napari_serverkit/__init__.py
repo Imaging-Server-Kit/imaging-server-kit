@@ -1,6 +1,6 @@
 from typing import Callable, Optional, Union
 
-from imaging_server_kit.core._optional import napari_available, require_napari  # noqa: F401 (napari_available is re-exported)
+from imaging_server_kit.core._optional import require_napari
 from imaging_server_kit.core.algorithm import as_runner
 from imaging_server_kit.core.runner import AlgorithmRunner
 

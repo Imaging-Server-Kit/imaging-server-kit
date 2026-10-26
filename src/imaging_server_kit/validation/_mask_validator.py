@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 
-from imaging_server_kit.validation.layer_validator import Validator
+from imaging_server_kit.validation.validator import Validator
 from imaging_server_kit.types._mask import Mask
 
 
