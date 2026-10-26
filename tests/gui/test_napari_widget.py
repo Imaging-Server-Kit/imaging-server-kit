@@ -147,6 +147,17 @@ def test_panel_follows_selected_algorithm(viewer):
     assert list(widget.params_panel.ui_state) == ["image", "threshold"]
 
 
+def test_layer_dropdowns_are_replaced_on_algorithm_change(viewer):
+    widget = NapariWidget(runner=sk.combine([threshold, invert]), viewer=viewer)
+
+    widget.runner_widget.cb_algorithms.setCurrentText("invert")
+    widget.runner_widget.cb_algorithms.setCurrentText("threshold")
+
+    layer_comboboxes = widget.params_panel.layer_comboboxes
+    assert list(layer_comboboxes) == ["image"]
+    assert layer_comboboxes["image"] == [widget.params_panel.ui_state["image"].qt_widget]
+
+
 def test_tiled_options_only_for_tileable_algorithms(viewer):
     widget = NapariWidget(runner=sk.combine([threshold, invert]), viewer=viewer)
     assert not widget.runner_widget.experimental_gb.isHidden()
