@@ -1,6 +1,8 @@
 """Smoke tests of the GUI entry points: `sk.to_napari` and the widgets opened from the Napari plugin menu."""
 
+import importlib
 import os
+import sys
 
 import numpy as np
 import pytest
@@ -14,6 +16,7 @@ from imaging_server_kit.gui.napari_serverkit.extra_widgets import (
     AlgorithmToolsWidget,
 )
 from imaging_server_kit.gui.napari_serverkit.napari_http_widget import NapariHttpWidget
+from qtpy.QtWidgets import QLabel
 
 
 @pytest.fixture
@@ -52,3 +55,16 @@ def test_plugin_menu_server_widget_without_server(viewer):
     # No server connected yet: the URL field is shown, and no algorithm is listed
     assert not widget.runner_widget.server_url_field.isHidden()
     assert widget.runner_widget.cb_algorithms.count() == 0
+
+
+def test_plugin_menu_qupath_widget_without_qubalab(viewer, monkeypatch):
+    # Simulate an install without the `qupath` extra: Napari must still import the widget module
+    monkeypatch.setitem(sys.modules, "qubalab", None)
+    for name in ["qupath_http_widget", "qupath_widget", "qupath_bridge"]:
+        monkeypatch.delitem(sys.modules, f"imaging_server_kit.gui.qupath_serverkit.{name}", raising=False)
+
+    module = importlib.import_module("imaging_server_kit.gui.qupath_serverkit.qupath_http_widget")
+    widget = module.QuPathHttpWidget(viewer)
+
+    label = widget.findChild(QLabel)
+    assert "imaging-server-kit[qupath]" in label.text()
