@@ -27,9 +27,6 @@ dependencies = [
     "scipy",                  # Used in the demo tools (scipy.ndimage).
     "jinja2",                 # To template the info endpoint.
     "PyYAML",                 # To load the metadata yaml file.
-    "rasterio",               # To convert masks to features and back.
-    "shapely>=2.0",           # To merge polygons of the same object.
-    "geojson",                # To convert masks and points to features.
     # FastAPI and related:
     "fastapi",
     "uvicorn[standard]",
@@ -41,7 +38,13 @@ dependencies = [
 
 [project.optional-dependencies]
 napari = ["qtpy", "napari[all]>=0.4.16", "napari-toolkit"]
-qupath = ["imaging-server-kit[napari]", "qubalab>=0.2.0"]
+qupath = [
+    "imaging-server-kit[napari]",
+    "qubalab>=0.2.0",
+    "rasterio",  # To convert masks to GeoJSON features and back.
+    "geojson",  # To build the GeoJSON features.
+    "shapely>=2.0",  # To build and merge the object polygons.
+]
 docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "ruff"]  # ruff formats signatures in the API reference
 test = ["pytest", "httpx2"]
 all = ["imaging-server-kit[napari,qupath,docs,test]"]

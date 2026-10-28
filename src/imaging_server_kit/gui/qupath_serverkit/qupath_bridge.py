@@ -18,7 +18,11 @@ import shapely
 from shapely.geometry import shape
 
 import imaging_server_kit as sk
-from imaging_server_kit.types._mask import mask2features, instance_mask2features
+from imaging_server_kit.gui.qupath_serverkit._geojson import (
+    _to_geojson,
+    instance_mask2features,
+    mask2features,
+)
 import imaging_server_kit.core._progress_display as progress_display
 from imaging_server_kit.core.runner import AlgorithmRunner
 from imaging_server_kit.core.tiling import TilingSpecs
@@ -73,7 +77,7 @@ def _merge_features_by_id(features: List[Feature]) -> List[Feature]:
     for group in groups.values():
         if len(group) > 1:
             geom = shapely.union_all([shape(f["geometry"]) for f in group])
-            group[0]["geometry"] = geojson.loads(shapely.to_geojson(geom))
+            group[0]["geometry"] = _to_geojson(geom)
         merged.append(group[0])
     return merged
 

@@ -1,10 +1,15 @@
 import numpy as np
 import pytest
+
+pytest.importorskip("rasterio")
+pytest.importorskip("geojson")
+pytest.importorskip("shapely")
+
 from shapely.geometry import shape
 from skimage.filters import gaussian
 from skimage.measure import label
 
-from imaging_server_kit.types._mask import (
+from imaging_server_kit.gui.qupath_serverkit._geojson import (
     features2instance_mask,
     features2mask,
     instance_mask2features,

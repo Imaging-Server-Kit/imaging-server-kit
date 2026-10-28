@@ -17,7 +17,7 @@ The Napari and QuPath integrations rely on extra packages that are not installed
 | Command | Adds |
 |---|---|
 | `pip install "imaging-server-kit[napari]"` | [Napari](https://github.com/napari/napari) and [napari-toolkit](https://github.com/MIC-DKFZ/napari_toolkit), for dock widgets and the Napari plugin |
-| `pip install "imaging-server-kit[qupath]"` | [QuBaLab](https://pypi.org/project/qubalab/) (`>=0.2.0`) and the Napari extra, for the QuPath integration |
+| `pip install "imaging-server-kit[qupath]"` | [QuBaLab](https://pypi.org/project/qubalab/) (`>=0.2.0`), the Napari extra, and the `rasterio`, `geojson` and `shapely` packages (mask-to-GeoJSON conversion), for the QuPath integration |
 | `pip install "imaging-server-kit[all]"` | All the above, plus the documentation and test dependencies |
 
 !!! note
