@@ -395,3 +395,166 @@ def test_tiled_matches_untiled(algo, params, tile_overlap):
     )[0].data
     assert result.shape == expected.shape
     np.testing.assert_allclose(result.astype(float), expected.astype(float), rtol=1e-6)
+
+
+def test_rescale_first_axis(image):
+    stack = np.stack([image, image * 2])
+    out = tools.rescale_algo(stack, scale=0.5, order=1, first_axis=True)
+    assert out.shape == (2, 16, 16)
+    expected = tools.rescale_algo(stack[1], scale=0.5, order=1)
+    np.testing.assert_allclose(out[1], expected)
+
+
+def test_crop_first_axis(image):
+    stack = np.stack([image, image + 1, image + 2])
+    out = tools.crop_algo(stack, crop_width=4, first_axis=True)
+    assert out.shape == (3, 24, 24)
+    np.testing.assert_array_equal(out[2], tools.crop_algo(stack[2], crop_width=4))
+
+
+@pytest.mark.parametrize("algo", [tools.rescale_algo, tools.crop_algo], ids=lambda a: a.name)
+def test_first_axis_requires_leading_axis(algo, image):
+    stack = algo.run(image=image, first_axis=True)
+    assert isinstance(stack[0], sk.Notification)
+
+
+def test_fill_holes_first_axis():
+    frame = np.zeros((7, 7), dtype=np.uint8)
+    frame[1:6, 1:6] = 1
+    frame[3, 3] = 0
+    stack = np.stack([frame, frame])
+    out = tools.fill_holes_algo(stack, first_axis=True)
+    assert out.shape == (2, 7, 7)
+    assert out.sum() == 50
+
+
+def test_remove_small_objects_first_axis():
+    # The same 2-pixel object in 3 frames: connected in 3D (6 px), separate per frame (2 px)
+    stack = np.zeros((3, 5, 5), dtype=np.uint8)
+    stack[:, 2, 1:3] = 1
+    kept_3d = tools.remove_small_objects_algo(stack, min_size=4, mask_is_binary=True)
+    assert kept_3d.sum() == 6
+    out = tools.remove_small_objects_algo(
+        stack, min_size=4, mask_is_binary=True, first_axis=True
+    )
+    assert out.shape == stack.shape
+    assert out.sum() == 0
+
+
+@pytest.mark.parametrize(
+    "algo", [tools.fill_holes_algo, tools.remove_small_objects_algo], ids=lambda a: a.name
+)
+def test_mask_first_axis_requires_leading_axis(algo, binary_mask):
+    stack = algo.run(mask=binary_mask, first_axis=True)
+    assert isinstance(stack[0], sk.Notification)
+
+
+def test_keep_biggest_objects_first_axis():
+    # Per frame: a 1-px object and a 3-px object; the 3D labelling would merge nothing across frames
+    stack = np.zeros((2, 5, 5), dtype=np.uint8)
+    stack[:, 0, 0] = 1
+    stack[:, 3, 1:4] = 1
+    out = tools.keep_biggest_objects_algo(
+        stack, n_objects=1, mask_is_binary=True, first_axis=True
+    )
+    assert out.shape == stack.shape
+    assert out.sum() == 6
+    assert out[:, 0, 0].sum() == 0
+
+
+def test_blobness_first_axis(image):
+    stack = np.stack([image, image[::-1]])
+    out = tools.blobness(stack, min_sigma=1.0, max_sigma=3.0, num_sigma=3, first_axis=True)
+    assert out.shape == stack.shape
+    expected = tools.blobness(stack[1], min_sigma=1.0, max_sigma=3.0, num_sigma=3)
+    np.testing.assert_allclose(out[1], expected)
+
+
+def test_blobness_and_keep_biggest_first_axis_require_leading_axis(image, binary_mask):
+    out = tools.blobness.run(image=image, first_axis=True)
+    assert isinstance(out[0], sk.Notification)
+    out = tools.keep_biggest_objects_algo.run(mask=binary_mask, first_axis=True)
+    assert isinstance(out[0], sk.Notification)
+
+
+def test_blob_detector_first_axis():
+    # One blob in frame 0, one in frame 2: a 3D detection would see two separate blobs in a volume
+    stack = np.zeros((3, 64, 64))
+    stack[0, 30:35, 30:35] = 1.0
+    stack[2, 10:15, 40:45] = 1.0
+    points = tools.blob_detector_algo(
+        stack, min_sigma=1, max_sigma=5, num_sigma=5, threshold=0.1, first_axis=True
+    )
+    assert points.shape == (2, 3)
+    np.testing.assert_allclose(points[0], [0, 32, 32], atol=1)
+    np.testing.assert_allclose(points[1], [2, 12, 42], atol=1)
+
+
+def test_blob_detector_first_axis_requires_leading_axis():
+    stack = tools.blob_detector_algo.run(image=np.zeros((32, 32)), first_axis=True)
+    assert stack[0].kind == "notification"
+
+
+@pytest.mark.parametrize(
+    "algo, kwargs",
+    [
+        (tools.gaussian_algo, {"sigma": 2.0, "mode": "nearest", "preserve_range": True, "rgb": False}),
+        (tools.median_algo, {"size": 2}),
+        (tools.variance_algo, {"size": 3}),
+        (tools.sobel_algo, {}),
+        (tools.rescale_intensity_algo, {"min_val": 0.0, "max_val": 1.0}),
+    ],
+    ids=lambda v: getattr(v, "name", ""),
+)
+def test_filters_first_axis_match_per_frame(algo, kwargs, image):
+    stack = np.stack([image, image[::-1] // 2, image.T])
+    out = algo(stack, first_axis=True, **kwargs)
+    assert out.shape == stack.shape
+    for i in range(len(stack)):
+        np.testing.assert_allclose(out[i], algo(stack[i], **kwargs))
+
+
+def test_otsu_first_axis_is_per_frame():
+    rng = np.random.default_rng(0)
+    base = rng.integers(0, 100, size=(32, 32)).astype(float)
+    stack = np.stack([base, base + 1000])
+    out = tools.otsu_threshold(stack, first_axis=True)
+    np.testing.assert_array_equal(out[0], out[1])
+    # A single global threshold separates the frames instead
+    assert not tools.otsu_threshold(stack)[0].any()
+
+
+def test_label_first_axis(binary_mask):
+    stack = np.stack([binary_mask, binary_mask])
+    out = tools.label_algo(stack, first_axis=True)
+    np.testing.assert_array_equal(out[0], out[1])
+    np.testing.assert_array_equal(out[0], tools.label_algo(binary_mask))
+
+
+def test_morphological_operators_first_axis():
+    frame = np.zeros((7, 7), dtype=bool)
+    frame[2:5, 2:5] = True
+    stack = np.stack([frame, frame, frame])
+    out = tools.morphological_operators(stack, operation="erosion", radius=1, first_axis=True)
+    np.testing.assert_array_equal(
+        out[1], tools.morphological_operators(frame, operation="erosion", radius=1)
+    )
+
+
+@pytest.mark.parametrize(
+    "algo, arg",
+    [
+        (tools.gaussian_algo, "image"),
+        (tools.median_algo, "image"),
+        (tools.variance_algo, "image"),
+        (tools.sobel_algo, "image"),
+        (tools.rescale_intensity_algo, "image"),
+        (tools.otsu_threshold, "image"),
+        (tools.label_algo, "mask"),
+        (tools.morphological_operators, "mask"),
+    ],
+    ids=lambda v: getattr(v, "name", v),
+)
+def test_first_axis_requires_leading_axis_more(algo, arg, image):
+    stack = algo.run(**{arg: image}, first_axis=True)
+    assert isinstance(stack[0], sk.Notification)
