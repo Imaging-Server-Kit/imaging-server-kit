@@ -1,13 +1,11 @@
 """Tests of the Napari widget, driven headless: set parameters in the panel, run, and check the viewer layers."""
 
-import os
 import sys
 import time
 
 import numpy as np
 import pytest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 napari = pytest.importorskip("napari")
 
 from qtpy.QtWidgets import QApplication

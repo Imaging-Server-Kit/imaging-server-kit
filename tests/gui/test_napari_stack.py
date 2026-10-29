@@ -1,10 +1,8 @@
-import os
 
 import numpy as np
 import pytest
 import skimage.measure
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 napari = pytest.importorskip("napari")
 
 import imaging_server_kit as sk

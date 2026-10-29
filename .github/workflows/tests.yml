@@ -35,7 +35,8 @@ jobs:
     - name: Install dependencies
       run: pip install -e ".[test,qupath]"
 
+    # Napari's canvas needs OpenGL, which the offscreen Qt platform doesn't provide: use a virtual X display (Mesa software rendering)
     - name: Run the tests
-      env:
-        QT_QPA_PLATFORM: offscreen
-      run: pytest -q
+      uses: aganders3/headless-gui@v2
+      with:
+        run: pytest -q
